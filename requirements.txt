@@ -1,7 +1,9 @@
-altair==6.2.1
-pandas==3.0.3
-playwright==1.60.0
-psycopg==3.3.4
-streamlit==1.57.0
-streamlit_extras==1.6.0
-Werkzeug==3.1.8
+altair
+pandas
+playwright
+psycopg
+streamlit
+streamlit_extras
+Werkzeug
+python-dotenv
+google-genai
