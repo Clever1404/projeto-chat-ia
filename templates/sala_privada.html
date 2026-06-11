@@ -1,0 +1,105 @@
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import os
+
+def template_sala_privada():
+    match_id = st.session_state.match_id_atual
+    
+    # 🔍 CORREÇÃO CRÍTICA: Desempacotamento de Tupla para descobrir o parceiro real
+    parceiro_nome, parceiro_foto, parceiro_gen, status_parceiro = "Usuário", None, "M", "⚫ Offline"
+    status_cor = "#a0aec0"
+    
+    try:
+        conn = obter_conexao()
+        cursor = conn.cursor()
+        
+        # Garante que passamos o ID do match convertido para inteiro puro
+        id_match_limpo = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id)
+        
+        cursor.execute("SELECT usuario_1_id, usuario_2_id FROM matches WHERE id = %s;", (id_match_limpo,))
+        res_m = cursor.fetchone()
+        
+        if res_m:
+            u1, u2 = res_m[0], res_m[1]
+            
+            # Limpa os IDs para garantir que são inteiros puros antes de comparar
+            meu_id_limpo = st.session_state.usuario_id[0] if isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
+            p_id = u2 if int(u1) == meu_id_limpo else u1
+            
+            cursor.execute("SELECT username, foto_perfil, genero, status FROM usuarios WHERE id = %s;", (int(p_id),))
+            res_u = cursor.fetchone()
+            
+            if res_u:
+                parceiro_nome, parceiro_foto, parceiro_gen, p_stat = res_u
+                
+                # 🔍 TRATAMENTO DE TEXTO IMPEDINDO FALSOS NEGATIVOS:
+                # Remove espaços em branco e checa se a string contém a palavra "Online" ou o emoji verde
+                status_texto_puro = str(p_stat).strip()
+                if "Online" in status_texto_puro or "🟢" in status_texto_puro:
+                    status_parceiro = "🟢 Online"
+                    status_cor = "#48bb78"
+                else:
+                    status_parceiro = "⚫ Offline"
+                    status_cor = "#a0aec0"
+                    
+        cursor.close()
+        conn.close()
+    except Exception as e: 
+        print(f"Erro ao buscar status: {e}")
+        
+    # Layout de duas colunas nativas na tela da sala privada
+    col_lateral_par, col_chat_privado = st.columns([1, 3])
+    
+    with col_lateral_par:
+        with st.container(border=True):
+            if parceiro_foto and os.path.exists(parceiro_foto.lstrip('/')): 
+                st.image(parceiro_foto.lstrip('/'), width=60)
+            else: 
+                st.subheader("👩" if parceiro_gen == 'F' else "👨")
+            st.markdown(f"### {str(parceiro_nome).split('@')[0].capitalize()}")
+            st.markdown(f"<span style='color:{status_cor}; font-weight:bold;'>{status_parceiro}</span>", unsafe_allow_html=True)
+            
+        st.markdown("""
+            <div class="info-box-segura">
+                <h3>🔒 Ambiente Seguro</h3>
+                <p>Esta é uma sala de transmissão privada e criptografada temporária. Suas mensagens serão armazenadas de forma segura nesta sessão de encontro.</p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🚪 Sair da Sala Privada", type="primary", width="stretch"):
+            st.session_state.match_id_atual = None
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun()
+
+    with col_chat_privado:
+        st.markdown(f"## 💬 Chat Privado - ID #{match_id}")
+        st.caption("Aproveite o seu encontro virtual reservado.")
+        
+        @st.fragment(run_every=2)
+        def live_chat_privado_engine(m_id, my_id):
+            try:
+                conn = obter_conexao()
+                cursor = conn.cursor()
+                cursor.execute('SELECT remetente_id, texto, data_envio FROM mensagens_chat WHERE match_id = %s ORDER BY data_envio ASC;', (int(m_id),))
+                rows = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                
+                for r_id, txt, dt in rows:
+                    with st.chat_message("user" if int(r_id) == int(my_id) else "assistant"): 
+                        st.write(txt)
+            except Exception: 
+                pass
+                
+            if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
+                if txt_in.strip():
+                    conn = obter_conexao()
+                    cursor = conn.cursor()
+                    cursor.execute('INSERT INTO mensagens_chat (match_id, remetente_id, texto) VALUES (%s, %s, %s);', (int(m_id), int(my_id), txt_in.strip()))
+                    conn.commit()
+                    cursor.close()
+                    conn.close()
+                    st.rerun()
+                    
+        live_chat_privado_engine(match_id, st.session_state.usuario_id)

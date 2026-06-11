@@ -1,0 +1,106 @@
+import streamlit as st
+
+def template_cadastro():
+    # --- 1. CONFIGURAÇÃO DE ESTILO (Marca-d'água e centralização igual ao HTML) ---
+    st.markdown("""
+        <style>
+        /* Container centralizado imitando o .register-container */
+        .block-container {
+            max-width: 400px !important;
+            padding-top: 5rem !important;
+        }
+        
+        /* Fundo com marca-d'água diagonal sutil baseada no seu CSS */
+        .stApp {
+            background-color: #e6f0fa !important;
+            background-image: repeating-linear-gradient(
+                -45deg,
+                transparent,
+                transparent 50px,
+                rgba(0, 123, 255, 0.03) 50px,
+                rgba(0, 123, 255, 0.03) 100px
+            ) !important;
+        }
+        
+        /* Centraliza e estiliza o título */
+        .titulo-cadastro {
+            text-align: center;
+            color: #007bff;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- 2. RENDERIZAÇÃO DA INTERFACE ---
+    st.markdown('<h2 class="titulo-cadastro">Criar Conta</h2>', unsafe_allow_html=True)
+
+    # Cria o formulário isolado (Substitui o <form method="POST">)
+    with st.form("form_cadastro_usuario", clear_on_submit=False):
+        
+        # Elementos de entrada de dados (Substituem os <input> e <select>)
+        usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
+        email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed").strip().lower()
+        senha = st.text_input("Senha", placeholder="Escolha uma Senha", type="password", label_visibility="collapsed")
+        
+        genero = st.selectbox(
+            "Gênero", 
+            options=["M", "F"], 
+            index=None, 
+            placeholder="Selecione seu Gênero",
+            label_visibility="collapsed"
+        )
+        
+        # Botão de envio do formulário (Substitui o <button type="submit">)
+        botao_submeter = st.form_submit_button("Cadastrar", type="primary", use_container_width=True)
+
+        # --- 3. LOGICA DE SUBMISSÃO E VALIDAÇÃO DE ENTRADAS ---
+        if botao_submeter:
+            # Substitui a lógica de validação de campos obrigatórios do HTML 'required'
+            if not usuario or not email or not senha or not genero:
+                st.error("⚠️ Preencha todos os campos obrigatórios.")
+            else:
+                try:
+                    # Executa a conexão ao banco para realizar a validação e insert
+                    conn = obter_conexao()
+                    cursor = conn.cursor()
+                    
+                    # Verifica se o usuário ou e-mail já existem (Substitui os flash messages de erro)
+                    cursor.execute("SELECT id FROM usuarios WHERE username = %s OR email = %s;", (usuario, email))
+                    if cursor.fetchone():
+                        st.error("❌ Username ou E-mail já cadastrados no sistema.")
+                    else:
+                        # Criptografa a senha antes de salvar
+                        senha_hash = generate_password_hash(senha)
+                        
+                        cursor.execute('''
+                            INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin)
+                            VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;
+                        ''', (usuario, email, senha_hash, genero))
+                        
+                        novo_id = cursor.fetchone()[0]
+                        conn.commit()
+                        
+                        # Atualiza a sessão global para efetuar o login automático pós-cadastro
+                        st.session_state.usuario_id = novo_id
+                        st.session_state.username = usuario
+                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                        
+                        st.success("🎉 Conta criada com sucesso!")
+                        st.rerun()
+                        
+                    cursor.close()
+                    conn.close()
+                    
+                except Exception as e:
+                    st.error(f"❌ Erro crítico ao processar cadastro: {e}")
+
+    # --- 4. LINKS DE NAVEGAÇÃO ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_link, _ = st.columns([1, 1])
+    with col_link:
+        # Troca a tag <a> por alteração de estado da sessão
+        if st.button("Voltar para o Login", type="secondary", use_container_width=True):
+            st.session_state.opcao_menu = "🔒 Login"
+            st.rerun()

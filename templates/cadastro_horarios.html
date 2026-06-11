@@ -1,0 +1,129 @@
+import streamlit as st
+import pandas as pd
+
+def template_disponibilidade():
+    # --- 1. CONFIGURAÇÃO DE ESTILO DARK DO GITHUB ---
+    st.markdown("""
+        <style>
+        /* Fundo escuro do app */
+        .stApp { background-color: #0d1117; color: #c9d1d9; }
+        h2 { color: #f0f6fc !important; text-align: center; font-family: Arial, sans-serif; }
+        .sub-texto { color: #8b949e; font-size: 14px; text-align: center; margin-bottom: 25px; }
+        
+        /* Força o container do editor a usar fundos condizentes com o tema */
+        div[data-testid="stDataEditor"] { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- 2. CABEÇALHO ---
+    st.markdown("<h2>📅 Sua Grade de Disponibilidade</h2>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-texto'>Selecione os dias e períodos em que você está livre. Nosso sistema usará isso para cruzar dados com seus matches!</p>", unsafe_allow_html=True)
+
+    # --- 3. DEFINIÇÃO DE EIXOS ---
+    dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
+    periodos = [
+        {"id": "manha", "nome": "Manhã"},
+        {"id": "tarde", "nome": "Tarde"},
+        {"id": "noite", "nome": "Noite"}
+    ]
+
+    # --- 4. RECUPERAÇÃO DE DADOS SALVOS DO BANCO ---
+    # Substitua pelo seu cursor do Postgres filtrando pelo usuário logado
+    # Exemplo de consulta: SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;
+    horarios_salvos = [] # Formato esperado do banco: [("Segunda-feira", "manha"), ("Sexta-feira", "noite")]
+    
+    try:
+        conn = obter_conexao()
+        cursor = conn.cursor()
+        cursor.execute("SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", (int(st.session_state.usuario_id),))
+        horarios_salvos = cursor.fetchall()
+        cursor.close()
+        conn.close()
+    except Exception:
+        # Fallback caso a tabela ainda esteja vazia ou em construção
+        pass
+
+    # Mapeia as tuplas salvas em um conjunto de strings do tipo 'Dia_periodo' para checagem rápida
+    chaves_salvas = {f"{dia}_{per}" for dia, per in horarios_salvos}
+
+    # --- 5. CONSTRUÇÃO DO DATAFRAME DA GRADE ---
+    # Monta as linhas da matriz. Se a chave existir no banco, a célula inicia como True
+    matriz_dados = []
+    for per in periodos:
+        linha = {"Período": per["nome"]}
+        for dia in dias:
+            chave_teste = f"{dia}_{per['id']}"
+            linha[dia] = (chave_teste in chaves_salvas)
+        matriz_dados.append(linha)
+
+    df_grade = pd.DataFrame(matriz_dados)
+
+    # --- 6. RENDERIZAÇÃO DA GRADE INTERATIVA ---
+    # Configura todas as colunas de dias para se comportarem como Checkboxes clicáveis
+    config_colunas = {
+        "Período": st.column_config.TextColumn(disabled=True)
+    }
+    for dia in dias:
+        config_colunas[dia] = st.column_config.CheckboxColumn(default=False)
+
+    # O st.data_editor permite que o usuário marque/desmarque os elementos diretamente na tela
+    grade_editada = st.data_editor(
+        df_grade,
+        column_config=config_colunas,
+        use_container_width=True,
+        hide_index=True,
+        key="editor_disponibilidade"
+    )
+
+    # --- 7. BOTÕES DE AÇÃO (SALVAR / VOLTAR) ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_salvar, col_voltar = st.columns(2)
+
+    with col_salvar:
+        # Botão em cinza (#4a5568) para salvar
+        if st.button("💾 Salvar Alterações", type="secondary", use_container_width=True):
+            # Processa o DataFrame modificado para descobrir quais checkboxes estão True
+            novos_horarios = []
+            
+            # Varre o resultado do editor linha por linha
+            for index, row in grade_editada.iterrows():
+                # Encontra qual era o ID do período correspondente ao nome da linha
+                nome_período = row["Período"]
+                per_id = next(p["id"] for p in periodos if p["nome"] == nome_período)
+                
+                # Coleta as colunas marcadas como True
+                for dia in dias:
+                    if row[dia] == True:
+                        novos_horarios.append((dia, per_id))
+
+            # Atualização atômica no banco de dados (Limpa o antigo e insere o novo)
+            try:
+                conn = obter_conexao()
+                cursor = conn.cursor()
+                
+                # 1. Remove os registros passados do usuário
+                cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (int(st.session_state.usuario_id),))
+                
+                # 2. Insere a nova grade em lote se houver marcações
+                if novos_horarios:
+                    for dia_s, per_s in novos_horarios:
+                        cursor.execute('''
+                            INSERT INTO disponibilidade_usuarios (usuario_id, dia_semana, periodo)
+                            VALUES (%s, %s, %s);
+                        ''', (int(st.session_state.usuario_id), dia_s, per_s))
+                
+                conn.commit()
+                cursor.close()
+                conn.close()
+                
+                st.success("🎉 Grade de horários atualizada com sucesso!")
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"❌ Erro ao salvar horários: {e}")
+
+    with col_voltar:
+        # Botão em azul para retornar ao ambiente principal
+        if st.button("Voltar ao Chat", type="primary", use_container_width=True):
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun()

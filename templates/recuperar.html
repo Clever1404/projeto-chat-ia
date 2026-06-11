@@ -1,0 +1,92 @@
+import streamlit as st
+
+def template_recuperar_senha():
+    # --- 1. CONFIGURAÇÃO DE ESTILO (Marca-d'água e fundo azul claro idênticos ao CSS) ---
+    st.markdown("""
+        <style>
+        /* Container centralizado imitando o .box-recuperar */
+        .block-container {
+            max-width: 400px !important;
+            padding-top: 5rem !important;
+        }
+        
+        /* Fundo azul claro com marca-d'água diagonal sutil (Mesmo padrão visual) */
+        .stApp {
+            background-color: #e6f0fa !important;
+            background-image: repeating-linear-gradient(
+                -45deg,
+                transparent,
+                transparent 50px,
+                rgba(0, 123, 255, 0.03) 50px,
+                rgba(0, 123, 255, 0.03) 100px
+            ) !important;
+        }
+        
+        /* Centraliza e estiliza o título */
+        .titulo-recuperar {
+            text-align: center;
+            color: #007bff;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- 2. RENDERIZAÇÃO DA INTERFACE ---
+    st.markdown('<h2 class="titulo-recuperar">Esqueci Minha Senha</h2>', unsafe_allow_html=True)
+
+    # Cria o formulário isolado (Substitui o <form action="/recuperar-senha" method="POST">)
+    with st.form("form_recuperar_senha_usuario", clear_on_submit=False):
+        
+        # Elementos de entrada de dados (Substituem os inputs HTML)
+        email_input = st.text_input("E-mail", placeholder="Digite seu E-mail Cadastrado", label_visibility="collapsed").strip().lower()
+        nova_senha_input = st.text_input("Nova Senha", placeholder="Digite sua Nova Senha", type="password", label_visibility="collapsed")
+        
+        # Botão de envio (Substitui o <button type="submit">)
+        botao_redefinir = st.form_submit_button("Redefinir Senha", type="primary", use_container_width=True)
+
+        # --- 3. LÓGICA DE ATUALIZAÇÃO E VALIDAÇÃO NO BANCO ---
+        if botao_redefinir:
+            if not email_input or not nova_senha_input:
+                st.error("❌ Por favor, preencha todos os campos obrigatórios.")
+            else:
+                try:
+                    conn = obter_conexao()
+                    cursor = conn.cursor()
+                    
+                    # 1. Verifica se o e-mail digitado realmente existe no sistema
+                    cursor.execute("SELECT id FROM usuarios WHERE email = %s;", (email_input,))
+                    usuario_existe = cursor.fetchone()
+                    
+                    if not usuario_existe:
+                        st.error("❌ E-mail não localizado no sistema. Verifique os dados digitados.")
+                    else:
+                        # 2. Gera o novo hash de senha criptografado de forma segura
+                        novo_senha_hash = generate_password_hash(nova_senha_input)
+                        
+                        # 3. Executa o UPDATE direto na tabela do PostgreSQL
+                        cursor.execute("""
+                            UPDATE usuarios 
+                            SET password_hash = %s 
+                            WHERE email = %s;
+                        """, (novo_senha_hash, email_input))
+                        
+                        conn.commit()
+                        
+                        st.success("🎉 Senha redefinida com sucesso! Você já pode retornar e realizar o login.")
+                        
+                    cursor.close()
+                    conn.close()
+                    
+                except Exception as e:
+                    st.error(f"❌ Erro crítico ao redefinir senha no banco: {e}")
+
+    # --- 4. LINK DE RETORNO PARA A TELA DE LOGIN ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_link, _ = st.columns()
+    with col_link:
+        # Substitui a tag <a> por alteração de estado da sessão global
+        if st.button("⬅️ Voltar para o Login", type="secondary", use_container_width=True):
+            st.session_state.opcao_menu = "🔒 Login"
+            st.rerun()

@@ -1,0 +1,89 @@
+import streamlit as st
+from datetime import datetime
+
+def template_meus_encontros():
+    # --- 1. CONFIGURAÇÃO DE ESTILO (LOOK & FEEL ORIGINAL CORRIGIDO) ---
+    st.markdown("""
+        <style>
+        /* Fundo escuro e tipografia customizada */
+        .stApp { background-color: #1a2436; color: white; }
+        h2 { color: white !important; text-align: center; font-family: Arial, sans-serif; }
+        .sub-titulo-encontros { text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 25px; }
+        
+        /* Ajuste do container para centralizar o conteúdo */
+        .block-container { max-width: 600px !important; padding-top: 3rem !important; }
+        
+        /* Sobrescrita visual para combinar os containers com os cards antigos */
+        div[data-testid="stHeader"] { background-color: transparent; }
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            background-color: #242f42;
+            border: 1px solid #384252 !important;
+            border-radius: 8px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- 2. MAPEAMENTO DE DATA DO SERVIDOR ---
+    dias_semana_map = {0: 'Segunda-feira', 1: 'Terça-feira', 2: 'Quarta-feira', 
+                       3: 'Quinta-feira', 4: 'Sexta-feira', 5: 'Sábado', 6: 'Domingo'}
+    dia_atual = dias_semana_map[datetime.now().weekday()]
+
+    # --- 3. CABEÇALHO DA TELA ---
+    st.markdown("<h2>📅 Seus Agendamentos</h2>", unsafe_allow_html=True)
+    st.markdown(f"<p class='sub-titulo-encontros'>Hoje é: <strong>{dia_atual}</strong></p>", unsafe_allow_html=True)
+
+    # --- 4. RECUPERAÇÃO DE DADOS DO POSTGRESQL ---
+    encontros_dados = []
+    try:
+        conn = obter_conexao()
+        cursor = conn.cursor()
+        # Busca encontros aceitos/confirmados onde o usuário logado participa
+        cursor.execute('''
+            SELECT a.id, a.match_id, a.dia_semana, a.periodo, a.horario, u.username
+            FROM agendamentos_virtuais a
+            JOIN usuarios u ON (u.id = a.destinatario_id OR u.id = a.remetente_id)
+            WHERE (a.remetente_id = %s OR a.destinatario_id = %s) AND u.id != %s AND a.status_convite = 'aceito'
+            ORDER BY a.id DESC;
+        ''', (st.session_state.usuario_id, st.session_state.usuario_id, st.session_state.usuario_id))
+        encontros_dados = cursor.fetchall()
+        cursor.close()
+        conn.close()
+    except Exception:
+        pass # Mantém lista vazia se a tabela estiver ausente
+
+    # --- 5. RENDERIZAÇÃO DOS CARDS DE COMPROMISSOS ---
+    if not encontros_dados:
+        st.markdown("<p style='text-align: center; color: #94a3b8;'>Nenhum encontro marcado no momento.</p>", unsafe_allow_html=True)
+    else:
+        for ag_id, m_id, dia_semana, periodo, horario, parceiro in encontros_dados:
+            # Trava cognitiva: A sala só fica ativa se o dia cadastrado for igual ao dia atual do servidor
+            sala_ativa = (str(dia_semana).lower().strip() == str(dia_atual).lower().strip())
+            
+            # Substitui a estrutura .card-encontro utilizando blocos nativos do Streamlit
+            with st.container(border=True):
+                col_info, col_acao = st.columns([2, 1])
+                
+                with col_info:
+                    st.markdown(f"<strong style='color: #3b82f6; font-size: 15px;'>Par: {str(parceiro).split('@')[0].capitalize()}</strong>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='font-size: 13px; color: #94a3b8; margin-top: 4px;'>{dia_semana} (Período da {periodo}) às {str(horario)[:5]}</div>", unsafe_allow_html=True)
+                    
+                with col_acao:
+                    st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True) # Alinhamento vertical simples
+                    if sala_ativa:
+                        # Botão verde ativo (Substitui a classe .ativo)
+                        if st.button("🚪 Entrar na Sala", key=f"entrar_sala_{ag_id}", type="primary", use_container_width=True):
+                            st.session_state.match_id_atual = m_id
+                            st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
+                            st.toast("Redirecionando para a conferência...")
+                            st.rerun()
+                    else:
+                        # Botão cinza desabilitado (Substitui a classe .inativo)
+                        st.button("🔒 Bloqueado", key=f"bloqueado_sala_{ag_id}", disabled=True, help="Disponível apenas no dia agendado", use_container_width=True)
+
+    # --- 6. LINK DE RETORNO NO RODAPÉ ---
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    col_voltar, _ = st.columns([1, 2])
+    with col_voltar:
+        if st.button("← Voltar para o Chat", type="secondary", use_container_width=True):
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun()

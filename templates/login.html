@@ -1,0 +1,119 @@
+import streamlit as st
+
+def template_login():
+    # --- 1. CONFIGURAÇÃO DE ESTILO (Marca-d'água, fundo azul claro e centralização) ---
+    st.markdown("""
+        <style>
+        /* Container centralizado imitando o .login-container */
+        .block-container {
+            max-width: 400px !important;
+            padding-top: 4rem !important;
+        }
+        
+        /* Fundo azul claro com marca-d'água diagonal sutil (Idêntico ao seu CSS) */
+        .stApp {
+            background-color: #e6f0fa !important;
+            background-image: repeating-linear-gradient(
+                -45deg,
+                transparent,
+                transparent 50px,
+                rgba(0, 123, 255, 0.03) 50px,
+                rgba(0, 123, 255, 0.03) 100px
+            ) !important;
+        }
+        
+        /* Estilização do título principal externo */
+        .titulo-plataforma {
+            text-align: center;
+            color: #007bff;
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-family: Arial, sans-serif;
+        }
+        .subtitulo-plataforma {
+            text-align: center;
+            color: #6c757d;
+            font-size: 15px;
+            margin-bottom: 25px;
+            font-family: Arial, sans-serif;
+        }
+        .titulo-login {
+            text-align: center;
+            color: #007bff;
+            font-family: Arial, sans-serif;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # --- 2. TÍTULOS EXTERNOS DA PÁGINA INITIAL ---
+    st.markdown('<h1 class="titulo-plataforma">Lucy Chat IA</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitulo-plataforma">Chat Virtual Online</p>', unsafe_allow_html=True)
+
+    # --- 3. CONTAINER DE FORMULÁRIO DE LOGIN ---
+    st.markdown('<h2 class="titulo-login">Login Lucy Chat IA</h2>', unsafe_allow_html=True)
+
+    with st.form("form_login_plataforma", clear_on_submit=False):
+        # inputs com Placeholders ocultando os labels nativos
+        user_in = st.text_input("Usuário", placeholder="Nome de Usuário", label_visibility="collapsed")
+        pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed")
+        
+        # Botão de Execução de Login (Substitui <button type="submit">)
+        botao_login = st.form_submit_button("Login", type="primary", use_container_width=True)
+
+        # --- 4. FLUXO COGNITIVO DE VALIDAÇÃO (Substitui as rotas do Flask) ---
+        if botao_login:
+            if not user_in or not pass_in:
+                st.error("❌ Por favor, preencha todos os campos obrigatórios.")
+            else:
+                try:
+                    conn = obter_conexao()
+                    cursor = conn.cursor()
+                    
+                    # Procura o usuário por username ou e-mail na tabela usuarios
+                    cursor.execute("""
+                        SELECT id, password_hash, username, foto_perfil, is_admin, genero 
+                        FROM usuarios 
+                        WHERE username = %s OR email = %s;
+                    """, (user_in, user_in))
+                    res = cursor.fetchone()
+                    
+                    # Substitui a função 'check_password_hash' do Flask Auth
+                    if res and check_password_hash(res[1], pass_in):
+                        # Armazena os dados de credenciamento na sessão global do Streamlit
+                        st.session_state.usuario_id = res[0]
+                        st.session_state.username = res[2]
+                        st.session_state.foto_perfil = res[3]
+                        st.session_state.eh_admin = res[4]
+                        st.session_state.genero = res[5]
+                        
+                        # Altera o status de presença para Online em tempo real
+                        cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (int(res[0]),))
+                        conn.commit()
+                        
+                        st.toast(f"🎉 Bem-vindo de volta, {res[2]}!")
+                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                        st.rerun()
+                    else:
+                        st.error("❌ Credenciais inválidas. Verifique seu usuário e senha.")
+                        
+                    cursor.close()
+                    conn.close()
+                except Exception as e:
+                    st.error(f"❌ Erro na conexão do PostgreSQL: {e}")
+
+    # --- 5. RENDERIZAÇÃO DOS LINKS DE REDIRECIONAMENTO ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_cad, c_rec = st.columns(2)
+    
+    with c_cad:
+        if st.button("📝 Cadastre-se", type="secondary", use_container_width=True, help="Criar nova conta"):
+            st.session_state.opcao_menu = "📝 Cadastro"
+            st.rerun()
+            
+    with c_rec:
+        if st.button("Esqueci minha senha", type="secondary", use_container_width=True):
+            st.session_state.opcao_menu = "🔑 Recuperar Senha"
+            st.rerun()

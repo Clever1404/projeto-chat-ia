@@ -1,0 +1,61 @@
+Por que o Streamlit Cloud é a melhor opção?💰 100% Gratuito: Você não paga nada para manter o seu site no ar.🚀 Sem Infraestrutura: Você não precisa configurar servidores, portas ou variáveis complexas.🔄 Sincronização Direta: Ele se conecta ao seu GitHub e atualiza o site sozinho a cada alteração.🔋 Suporte a Postgres: Conecta perfeitamente com qualquer banco PostgreSQL (Supabase, Neon, Render, etc.) via segredos de ambiente (secrets.toml).
+
+Passo a Passo para Colocar o Site no ArComo você já tem uma conta no GitHub, o processo levará menos de 10 minutos seguindo estes 4 passos estruturados:1. Preparar o Código no seu ComputadorNa pasta do seu projeto (no VS Code), você precisa criar um arquivo de texto chamado requirements.txt. Esse arquivo diz ao servidor quais bibliotecas o seu app precisa para rodar.Crie o arquivo requirements.txt na raiz do projeto.Escreva dentro dele o nome das bibliotecas que você usa (uma por linha). Exemplo:textstreamlit
+psycopg2-binary
+
+Passo a Passo para Colocar o Site no ArComo você já tem uma conta no GitHub, o processo levará menos de 10 minutos seguindo estes 4 passos estruturados:1. Preparar o Código no seu ComputadorNa pasta do seu projeto (no VS Code), você precisa criar um arquivo de texto chamado requirements.txt. Esse arquivo diz ao servidor quais bibliotecas o seu app precisa para rodar.Crie o arquivo requirements.txt na raiz do projeto.Escreva dentro dele o nome das bibliotecas que você usa (uma por linha). Exemplo:textstreamlit
+psycopg2-binary
+
+3. Conectar ao Streamlit Community CloudAcesse o site do Streamlit Share.Clique em Continue with GitHub e faça login com a conta que você já possui.Clique no botão New app (Novo aplicativo).Selecione o repositório que o VS Code acabou de criar, escolha o branch (geralmente main ou master) e digite o nome do seu arquivo principal (ex: app.py ou main.py).
+
+4. Configurar as Credenciais do PostgreSQL (Muito Importante)Como seu app usa banco de dados, você não deve deixar as senhas expostas no código do GitHub por segurança.Antes de clicar em "Deploy", clique em Advanced settings... (Configurações avançadas) na tela do Streamlit.Na caixa Secrets, cole as credenciais do seu banco de dados PostgreSQL no formato TOML. Exemplo:toml[postgres]
+host = "://azure.com"
+port = 5432
+database = "seu_banco"
+user = "seu_usuario"
+password = "sua_senha"
+
+No seu código Python, você poderá acessar essas credenciais usando com segurança: st.secrets["postgres"]["password"].Clique em Deploy! Seu site estará online em menos de 2 minutos.
+
+✅ ConclusãoO Streamlit Community Cloud é o caminho ideal porque elimina custos, roda seu código Python nativamente e possui integração direta com o GitHub (que você usará de forma 100% visual pelo VS Code).
+
+
+Passo 1: Fazer o Backup no pgAdmin (Localhost)Abra o pgAdmin e conecte-se ao seu servidor local (localhost).Expanda a árvore do lado esquerdo até encontrar o seu banco de dados atual.Clique com o botão direito em cima do nome do seu banco de dados e selecione Backup....Na aba General, digite um nome para o arquivo no campo Filename (ex: backup_local.sql).Na aba Dump options, selecione o formato Plain (isso garante que ele vire um script SQL legível).Clique no botão Backup lá embaixo. O pgAdmin criará um arquivo com toda a estrutura das suas tabelas.
+
+Passo 1: Criar o Projeto no SupabaseAcesse supabase.com e faça login com sua conta do GitHub.Clique em New Project (Novo Projeto) e selecione sua organização.Preencha os dados:Name: Nome do seu projeto.Database Password: Crie uma senha forte e guarde-a bem (você vai usar no pgAdmin e no Streamlit).Region: Escolha South America (São Paulo) para o banco ficar super rápido no Brasil 🇧🇷.Clique em Create new project. O Supabase vai demorar cerca de 1 minuto para provisionar seu banco.
+
+Passo 2: Pegar as Credenciais de ConexãoAssim que o projeto carregar:No menu lateral esquerdo do Supabase, clique no ícone de engrenagem (Project Settings).Clique na opção Database.Role a página até a seção Connection Info. Ali você encontrará os dados que precisamos:Host: (Ex: ://supabase.com)Database name: postgresPort: 5432User: postgres
+
+
+Passo 3: Conectar e Restaurar no pgAdminCom os dados acima em mãos, abra o seu pgAdmin:Clique com o botão direito em Servers > Register > Server....Na aba General, digite Supabase Prod.Na aba Connection, preencha:Host name/address: Cole o Host do Supabase.Maintenance database: postgresUsername: postgresPassword: A senha que você criou ao iniciar o projeto no Supabase.
+Clique em Save.Abra a Query Tool (Ferramenta de Consulta) clicando com o botão direito sobre o novo banco do Supabase, abra o arquivo backup_local.sql (que você exportou do localhost anteriormente) e clique no Play (Executar). Suas tabelas agora estão no Supabase!
+
+Passo 4: Configurar os Secrets no Streamlit CloudNo painel do seu app no Streamlit Cloud, vá em Settings > Secrets e cole as credenciais do Supabase exatamente neste formato:toml[postgres]
+host = "cole_o_host_do_supabase_aqui"
+database = "postgres"
+user = "postgres"
+password = "sua_senha_do_supabase"
+port = 5432
+
+
+Código de Conexão em PythonO código no seu arquivo do Streamlit permanece limpo e seguro, usando a biblioteca padrão psycopg2 (certifique-se de incluir psycopg2-binary no seu requirements.txt):pythonimport streamlit as st
+import psycopg2
+
+def conectar_supabase():
+    conn = psycopg2.connect(
+        host=st.secrets["postgres"]["host"],
+        database=st.secrets["postgres"]["database"],
+        user=st.secrets["postgres"]["user"],
+        password=st.secrets["postgres"]["password"],
+        port=st.secrets["postgres"]["port"]
+    )
+    return conn
+
+# Testando a conexão
+try:
+    conn = conectar_supabase()
+    st.success("Conectado ao Supabase com sucesso!")
+except Exception as e:
+    st.error(f"Erro ao conectar: {e}")
+
+

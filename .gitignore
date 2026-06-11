@@ -1,0 +1,8 @@
+.env
+bot/.env
+__pycache__/
+*.pyc
+*.db
+*.sql
+static/uploads/
+site no ar.txt

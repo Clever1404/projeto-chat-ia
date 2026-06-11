@@ -1,0 +1,116 @@
+import streamlit as st
+import pandas as pd
+import os
+
+//# --- 1. CONFIGURAÇÕES DA PÁGINA (ESTILO DARK DO GITHUB CONFIGURADO) ---
+st.set_page_config(page_title="Painel Administrativo - Lucy IA", layout="wide")
+
+#// Injeção de CSS para espelhar exatamente o estilo do seu HTML original
+
+
+st.markdown("""
+<style>
+    /* Reset e estilização global de fundos */
+    .stApp { background-color: #0d1117; color: #c9d1d9; }
+    h1, h2, h3 { color: #f0f6fc !important; font-family: Arial, sans-serif; }
+        
+    /* Estilização compacta de cards indicadores */
+    .card-indicador {
+        background-color: #161b22; 
+        border: 1px solid #30363d; 
+        border-radius: 8px; 
+        padding: 15px; 
+        text-align: left;
+        margin-bottom: 15px;
+    }
+    .card-indicador p { font-size: 12px; color: #8b949e; text-transform: uppercase; font-weight: bold; margin: 0; }
+    .card-indicador h2 { font-size: 28px; color: #58a6ff; margin-top: 5px; font-weight: bold; }
+        
+    /* Customização fina para tabelas nativas do Streamlit parecerem o template */
+    .stDataFrame div[data-testid="stTable"] { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; }
+</style>
+""", unsafe_allow_html=True)
+
+/# --- 2. HEADER DO PAINEL ---
+col_head1, col_head2 = st.columns([4, 1])
+with col_head1:
+    st.markdown("<h1 style='margin: 0;'>⚙️ Painel de Gerenciamento Geral</h1>", unsafe_allow_html=True)
+with col_head2:
+    # Substitui a tag <a> por um botão funcional de retorno do Streamlit
+    if st.button("← Voltar ao Chat Lucy", type="primary", use_container_width=True):
+        st.session_state.opcao_menu = "💬 Chat" # Altere para a sua chave de navegação real
+        st.rerun()
+
+st.markdown("<hr style='border-color: #30363d; margin-top: 10px; margin-bottom: 25px;'>", unsafe_allow_html=True)
+
+#// --- 3. MOCK / CAPTURA DE DADOS DO BANCO ---
+#// Substitua estas variáveis pelas consultas reais (cursor.fetchall()) do seu banco PostgreSQL
+total_usuarios = 42  # Exemplo: len(usuarios_bd)
+total_salas_ativas = 5
+
+labels_dias = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+unidades_agendadas = [12, 19, 3, 5, 2, 3, 10]
+unidades_realizadas = [8, 15, 2, 4, 1, 2, 7]
+
+#// Lista simulada de usuários vinda do banco (substitua pelo cursor do Postgres)
+usuarios_lista = [
+    {"id": 1, "username": "Clever1404", "email": "clever@mail.com", "genero": "M", "idade": 24, "procura_por": "F", "status": "🟢 Online"},
+    {"id": 2, "username": "Ana_Silva", "email": "ana@mail.com", "genero": "F", "idade": 28, "procura_por": "M", "status": "⚫ Offline"},
+]
+
+#// --- 4. SEÇÃO DASHBOARD TOP GRID (INDICADORES + GRÁFICO PARETO) ---
+col_cards, col_chart = st.columns([1, 2])
+
+with col_cards:
+    # Renderização HTML dos retângulos compactos solicitados no CSS original
+    st.markdown(f"""
+        <div class="card-indicador">
+            <p>Usuários Cadastrados</p>
+            <h2>{total_usuarios} <span style="font-size:14px; color:#8b949e; font-weight:normal;">unid.</span></h2>
+        </div>
+        <div class="card-indicador">
+            <p>Salas em Uso Ativo</p>
+            <h2>{total_salas_ativas} <span style="font-size:14px; color:#8b949e; font-weight:normal;">salas</span></h2>
+        </div>
+    """, unsafe_allow_html=True)
+
+with col_chart:
+    st.markdown("<p style='font-size: 12px; color: #8b949e; text-transform: uppercase; font-weight: bold; margin-bottom: 2px;'>📊 Distribuição de Encontros por Dia</p>", unsafe_allow_html=True)
+    
+    #// Estruturação e Plotagem do Pareto estatístico puro via Pandas DataFrame
+    df_pareto = pd.DataFrame({
+        "Agendado": unidades_agendadas,
+        "Realizado": unidades_realizadas
+    }, index=labels_dias)
+    
+    #// Gráfico nativo com as cores exatas do seu SVG original (#1f6feb para azul e #238636 para verde)
+    st.bar_chart(df_pareto, color=["#1f6feb", "#238636"], height=185, use_container_width=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+#// --- 5. SEÇÃO DA TABELA DE USUÁRIOS (CONTROLE DE CONTAS) ---
+st.markdown("<h3>📋 Controle de Contas Cadastradas</h3>", unsafe_allow_html=True)
+
+if usuarios_lista:
+    #// Convertendo a lista de dicionários para DataFrame para exibição limpa e rolável no Streamlit
+    df_usuarios = pd.DataFrame(usuarios_lista)
+    
+    #// Renomeia as colunas do Dataframe para corresponder ao seu <thead> do HTML
+    df_usuarios.columns = ["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", "Status Presença"]
+    
+    # Renderiza a tabela de dados estilizada na tela com largura total
+    st.dataframe(
+        df_usuarios, 
+        use_container_width=True, 
+        hide_index=True,
+        column_config={
+            "ID": st.column_config.NumberColumn(format="#%d"),
+            "Status Presença": st.column_config.TextColumn()
+        }
+    )
+else:
+    st.info("Nenhum usuário localizado ou erro na conexão do PostgreSQL.")
+
+
+</body>
+</html>
