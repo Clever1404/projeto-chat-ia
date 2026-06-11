@@ -1,8 +1,8 @@
+streamlit
+psycopg[binary]
 altair
 pandas
 playwright
-psycopg
-streamlit
 streamlit_extras
 Werkzeug
 python-dotenv
