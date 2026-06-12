@@ -31,8 +31,12 @@ if not GEMINI_API_KEY:
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 def conectar_supabase():
-    conn = psycopg2.connect( 
-        st.secrets["DATABASE_URL"]
+    conn = psycopg2.connect(
+        host=st.secrets["postgres"]["host"],
+        database=st.secrets["postgres"]["database"],
+        user=st.secrets["postgres"]["user"],
+        password=st.secrets["postgres"]["password"],
+        port=st.secrets["postgres"]["port"]
     )
     return conn
 # Testando a conexão
