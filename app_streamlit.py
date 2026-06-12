@@ -12,6 +12,7 @@ import streamlit.components.v1 as components
 from werkzeug.security import generate_password_hash
 import time
 from streamlit_extras.stylable_container import stylable_container
+import psycopg2
 
 
 UPLOAD_FOLDER = "uploads"
