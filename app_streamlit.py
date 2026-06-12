@@ -29,10 +29,17 @@ if not GEMINI_API_KEY:
 # Cria o objeto 'client' com escopo global exigido pela função de match
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-def obter_conexao():
-    DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres")
-    return psycopg.connect(DB_URL)
-
+def conectar_supabase():
+    conn = psycopg2.connect( 
+        st.secrets["DATABASE_URL"]
+    )
+    return conn
+# Testando a conexão
+try:
+    conn = conectar_supabase()
+    st.success("Conectado ao Supabase com sucesso!")
+except Exception as e:
+    st.error(f"Erro ao conectar: {e}")
 
 # ==============================================================================
 # 4. CONTROLE DE ESTADO E EXIBIÇÃO DAS TELAS (RODA NO FINAL)
