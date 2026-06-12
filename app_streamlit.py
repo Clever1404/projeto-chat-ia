@@ -121,7 +121,7 @@ elif st.session_state.opcao_menu == "🔒 Login":
             if st.form_submit_button("Login", type="primary", width="stretch"):
                 try:
                     conn = conectar_supabase(); cursor = conn.cursor()
-                    cursor.execute("SELECT id, username, foto_perfil, is_admin, genero FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
+                    cursor.execute("SELECT id, username, foto_perfil, is_admin, genero FROM usuario WHERE username = %s OR email = %s;", (user_in, user_in))
                     res = cursor.fetchone()
                     if res:
                         st.session_state.usuario_id = res[0]
