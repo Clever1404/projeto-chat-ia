@@ -7,3 +7,4 @@ streamlit_extras
 Werkzeug
 python-dotenv
 google-genai
+psycopg2-binary
