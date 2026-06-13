@@ -19,24 +19,24 @@ UPLOAD_FOLDER = "uploads"
 load_dotenv()
 UPLOAD_FOLDER = 'static/uploads/perfis'
 
-# --- 2. INICIALIZAÇÃO DO CLIENTE GOOGLE GENAI ---
-# O código tenta ler a chave de API direto do seu arquivo .env ou sistema
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# 1. Busca a chave do Gemini PRIORIZANDO o st.secrets (nuvem) e usando os.getenv como fallback (local)
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
 
-if not GEMINI_API_KEY:
-    # Caso não tenha configurado no .env, você pode colocar sua chave temporariamente aqui:
-    GEMINI_API_KEY = "SUA_CHAVE_API_AQUI" 
+if not GEMINI_API_KEY or GEMINI_API_KEY == "SUA_CHAVE_API_AQUI":
+    st.error("Chave API do Gemini não configurada corretamente nos Secrets!")
 
-# Cria o objeto 'client' com escopo global exigido pela função de match
+# Cria o objeto 'client'
 client = genai.Client(api_key=GEMINI_API_KEY)
 
+# 2. Função de conexão com o Supabase corrigida com SSL seguro
 def conectar_supabase():
     conn = psycopg2.connect(
         host=st.secrets["postgres"]["host"],
         database=st.secrets["postgres"]["database"],
         user=st.secrets["postgres"]["user"],
         password=st.secrets["postgres"]["password"],
-        port=st.secrets["postgres"]["port"]
+        port=st.secrets["postgres"]["port"],
+        sslmode="require"  # <--- ESSA LINHA EVITA O BLOQUEIO 403 DO SUPABASE
     )
     return conn
 
