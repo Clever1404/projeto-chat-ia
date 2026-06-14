@@ -1,4 +1,4 @@
-openai
+openai>=1.0.0
 streamlit
 psycopg[binary]
 altair
@@ -9,3 +9,6 @@ Werkzeug
 python-dotenv
 google-genai
 psycopg2-binary
+supabase
+
+
