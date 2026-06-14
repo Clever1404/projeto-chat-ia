@@ -14,6 +14,7 @@ import time
 from streamlit_extras.stylable_container import stylable_container
 import psycopg2
 from openai import OpenAI
+import json as modulo_json 
 
 
 UPLOAD_FOLDER = "uploads"
@@ -813,8 +814,6 @@ def template_chat_ia_completo():
             if ia_r: st.chat_message("assistant").write(ia_r) 
 
 
-
-
     # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE (LUCY COGNITIVA INTERPESSOAL)
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
@@ -892,8 +891,8 @@ def template_chat_ia_completo():
                 resposta_streaming = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=mensagens_openai,
-                    temperature=0.9,
-                    stream=False # Defina como True se for usar o st.write_stream depois
+                    temperature=0.9
+                    
                 )
 
                 # 3. Na OpenAI, capturamos o texto através de .choices[0].message.content
@@ -911,7 +910,7 @@ def template_chat_ia_completo():
                 conn.close() 
 
                 # 🚀 CORREÇÃO DO SUMIÇO: Força a página a recarregar e buscar o histórico atualizado do banco
-                st.rerun()
+                #st.rerun()
 
                 # 4. ATUALIZAÇÃO AUTOMÁTICA DE ATRIBUTOS (EXTRATOR INTELIGENTE BACKEND)
                  # 1. Monta a estrutura correta de mensagens com System e User
@@ -1248,21 +1247,12 @@ def template_sala_privada():
 
         # 📥 MOTOR FRAGMENTADO AS SÍNCRONO REATIVO (ATUALIZA A CADA 2 SEGUNDOS)
         #@st.fragment(run_every=2)
-        @st.fragment
         def live_chat_privado_engine(m_id, my_id, p_nome_str):
-            # Container com scroll para visualização das mensagens
             with st.container(height=410, border=False):
                 try:
-                    conn = conectar_supabase()
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        'SELECT remetente_id, texto, data_envio FROM mensagens_chat WHERE match_id = %s ORDER BY data_envio ASC;', 
-                        (int(m_id),)
-                    )
-                    rows = cursor.fetchall()
-                    cursor.close()
-                    conn.close()
-                    
+                    conn = conectar_supabase(); cursor = conn.cursor()
+                    cursor.execute('SELECT remetente_id, texto, data_envio FROM mensagens_chat WHERE match_id = %s ORDER BY data_envio ASC;', (int(m_id),))
+                    rows = cursor.fetchall(); cursor.close(); conn.close()
                     for r_id, txt, dt in rows:
                         hora_f = dt.strftime("%H:%M")
                         if int(r_id) == int(my_id):
@@ -1273,27 +1263,15 @@ def template_sala_privada():
                             with st.chat_message("assistant"):
                                 st.write(txt)
                                 st.caption(f"{p_nome_str.split('@')[0].capitalize()} — {hora_f}")
-                except Exception:
-                    pass
+                except Exception: pass
             
-            # Input de texto e lógica de envio dentro do fragmento
             if st.session_state.opcao_menu == "🤝 Sala Privada":
                 if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
                     if txt_in.strip():
-                        try:
-                            conn = conectar_supabase()
-                            cursor = conn.cursor()
-                            cursor.execute(
-                                'INSERT INTO mensagens_chat (match_id, remetente_id, texto) VALUES (%s, %s, %s);', 
-                                (int(m_id), int(my_id), txt_in.strip())
-                            )
-                            conn.commit()
-                            cursor.close()
-                            conn.close()
-                            # Recarrega apenas este fragmento instantaneamente
-                            st.rerun()
-                        except Exception:
-                            pass
+                        conn = conectar_supabase(); cursor = conn.cursor()
+                        cursor.execute('INSERT INTO mensagens_chat (match_id, remetente_id, texto) VALUES (%s, %s, %s);', (int(m_id), int(my_id), txt_in.strip()))
+                        conn.commit(); cursor.close(); conn.close()
+                        st.rerun()
 
 
             
