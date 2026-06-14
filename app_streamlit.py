@@ -1223,7 +1223,7 @@ def template_sala_privada():
         # 📥 MOTOR FRAGMENTADO AS SÍNCRONO REATIVO (ATUALIZA A CADA 2 SEGUNDOS)
         @st.fragment
         def live_chat_privado_engine(m_id, my_id, p_nome_str):
-            # Correção do split: extrai o primeiro item da lista antes de aplicar capitalize
+            # Tratamento seguro do nome
             try:
                 nome_exibicao = p_nome_str.split('@')[0].capitalize()
             except Exception:
@@ -1242,7 +1242,12 @@ def template_sala_privada():
                     conn.close()
                     
                     for r_id, txt, dt in rows:
-                        hora_f = dt.strftime("%H:%M")
+                        # Tratamento seguro contra valores None/Nulos na data
+                        if dt is not None:
+                            hora_f = dt.strftime("%H:%M")
+                        else:
+                            hora_f = "--:--"  # Fallback caso a data antiga esteja nula [1]
+                        
                         if int(r_id) == int(my_id):
                             with st.chat_message("user"):
                                 st.write(txt)
@@ -1254,21 +1259,20 @@ def template_sala_privada():
                 except Exception as e:
                     st.error(f"Erro ao ler banco: {e}")
             
-            # Executa o input e processamento de envio de forma estritamente isolada
             if st.session_state.opcao_menu == "🤝 Sala Privada":
                 if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
                     if txt_in.strip():
                         try:
                             conn = conectar_supabase()
                             cursor = conn.cursor()
+                            # Força a inserção da data atual (NOW()) direto na query SQL
                             cursor.execute(
-                                'INSERT INTO mensagens_chat (match_id, remetente_id, texto) VALUES (%s, %s, %s);', 
+                                'INSERT INTO mensagens_chat (match_id, remetente_id, texto, data_envio) VALUES (%s, %s, %s, NOW());', 
                                 (int(m_id), int(my_id), txt_in.strip())
                             )
                             conn.commit()
                             cursor.close()
                             conn.close()
-                            # Rerun local: atualiza estritamente o fragmento do chat
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao enviar: {e}")
