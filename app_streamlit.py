@@ -473,7 +473,7 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
                 cursor.close()
                 conn.close()
                 
-                #par_online = "Online" in str(status_par) or "🟢" in str(status_par)
+                par_online = "Online" in str(status_par) or "🟢" in str(status_par)
                 
                 return {
                     "match": True, "match_id": match_id, "id_par": int(id_par), "nome_par": nome_par, "online": par_online
