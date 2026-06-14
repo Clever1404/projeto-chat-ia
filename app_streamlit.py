@@ -863,73 +863,30 @@ def template_chat_ia_completo():
     st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
 
     # Área de histórico com rolagem única interna (Não arrasta o título junto)
+     # Área de histórico temporária para teste visual
     with st.container(height=440, border=False):
-        historico = buscar_memoria(st.session_state.usuario_id, limite=15) 
-        for user_p, ia_r in historico: 
-            if user_p: st.chat_message("user").write(user_p) 
-            if ia_r: st.chat_message("assistant").write(ia_r) 
+        if "mensagens_teste" in st.session_state:
+            for msg in st.session_state.mensagens_teste:
+                st.chat_message(msg["role"]).write(msg["content"])
 
 
 
-
-    # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE (LUCY COGNITIVA INTERPESSOAL)
+     # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE (MÓDULO DE TESTE ISOLADO)
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
-            st.chat_message("user").write(prompt) 
+            
+            # 1. Garante que a lista de mensagens locais existe
+            if "mensagens_teste" not in st.session_state:
+                st.session_state.mensagens_teste = []
+                
+            # 2. Guarda o texto do usuário na memória local
+            st.session_state.mensagens_teste.append({"role": "user", "content": prompt})
             
             try:
-                meu_id_f = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
-                
-                # --- BUSCA O ESTADO ATUAL DOS PILARES ---
-                conn_pilar = conectar_supabase()
-                cursor_pilar = conn_pilar.cursor()
-                try:
-                    cursor_pilar.execute("SELECT idade, genero, procura_por, procura_relacionamento FROM usuarios WHERE id = %s;", (meu_id_f,))
-                    pilar_dados = cursor_pilar.fetchone()
-                except Exception:
-                    conn_pilar.rollback()
-                    cursor_pilar.execute("SELECT idade, genero, procura_por, 'namoro' FROM usuarios WHERE id = %s;", (meu_id_f,))
-                    pilar_dados = cursor_pilar.fetchone()
-                cursor_pilar.close()
-                conn_pilar.close()
-                
-                dados_faltantes_contexto = ""
-                if pilar_dados:
-                    idade_b, gen_b, proc_gen_b, proc_rel_b = pilar_dados
-                    if not idade_b: dados_faltantes_contexto += "- IDADE do usuário\n"
-                    if not proc_gen_b: dados_faltantes_contexto += "- Se ele tem interesse por HOMEM, MULHER ou AMBOS\n"
-                    if not proc_rel_b: dados_faltantes_contexto += "- Se ele procura AMIZADE ou NAMORO\n"
-
-                # --- RESGATA A MEMÓRIA RECENTE ---
-                historico_previo = buscar_memoria(meu_id_f, limite=6)
-                contexto_conversacao = ""
-                for u_p, ia_r in historico_previo:
-                    contexto_conversacao += f"Usuário: {u_p}\nVocê (Lucy): {ia_r}\n"
-                
-                # --- 1. CHAMADA DA LUCY ---
+                # 3. Chamada direta e simples para a OpenAI
                 mensagens_openai = [
-                    {
-                        "role": "system",
-                        "content": "Você é Lucy, uma assistente virtual focada em criar conexões humana legítimas através de afinidades semânticas. "
-                         "Seu tom deve ser amigável, interpessoal, acolhedor e levemente curioso. "
-                            "Sua missão secreta é descobrir 4 dados essenciais sobre o usuário, mas você DEVE fazer isso de forma embutida e fluida na conversa, "
-                            "investigando APENAS UM DADO POR VEZ. Nunca faça uma lista de perguntas estilo questionário.\n\n"
-                            "Os 4 dados são:\n"
-                            "1. A idade dele.\n"
-                            "2. Se ele tem interesse por: Homem, Mulher ou Ambos.\n"
-                            "3. O que ele procura na plataforma (Amizade ou Namoro).\n"
-                            "4. Seus hobbies e interesses cotidianos.\n\n"
-                            "Instruções de fluxo:\n"
-                            "- Analise a lista de 'Dados atuais pendentes de extração' que foi enviada no escopo.\n"
-                            "- Escolha o primeiro item da lista de pendências e conduza o assunto para aquele rumo.\n"
-                            "- Exemplo para Idade: Se ele falar de planos do dia, diga algo como 'Nossa, que legal! Isso me lembra quando eu ajudei um usuário da sua faixa de idade... por sinal, quantos anos você tem?'\n"
-                            "- Exemplo para Intenção: 'Acho lindo como as pessoas buscam coisas diferentes... alguns querem só uma boa amizade para conversar, outros procuram um namoro sério. O que você está buscando por aqui hoje?'\n"
-                            "- Sempre valide o prompt atual do usuário com empatia antes de introduzir a sua pergunta direcionada no final."
-                        },
-                        {
-                        "role": "user",
-                        "content": f"{contexto_conversacao}\nDados atuais pendentes de extração:\n{dados_faltantes_contexto}\nUsuário: {prompt}"
-                        }
+                    {"role": "system", "content": "Você é Lucy, uma assistente virtual amigável."},
+                    {"role": "user", "content": prompt}
                 ]
 
                 resposta_streaming = client.chat.completions.create(
@@ -939,89 +896,30 @@ def template_chat_ia_completo():
                 )
                 resposta_lucy = resposta_streaming.choices[0].message.content
 
-                # Exibe e grava a conversa imediatamente (Se o resto falhar, isso já funcionou)
-                st.chat_message("assistant").write(resposta_lucy)
+                # 4. Guarda a resposta da Lucy na memória local
+                st.session_state.mensagens_teste.append({"role": "assistant", "content": resposta_lucy})
+
+                # 5. FORÇA O GATILHO DE MATCH DE TESTE DIRETOR PARA A SALA PRIVADA
+                # Mudamos os estados que sua sala privada provavelmente lê para abrir a comunicação
+                st.session_state.alerta_match = {
+                    "match_id": 12345,         # ID de match fictício para teste
+                    "id_par": 2,               # ID do parceiro de teste
+                    "nome": "Usuário Teste 🟢",
+                    "online": True
+                } 
                 
-                conn = conectar_supabase()
-                cursor = conn.cursor() 
-                cursor.execute("INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta, data_hora) VALUES (%s, %s, %s, %s);", (meu_id_f, prompt, resposta_lucy, datetime.now())) 
-                conn.commit()
-                cursor.close()
-                conn.close() 
-
-                # --- 2. EXTRATOR INTELIGENTE BACKEND (Isolado em um try/except próprio) ---
-                try:
-                    mensagens_extracao = [
-                        {
-                            "role": "system",
-                            "content": "Você é um parser de dados JSON rígido. Analise o texto e devolva APENAS um objeto JSON no formato:\n"
-                                       '{"idade": null, "interesse": null, "procura": null}'
-                        },
-                        {
-                            "role": "user",
-                            "content": f"Analise o texto do usuário e extraia se ele respondeu alguma das perguntas. Texto: '{prompt}'"
-                        }
-                    ]
-
-                    resposta_extracao = client.chat.completions.create(
-                        model='gpt-4o-mini',
-                        messages=mensagens_extracao,
-                        temperature=0.0,
-                        response_format={"type": "json_object"}
-                    )
-                    
-                    texto_json = resposta_extracao.choices[0].message.content
-                    dados_extraidos = modulo_json.loads(texto_json)
-                    
-                    if dados_extraidos.get("idade") or dados_extraidos.get("interesse") or dados_extraidos.get("procura"):
-                        conn_up = conectar_supabase()
-                        cursor_up = conn_up.cursor()
-                        if dados_extraidos.get("idade"):
-                            cursor_up.execute("UPDATE usuarios SET idade = %s WHERE id = %s;", (int(dados_extraidos["idade"]), meu_id_f))
-                        if dados_extraidos.get("interesse"):
-                            cursor_up.execute("UPDATE usuarios SET procura_por = %s WHERE id = %s;", (str(dados_extraidos["interesse"]), meu_id_f))
-                        if dados_extraidos.get("procura"):
-                            cursor_up.execute("UPDATE usuarios SET procura_relacionamento = %s WHERE id = %s;", (str(dados_extraidos["procura"]), meu_id_f))
-                        conn_up.commit()
-                        cursor_up.close()
-                        conn_up.close()
-                except Exception as e_extracao:
-                    st.sidebar.warning(f"Erro silencioso na extração: {e_extracao}")
-
-                # --- 3. GATILHO DE MATCH FORÇADO (Isolado para teste) ---
-                try:
-                    res_match = gatilho_match_teste_forcado(meu_id_f, id_parceiro_teste=2)
-                    
-                    if res_match and res_match.get("match") == True: 
-                        id_parceiro_match = int(res_match["id_par"])
-                        
-                        conn_p = conectar_supabase()
-                        cursor_p = conn_p.cursor()
-                        cursor_p.execute("SELECT status FROM usuarios WHERE id = %s;", (id_parceiro_match,))
-                        status_banco = cursor_p.fetchone()
-                        cursor_p.close()
-                        conn_p.close()
-                        
-                        parceiro_real_online = False
-                        if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
-                            parceiro_real_online = True
-
-                        st.session_state.alerta_match = {
-                            "match_id": int(res_match["match_id"]), 
-                            "id_par": id_parceiro_match, 
-                            "nome": res_match["nome_par"], 
-                            "online": parceiro_real_online
-                        } 
-                        st.balloons()
-                except Exception as e_match:
-                    st.sidebar.warning(f"Erro no match: {e_match}")
-
-                # Recarrega a página de forma limpa puxando os novos dados salvos
-                st.rerun() 
+                # Se o seu sistema de sala privada usa outras variáveis, ative-as aqui:
+                st.session_state.sala_atual_id = 12345 
+                st.session_state.id_parceiro_chat = 2
+                
+                st.balloons() # Mostra os balões de match na tela
+                st.rerun()    # Recarrega a tela para fixar as mensagens
                 
             except Exception as e: 
-                # Se cair aqui, o Streamlit vai printar o erro exato na tela em vez de só sumir com o texto
-                st.error(f"Erro crítico na execução do Chat: {e}")
+                st.error(f"Erro crítico na chamada da OpenAI: {e}")
+
+
+
 
 # ==============================================================================
 # 7. TELA DE GESTÃO DE RELACIONAMENTOS (RESTAURAÇÃO COMPLETA DA LISTA DE MATCHES)
