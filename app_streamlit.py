@@ -795,10 +795,9 @@ def template_chat_ia_completo():
     with col_botoes_topo:
         c_refresh, c_fc = st.columns(2)
         with c_refresh:
-            # 🔍 NOVO: Botão reativo de atualização que não derruba o login do usuário!
             if st.button("🔄 Atualizar Dados", type="tertiary", help="Sincronizar mensagens e limpar cache sem deslogar"):
                 st.toast("Sincronizando dados com o PostgreSQL...")
-                st.rerun() # Força o Streamlit a reler o banco de dados mantendo os estados ativos
+                st.rerun() 
         with c_fc:
             if st.button("✉️ Fale Conosco", type="tertiary", help="Abrir suporte de atendimento"):
                 st.session_state.opcao_menu = "✉️ Fale Conosco"
@@ -806,24 +805,22 @@ def template_chat_ia_completo():
 
     st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
 
-    # Área de histórico com rolagem única interna (Não arrasta o título junto)
+    # Área de histórico com rolagem única interna
     with st.container(height=440, border=False):
         historico = buscar_memoria(st.session_state.usuario_id, limite=15) 
         for user_p, ia_r in historico: 
             if user_p: st.chat_message("user").write(user_p) 
             if ia_r: st.chat_message("assistant").write(ia_r) 
 
-
-    # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE (LUCY COGNITIVA INTERPESSOAL)
+    # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
             st.chat_message("user").write(prompt) 
             
             try:
-                # A variável nasce aqui como meu_id_f
                 meu_id_f = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
                 
-                # --- BUSCA O ESTADO ATUAL DOS PILARES (RESOLVIDO: meu_id_f unificado) ---
+                # --- BUSCA O ESTADO ATUAL DOS PILARES ---
                 conn_pilar = conectar_supabase()
                 cursor_pilar = conn_pilar.cursor()
                 
@@ -834,7 +831,6 @@ def template_chat_ia_completo():
                     """, (meu_id_f,))
                     pilar_dados = cursor_pilar.fetchone()
                 except Exception:
-                    # Fallback preventivo caso a coluna de relacionamento ainda não tenha sido criada via ALTER TABLE
                     conn_pilar.rollback()
                     cursor_pilar.execute("""
                         SELECT idade, genero, procura_por, 'namoro' 
@@ -845,40 +841,29 @@ def template_chat_ia_completo():
                 cursor_pilar.close()
                 conn_pilar.close()
                 
-                # Desempacota as variáveis de forma segura para montar o diagnóstico da Lucy
                 dados_faltantes_contexto = ""
                 if pilar_dados:
                     idade_b, gen_b, proc_gen_b, proc_rel_b = pilar_dados
                     if not idade_b: dados_faltantes_contexto += "- IDADE do usuário\n"
                     if not proc_gen_b: dados_faltantes_contexto += "- Se ele tem interesse por HOMEM, MULHER ou AMBOS\n"
                     if not proc_rel_b: dados_faltantes_contexto += "- Se ele procura AMIZADE ou NAMORO\n"
-                # 2. RESGATA A MEMÓRIA RECENTE DO CHAT
+                
+                # Resgata a memória recente do chat
                 historico_previo = buscar_memoria(meu_id_f, limite=6)
                 contexto_conversacao = ""
                 for u_p, ia_r in historico_previo:
                     contexto_conversacao += f"Usuário: {u_p}\nVocê (Lucy): {ia_r}\n"
                 
-                # 3. EXECUTADOR DA PERSONA DIRECIONADA
-                # 1. Estruture as mensagens no formato correto da OpenAI (Lista de Dicionários)
+                # Configuração da Persona
                 mensagens_openai = [
                     {
                         "role": "system",
                         "content": (
                             "Você é Lucy, uma assistente virtual focada em criar conexões humanas legítimas através de afinidades semânticas. "
                             "Seu tom deve ser amigável, interpessoal, acolhedor e levemente curioso. "
-                            "Sua missão secreta é descobrir 4 dados essenciais sobre o usuário, mas você DEVE fazer isso de forma embutida e fluida na conversa, "
-                            "investigando APENAS UM DADO POR VEZ. Nunca faça uma lista de perguntas estilo questionário.\n\n"
-                            "Os 4 dados são:\n"
-                            "1. A idade dele.\n"
-                            "2. Se ele tem interesse por: Homem, Mulher ou Ambos.\n"
-                            "3. O que ele procura na plataforma (Amizade ou Namoro).\n"
-                            "4. Seus hobbies e interesses cotidianos.\n\n"
-                            "Instruções de fluxo:\n"
-                            "- Analise a lista de 'Dados atuais pendentes de extração' que foi enviada no escopo.\n"
-                            "- Escolha o primeiro item da lista de pendências e conduza o assunto para aquele rumo.\n"
-                            "- Exemplo para Idade: Se ele falar de planos do dia, diga algo como 'Nossa, que legal! Isso me lembra quando eu ajudei um usuário da sua faixa de idade... por sinal, quantos anos você tem?'\n"
-                            "- Exemplo para Intenção: 'Acho lindo como as pessoas buscam coisas diferentes... alguns querem só uma boa amizade para conversar, outros procuram um namoro sério. O que você está buscando por aqui hoje?'\n"
-                            "- Sempre valide o prompt atual do usuário com empatia antes de introduzir a sua pergunta direcionada no final."
+                            "Sua missão secreta é descobrir 4 dados essenciais sobre o usuário, investigando APENAS UM DADO POR VEZ.\n\n"
+                            "Os 4 dados são:\n1. A idade dele.\n2. Se ele tem interesse por: Homem, Mulher ou Ambos.\n3. O que ele procura na plataforma (Amizade ou Namoro).\n4. Seus hobbies e interesses cotidianos.\n\n"
+                            "Sempre valide o prompt atual do usuário com empatia antes de introduzir a sua pergunta direcionada no final."
                         )
                     },
                     {
@@ -887,21 +872,17 @@ def template_chat_ia_completo():
                     }
                 ]
 
-                # 2. Faça a chamada correta para a OpenAI
+                # Chamada do modelo GPT-4o-mini para gerar a resposta de chat
                 resposta_streaming = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=mensagens_openai,
                     temperature=0.9
-                    
                 )
 
-                # 3. Na OpenAI, capturamos o texto através de .choices[0].message.content
                 resposta_lucy = resposta_streaming.choices[0].message.content
-
-                # 4. Exibe no Streamlit
                 st.chat_message("assistant").write(resposta_lucy)
 
-                # Salva de forma estável no Postgres
+                # Salva a conversa no banco PostgreSQL
                 conn = conectar_supabase()
                 cursor = conn.cursor() 
                 cursor.execute("INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta, data_hora) VALUES (%s, %s, %s, %s);", (meu_id_f, prompt, resposta_lucy, datetime.now())) 
@@ -909,11 +890,7 @@ def template_chat_ia_completo():
                 cursor.close()
                 conn.close() 
 
-                # 🚀 CORREÇÃO DO SUMIÇO: Força a página a recarregar e buscar o histórico atualizado do banco
-                #st.rerun()
-
                 # 4. ATUALIZAÇÃO AUTOMÁTICA DE ATRIBUTOS (EXTRATOR INTELIGENTE BACKEND)
-                 # 1. Monta a estrutura correta de mensagens com System e User
                 mensagens_extracao = [
                     {
                         "role": "system",
@@ -933,23 +910,19 @@ def template_chat_ia_completo():
                     }
                 ]
 
-                # 2. Faz a chamada forçando o formato JSON
+                # Chamada forçando o formato JSON nativo da OpenAI
                 resposta_extracao = client.chat.completions.create(
                     model='gpt-4o-mini',
                     messages=mensagens_extracao,
-                    temperature=0.0,  # Reduzido para 0.0 para garantir máxima precisão no JSON
-                    response_format={"type": "json_object"}  # Força a OpenAI a responder em JSON puro
+                    temperature=0.0, 
+                    response_format={"type": "json_object"} 
                 )
 
-                 # 3. Captura a string de texto do JSON
                 texto_json = resposta_extracao.choices[0].message.content
-
-                # 4. Transforma a string em um dicionário Python para você usar no Supabase
                 dados_extraidos = modulo_json.loads(texto_json)
 
-                # --- RESOLVIDO: Processamento e persistência das respostas pescadas pela Lucy ---
+                # Persistência das respostas pescadas pela Lucy no Banco
                 try:
-                    # Usamos diretamente o 'dados_extraidos' que já foi validado e convertido acima
                     if dados_extraidos.get("idade"):
                         conn_up = conectar_supabase()
                         cursor_up = conn_up.cursor()
@@ -975,10 +948,9 @@ def template_chat_ia_completo():
                         conn_up.close()
                         
                 except Exception as erro_banco:
-                    # Opcional: mude para st.warning(f"Erro ao salvar dados: {erro_banco}") caso queira debugar
                     pass 
 
-                # Dispara o motor clássico de matches semânticos por 4 pilares
+                # Dispara o motor de matches semânticos
                 res_match = processar_afinidade_e_match(meu_id_f, prompt) 
                 
                 if res_match and res_match.get("match") == True: 
@@ -999,15 +971,15 @@ def template_chat_ia_completo():
                         "match_id": int(res_match["match_id"]), 
                         "id_par": id_parceiro_match, 
                         "nome": res_match["nome_par"], 
-                        "online": parceiro_real_online
+                        "online": parceiro_real_online 
                     } 
                     st.balloons() 
-                
-                # Executa o recarregamento final da tela com todas as atualizações prontas
-                st.rerun() 
-                
-            except Exception as e: 
-                st.error(f"Erro na IA: {e}")
+
+                    # Único rerun no final de toda a lógica do chatbot 
+                    st.rerun() 
+
+                except Exception as e: 
+                    st.error(f"Erro na IA: {e}") 
 
 # ==============================================================================
 # 7. TELA DE GESTÃO DE RELACIONAMENTOS (RESTAURAÇÃO COMPLETA DA LISTA DE MATCHES)
