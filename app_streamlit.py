@@ -357,7 +357,7 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
         resposta_sintese = client.models.generate_content(
             model='gpt-4o-mini',
             contents=f"Baseado nesta interação recente do usuário, extraia e descreva em terceira pessoa uma lista de seus hobbies e interesses: {texto_atual}",
-            config={"system_instruction": "Escreva apenas um parágrafo corrido contendo as palavras-chaves semânticas de interesses."}
+            config={"system_instruction": "Escreva apenas um parágrafo corrido contendo as palavras-chaves semânticas de interesses."},
             temperature=0.9
         )
         
