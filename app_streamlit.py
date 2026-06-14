@@ -491,6 +491,45 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
             
     return {"match": False}
 
+# --- ADICIONE ESTA FUNÇÃO NO SEU CÓDIGO (OU NO TOPO DO ARQUIVO) ---
+def criar_match_real_para_teste(meu_id, id_parceiro_teste=2):
+    """
+    Insere um match real na tabela 'matches' do Supabase para gerar um ID válido.
+    """
+    try:
+        conn = conectar_supabase()
+        cursor = conn.cursor()
+        
+        # 1. Garante que o parceiro de teste existe (ID 2). Se não, pega o primeiro que achar
+        cursor.execute("SELECT id FROM usuarios WHERE id = %s;", (id_parceiro_teste,))
+        parceiro = cursor.fetchone()
+        if not parceiro:
+            cursor.execute("SELECT id FROM usuarios WHERE id != %s LIMIT 1;", (meu_id,))
+            parceiro = cursor.fetchone()
+            
+        if not parceiro:
+            cursor.close(); conn.close()
+            return None
+            
+        id_par = parceiro[0]
+        
+        # 2. Insere na tabela 'matches' e captura o ID real gerado pelo banco
+        cursor.execute("""
+            INSERT INTO matches (usuario_id_1, usuario_id_2, ativo, data_criacao)
+            VALUES (%s, %s, true, NOW())
+            RETURNING id;
+        """, (meu_id, id_par))
+        
+        match_id_real = cursor.fetchone()[0]
+        
+        conn.commit()
+        cursor.close(); conn.close()
+        return {"match_id": match_id_real, "id_par": id_par}
+    except Exception as e:
+        if 'conn' in locals() and conn: conn.rollback()
+        st.error(f"Erro ao gerar match no banco: {e}")
+        return None
+
 
 
 def gatilho_match_teste_forcado(usuario_id_atual, id_parceiro_teste=999, nome_parceiro_teste="Usuário Teste 🟢"):
@@ -871,52 +910,53 @@ def template_chat_ia_completo():
 
 
 
-     # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE (MÓDULO DE TESTE ISOLADO)
+     # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE (MÓDULO DE TESTE COM MATCH REAL)
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
             
-            # 1. Garante que a lista de mensagens locais existe
             if "mensagens_teste" not in st.session_state:
                 st.session_state.mensagens_teste = []
                 
-            # 2. Guarda o texto do usuário na memória local
             st.session_state.mensagens_teste.append({"role": "user", "content": prompt})
             
             try:
-                # 3. Chamada direta e simples para a OpenAI
-                mensagens_openai = [
-                    {"role": "system", "content": "Você é Lucy, uma assistente virtual amigável."},
-                    {"role": "user", "content": prompt}
-                ]
+                # Converte o ID do usuário logado de forma limpa
+                meu_id_f = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
 
+                # Chamada simples para a OpenAI
                 resposta_streaming = client.chat.completions.create(
                     model="gpt-4o-mini",
-                    messages=mensagens_openai,
+                    messages=[
+                        {"role": "system", "content": "Você é Lucy, uma assistente virtual amigável."},
+                        {"role": "user", "content": prompt}
+                    ],
                     temperature=0.9
                 )
                 resposta_lucy = resposta_streaming.choices[0].message.content
-
-                # 4. Guarda a resposta da Lucy na memória local
                 st.session_state.mensagens_teste.append({"role": "assistant", "content": resposta_lucy})
 
-                # 5. FORÇA O GATILHO DE MATCH DE TESTE DIRETOR PARA A SALA PRIVADA
-                # Mudamos os estados que sua sala privada provavelmente lê para abrir a comunicação
-                st.session_state.alerta_match = {
-                    "match_id": 12345,         # ID de match fictício para teste
-                    "id_par": 2,               # ID do parceiro de teste
-                    "nome": "Usuário Teste 🟢",
-                    "online": True
-                } 
+                # 🚀 CRIA O MATCH REAL NO SUPABASE
+                dados_match = criar_match_real_para_teste(meu_id_f, id_parceiro_teste=2)
                 
-                # Se o seu sistema de sala privada usa outras variáveis, ative-as aqui:
-                st.session_state.sala_atual_id = 12345 
-                st.session_state.id_parceiro_chat = 2
+                if dados_match:
+                    # Alimenta as variáveis que a sua função 'live_chat_privado_engine' (Linha 1184) precisa
+                    st.session_state.alerta_match = {
+                        "match_id": dados_match["match_id"], 
+                        "id_par": dados_match["id_par"], 
+                        "nome": "Usuário Teste 🟢",
+                        "online": True
+                    } 
+                    
+                    # Configura as variáveis de controle da sala privada
+                    st.session_state.sala_atual_id = dados_match["match_id"] 
+                    st.session_state.id_parceiro_chat = dados_match["id_par"]
+                    
+                    st.balloons()
                 
-                st.balloons() # Mostra os balões de match na tela
-                st.rerun()    # Recarrega a tela para fixar as mensagens
+                st.rerun()
                 
             except Exception as e: 
-                st.error(f"Erro crítico na chamada da OpenAI: {e}")
+                st.error(f"Erro crítico na chamada: {e}")
 
 
 
