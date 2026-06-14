@@ -936,7 +936,7 @@ def template_chat_ia_completo():
                 st.session_state.mensagens_teste.append({"role": "assistant", "content": resposta_lucy})
 
                 # 🚀 CRIA O MATCH REAL NO SUPABASE
-                dados_match = criar_match_real_para_teste(id_par=2, nome_par=3)
+                id_match_existente_no_banco = 2
                 
                 if dados_match:
                     # Alimenta as variáveis que a sua função 'live_chat_privado_engine' (Linha 1184) precisa
