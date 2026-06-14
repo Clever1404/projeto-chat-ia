@@ -910,7 +910,7 @@ def template_chat_ia_completo():
 
 
 
-     # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE (MÓDULO DE TESTE COM MATCH REAL)
+      # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE (MÓDULO DE TESTE SUPER FORÇADO)
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
             
@@ -920,10 +920,7 @@ def template_chat_ia_completo():
             st.session_state.mensagens_teste.append({"role": "user", "content": prompt})
             
             try:
-                # Converte o ID do usuário logado de forma limpa
-                meu_id_f = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
-
-                # Chamada simples para a OpenAI
+                # 1. Chamada simples para a OpenAI
                 resposta_streaming = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
@@ -935,24 +932,23 @@ def template_chat_ia_completo():
                 resposta_lucy = resposta_streaming.choices[0].message.content
                 st.session_state.mensagens_teste.append({"role": "assistant", "content": resposta_lucy})
 
-                # 🚀 CRIA O MATCH REAL NO SUPABASE
-                id_match_existente_no_banco = 2
+                # 🚀 PASSO CRÍTICO: Injetando um ID que JÁ EXISTE na tabela 'matches'
+                # ⚠️ SUBSTITUA O NÚMERO 1 ABAIXO PELO ID QUE VOCÊ VIU NO SUPABASE
+                id_match_existente_no_banco = 1 
                 
-                if dados_match:
-                    # Alimenta as variáveis que a sua função 'live_chat_privado_engine' (Linha 1184) precisa
-                    st.session_state.alerta_match = {
-                        "match_id": dados_match["match_id"], 
-                        "id_par": dados_match["id_par"], 
-                        "nome": "Usuário Teste 🟢",
-                        "online": True
-                    } 
-                    
-                    # Configura as variáveis de controle da sala privada
-                    st.session_state.sala_atual_id = dados_match["match_id"] 
-                    st.session_state.id_parceiro_chat = dados_match["id_par"]
-                    
-                    st.balloons()
+                # Preenche as variáveis exatas que a sua sala privada usa
+                st.session_state.alerta_match = {
+                    "match_id": id_match_existente_no_banco, 
+                    "id_par": 2, 
+                    "nome": "Usuário Teste Real 🟢",
+                    "online": True
+                } 
                 
+                # Configura os estados que alimentam a linha 1184 do seu live_chat_privado_engine
+                st.session_state.sala_atual_id = id_match_existente_no_banco
+                st.session_state.id_parceiro_chat = 2
+                
+                st.balloons()
                 st.rerun()
                 
             except Exception as e: 
