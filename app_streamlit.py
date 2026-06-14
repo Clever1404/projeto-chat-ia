@@ -978,8 +978,8 @@ def template_chat_ia_completo():
                     # Único rerun no final de toda a lógica do chatbot 
                     st.rerun() 
 
-                except Exception as e: 
-                    st.error(f"Erro na IA: {e}") 
+            except Exception as e: 
+                st.error(f"Erro na IA: {e}") 
 
 # ==============================================================================
 # 7. TELA DE GESTÃO DE RELACIONAMENTOS (RESTAURAÇÃO COMPLETA DA LISTA DE MATCHES)
