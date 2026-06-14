@@ -356,7 +356,7 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
         # --- PILAR 4: IA SINTETIZA OS HOBBIES E INTERESSES RECENTES ---
         resposta_sintese = client.chat.completions.create(
             model='gpt-4o-mini',
-            contents=f"Baseado nesta interação recente do usuário, extraia e descreva em terceira pessoa uma lista de seus hobbies e interesses: {texto_atual}",
+            messages=f"Baseado nesta interação recente do usuário, extraia e descreva em terceira pessoa uma lista de seus hobbies e interesses: {texto_atual}",
             config={"system_instruction": "Escreva apenas um parágrafo corrido contendo as palavras-chaves semânticas de interesses."},
             temperature=0.9
         )
@@ -791,13 +791,35 @@ def template_chat_ia_completo():
 
     st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
 
-
     # Área de histórico com rolagem única interna (Não arrasta o título junto)
     with st.container(height=440, border=False):
         historico = buscar_memoria(st.session_state.usuario_id, limite=15) 
         for user_p, ia_r in historico: 
             if user_p: st.chat_message("user").write(user_p) 
             if ia_r: st.chat_message("assistant").write(ia_r) 
+
+
+    # Garanta que o histórico possui mensagens antes de enviar
+    if st.session_state.messages:
+        with st.chat_message("assistant"):
+            # Criamos a lista de mensagens explicitamente
+            mensagens_api = [
+                {"role": m["role"], "content": m["content"]}
+                for m in st.session_state.messages
+            ]
+            
+            # Chamada com argumentos nomeados explícitos
+            stream = client.chat.completions.create(
+                model="gpt-4o-mini",  # Certifique-se de que o nome do modelo está correto
+                messages=mensagens_api,
+                stream=True
+            )
+            response = st.write_stream(stream)
+
+
+
+
+
 
     # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE (LUCY COGNITIVA INTERPESSOAL)
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
@@ -845,8 +867,8 @@ def template_chat_ia_completo():
                 
                 # 3. EXECUTADOR DA PERSONA DIRECIONADA
                 resposta_streaming = client.chat.completions.create(
-                    model='gpt-4o-mini',
-                    contents=f"{contexto_conversacao}Dados atuais pendentes de extração:\n{dados_faltantes_contexto}\nUsuário: {prompt}\nVocê (Lucy):",
+                    model="gpt-4o-mini",
+                    messages=f"{contexto_conversacao}Dados atuais pendentes de extração:\n{dados_faltantes_contexto}\nUsuário: {prompt}\nVocê (Lucy):",
                     temperature=0.9,
                     config={
                         "system_instruction": (
@@ -882,7 +904,7 @@ def template_chat_ia_completo():
                 # 4. ATUALIZAÇÃO AUTOMÁTICA DE ATRIBUTOS (EXTRATOR INTELIGENTE BACKEND)
                 resposta_extracao = client.chat.completions.create(
                     model='gpt-4o-mini',
-                    contents=f"Analise o texto do usuário e extraia se ele respondeu alguma das perguntas. Texto: '{prompt}'",
+                    messages=f"Analise o texto do usuário e extraia se ele respondeu alguma das perguntas. Texto: '{prompt}'",
                     temperature=0.9,
                     config={
                         "system_instruction": (
