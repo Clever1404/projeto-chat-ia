@@ -982,11 +982,11 @@ def template_chat_ia_completo():
                     # Força o status para offline no teste, ignorando o banco real se necessário
                     # status_banco = ("Offline",) 
                     
-                    #if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
-                    #    parceiro_real_online = True
-                    #else:
-                        # Garante que caia aqui no teste caso o ID 999 não exista ou esteja offline
-                    #    parceiro_real_online = False 
+                    if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
+                        parceiro_real_online = True
+                    else:
+                        #Garante que caia aqui no teste caso o ID 999 não exista ou esteja offline
+                        parceiro_real_online = False 
 
                     st.session_state.alerta_match = {
                         "match_id": int(res_match["match_id"]), 
