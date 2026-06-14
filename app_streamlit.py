@@ -374,7 +374,7 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
         )
 
         # 3. Captura o texto gerado corretamente
-        perfil_consolidado_texto = resposta_sintese.choices.message.content
+        perfil_consolidado_texto = resposta_sintese.choices[0].message.content
 
         # Gera o embedding de 768 dimensões usando o modelo correto da OpenAI
         resposta_embedding = client.embeddings.create(
@@ -939,7 +939,7 @@ def template_chat_ia_completo():
                 )
 
                 # 3. Captura a string de texto do JSON
-                texto_json = resposta_extracao.choices.message.content
+                texto_json = resposta_extracao.choices[0].message.content
 
                 # 4. Transforma a string em um dicionário Python para você usar no Supabase
                 dados_extraidos = json.loads(texto_json)
