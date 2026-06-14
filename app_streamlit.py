@@ -974,12 +974,15 @@ def template_chat_ia_completo():
                         "online": parceiro_real_online 
                     } 
                     st.balloons() 
-
-                    # Único rerun no final de toda a lógica do chatbot 
-                    st.rerun() 
+                    # SÓ executa o rerun global se o usuário NÃO estiver na Sala Privada conversando
+                    if st.session_state.opcao_menu != "🤝 Sala Privada":
+                        st.rerun() 
 
             except Exception as e: 
-                st.error(f"Erro na IA: {e}") 
+                st.error(f"Erro na IA: {e}")
+               
+
+            
 
 # ==============================================================================
 # 7. TELA DE GESTÃO DE RELACIONAMENTOS (RESTAURAÇÃO COMPLETA DA LISTA DE MATCHES)
@@ -1218,13 +1221,26 @@ def template_sala_privada():
             
 
         # 📥 MOTOR FRAGMENTADO AS SÍNCRONO REATIVO (ATUALIZA A CADA 2 SEGUNDOS)
-        #@st.fragment(run_every=2)
+        @st.fragment
         def live_chat_privado_engine(m_id, my_id, p_nome_str):
+            # Correção do split: extrai o primeiro item da lista antes de aplicar capitalize
+            try:
+                nome_exibicao = p_nome_str.split('@')[0].capitalize()
+            except Exception:
+                nome_exibicao = str(p_nome_str).capitalize()
+
             with st.container(height=410, border=False):
                 try:
-                    conn = conectar_supabase(); cursor = conn.cursor()
-                    cursor.execute('SELECT remetente_id, texto, data_envio FROM mensagens_chat WHERE match_id = %s ORDER BY data_envio ASC;', (int(m_id),))
-                    rows = cursor.fetchall(); cursor.close(); conn.close()
+                    conn = conectar_supabase()
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        'SELECT remetente_id, texto, data_envio FROM mensagens_chat WHERE match_id = %s ORDER BY data_envio ASC;', 
+                        (int(m_id),)
+                    )
+                    rows = cursor.fetchall()
+                    cursor.close()
+                    conn.close()
+                    
                     for r_id, txt, dt in rows:
                         hora_f = dt.strftime("%H:%M")
                         if int(r_id) == int(my_id):
@@ -1234,16 +1250,29 @@ def template_sala_privada():
                         else:
                             with st.chat_message("assistant"):
                                 st.write(txt)
-                                st.caption(f"{p_nome_str.split('@')[0].capitalize()} — {hora_f}")
-                except Exception: pass
+                                st.caption(f"{nome_exibicao} — {hora_f}")
+                except Exception as e:
+                    st.error(f"Erro ao ler banco: {e}")
             
+            # Executa o input e processamento de envio de forma estritamente isolada
             if st.session_state.opcao_menu == "🤝 Sala Privada":
                 if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
                     if txt_in.strip():
-                        conn = conectar_supabase(); cursor = conn.cursor()
-                        cursor.execute('INSERT INTO mensagens_chat (match_id, remetente_id, texto) VALUES (%s, %s, %s);', (int(m_id), int(my_id), txt_in.strip()))
-                        conn.commit(); cursor.close(); conn.close()
-                        st.rerun()
+                        try:
+                            conn = conectar_supabase()
+                            cursor = conn.cursor()
+                            cursor.execute(
+                                'INSERT INTO mensagens_chat (match_id, remetente_id, texto) VALUES (%s, %s, %s);', 
+                                (int(m_id), int(my_id), txt_in.strip())
+                            )
+                            conn.commit()
+                            cursor.close()
+                            conn.close()
+                            # Rerun local: atualiza estritamente o fragmento do chat
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao enviar: {e}")
+
 
 
             
