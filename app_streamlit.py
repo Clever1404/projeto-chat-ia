@@ -525,17 +525,17 @@ def modal_match_lucy(dados_m):
     
     # 🟢 COMPORTAMENTO SE O PAR ESTIVER ONLINE: Libera o chat imediato
     if dados_m["online"]:
-        if st.button(f"🟢 {dados_m['nome']} está online. Gostaria de conversar agora!", type="primary", width="stretch"):
+        if st.button(f"🟢 {dados_m['nome']} está online. Gostaria de conversar agora!", type="primary", use_container_width=True):
             st.session_state.match_id_atual = dados_m["match_id"]
             st.session_state.opcao_menu = "🤝 Sala Privada"
             st.rerun()
             
     # ⚪ COMPORTAMENTO SE O PAR ESTIVER OFFLINE: Mostra bloqueado e ativa o botão de agendamento
     else:
-        st.button(f"⚪ {dados_m['nome']} está offline. Indisponível.", disabled=True, width="stretch")
+        st.button(f"⚪ {dados_m['nome']} está offline. Indisponível.", disabled=True, use_container_width=True)
         
         # O botão azul agora herda os IDs e aciona de forma atômica o modal de agendamentos no próximo ciclo
-        if st.button("📅 Agende um encontro virtual", type="secondary", width="stretch"):
+        if st.button("📅 Agende um encontro virtual", type="secondary", use_container_width=True):
             st.session_state.abrir_reserva_fluxo = {
                 "id_par": dados_m["id_par"], 
                 "nome_par": dados_m["nome"], 
@@ -544,9 +544,10 @@ def modal_match_lucy(dados_m):
             st.rerun()
             
     # ❌ Opção comum de rejeição em qualquer cenário
-    if st.button("❌ Não tenho interesse", type="primary", width="stretch"):
+    if st.button("❌ Não tenho interesse", type="primary", use_container_width=True):
         st.rerun()
 
+        
 @st.dialog("📅 Reserva de Encontro")
 def modal_agendamento_encontro(dados_r):
     st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
