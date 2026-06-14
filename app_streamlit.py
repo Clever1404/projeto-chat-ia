@@ -964,19 +964,43 @@ def template_chat_ia_completo():
                     pass
 
                 # ============================================================
-                # 🚀 DETECTOR REAL DE STATUS ONLINE/OFFLINE (IDs 2 e 3)
+                # 🚀 RESOLUÇÃO DEFINITIVA: CRIAÇÃO AUTOMÁTICA DE MATCH NO BANCO
                 # ============================================================
                 ID_ALVO_TESTE = 3 if int(meu_id_f) == 2 else 2
-                MATCH_ID_FIXO = 203
                 
                 try:
                     conn_t = conectar_supabase()
                     cursor_t = conn_t.cursor()
                     
-                    # 1. Busca o nome e o status real do banco do outro usuário
+                    # 1. Verifica se já existe um match entre esses dois usuários
+                    cursor_t.execute("""
+                        SELECT id FROM matches 
+                        WHERE (usuario_1_id = %s AND usuario_2_id = %s) 
+                           OR (usuario_1_id = %s AND usuario_2_id = %s);
+                    """, (int(meu_id_f), ID_ALVO_TESTE, ID_ALVO_TESTE, int(meu_id_f)))
+                    
+                    resultado_match = cursor_t.fetchone()
+                    
+                    if resultado_match:
+                        # Se já existir, captura o ID existente
+                        match_id_final = resultado_match[0]
+                    else:
+                        # Se NÃO existir, CRIA O MATCH AUTOMATICAMENTE AGORA
+                        # O 'RETURNING id' pede para o PostgreSQL devolver o ID gerado (útil para campos serial/auto-incremento)
+                        cursor_t.execute("""
+                            INSERT INTO matches (usuario_1_id, usuario_2_id) 
+                            VALUES (%s, %s) 
+                            RETURNING id;
+                        """, (int(meu_id_f), ID_ALVO_TESTE))
+                        
+                        match_id_final = cursor_t.fetchone()[0]
+                        conn_t.commit() # Grava a criação do match imediatamente
+                    
+                    # 2. Busca o status online/offline real do parceiro
                     cursor_t.execute("SELECT status FROM usuarios WHERE id = %s;", (ID_ALVO_TESTE,))
                     resultado_status = cursor_t.fetchone()
                     
+                    # 3. Busca o nome real do parceiro
                     try:
                         cursor_t.execute("SELECT nome FROM usuarios WHERE id = %s;", (ID_ALVO_TESTE,))
                         resultado_nome = cursor_t.fetchone()
@@ -987,30 +1011,28 @@ def template_chat_ia_completo():
                     cursor_t.close()
                     conn_t.close()
                     
-                    # 2. Varre o texto do status buscando marcadores de atividade
+                    # 4. Processa se está online
                     parceiro_real_online = False
-                    if resultado_status:
+                    if resultado_status and resultado_status[0]:
                         texto_status = str(resultado_status[0])
                         if "Online" in texto_status or "🟢" in texto_status:
                             parceiro_real_online = True
                     
-                    # 3. Monta o payload dinâmico para o Dialog
+                    # 5. Monta o payload perfeitamente blindado para o Modal e Agendamento
                     res_match = {
                         "match": True,
                         "id_par": ID_ALVO_TESTE,
-                        "match_id": MATCH_ID_FIXO,
+                        "match_id": match_id_final, # ID 100% real e existente no banco de dados
                         "nome": nome_parceiro_real,
-                        "online": parceiro_real_online  # 👈 DECTECTADO DINAMICAMENTE AQUI
+                        "online": parceiro_real_online
                     }
                     
                     st.session_state.alerta_match = res_match
                     st.balloons()
                     
                 except Exception as e:
-                    st.error(f"Erro no detector de status: {e}")
+                    st.error(f"Erro na automação do match: {e}")
 
-                
-                # Força a tela a recarregar e desenhar o histórico + disparar modal
                 st.rerun()
 
             except Exception as e: 
