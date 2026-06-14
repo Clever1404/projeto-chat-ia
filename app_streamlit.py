@@ -910,6 +910,9 @@ def template_chat_ia_completo():
                 cursor.close()
                 conn.close() 
 
+                # 🚀 CORREÇÃO DO SUMIÇO: Força a página a recarregar e buscar o histórico atualizado do banco
+                st.rerun()
+
                 # 4. ATUALIZAÇÃO AUTOMÁTICA DE ATRIBUTOS (EXTRATOR INTELIGENTE BACKEND)
                  # 1. Monta a estrutura correta de mensagens com System e User
                 mensagens_extracao = [
@@ -939,32 +942,41 @@ def template_chat_ia_completo():
                     response_format={"type": "json_object"}  # Força a OpenAI a responder em JSON puro
                 )
 
-                # 3. Captura a string de texto do JSON
-                texto_json = resposta_extracao.choices.message.content
+                 # 3. Captura a string de texto do JSON
+                texto_json = resposta_extracao.choices[0].message.content
 
                 # 4. Transforma a string em um dicionário Python para você usar no Supabase
                 dados_extraidos = modulo_json.loads(texto_json)
 
-                # Exemplo de uso posterior:
-                # idade = dados_extraidos.get("idade")
-                
-                # Processamento e persistência das respostas pescadas pela Lucy
+                # --- RESOLVIDO: Processamento e persistência das respostas pescadas pela Lucy ---
                 try:
-                    import json
-                    dados_json = json.loads(resposta_extracao.text.strip().replace("```json", "").replace("```", ""))
-                    
-                    conn_up = conectar_supabase()
-                    cursor_up = conn_up.cursor()
-                    if dados_json.get("idade"):
-                        cursor_up.execute("UPDATE usuarios SET idade = %s WHERE id = %s;", (int(dados_json["idade"]), meu_id_f))
-                    if dados_json.get("interesse"):
-                        cursor_up.execute("UPDATE usuarios SET procura_por = %s WHERE id = %s;", (str(dados_json["interesse"]), meu_id_f))
-                    if dados_json.get("procura"):
-                        cursor_up.execute("UPDATE usuarios SET procura_relacionamento = %s WHERE id = %s;", (str(dados_json["procura"]), meu_id_f))
-                    conn_up.commit()
-                    cursor_up.close()
-                    conn_up.close()
-                except Exception:
+                    # Usamos diretamente o 'dados_extraidos' que já foi validado e convertido acima
+                    if dados_extraidos.get("idade"):
+                        conn_up = conectar_supabase()
+                        cursor_up = conn_up.cursor()
+                        cursor_up.execute("UPDATE usuarios SET idade = %s WHERE id = %s;", (int(dados_extraidos["idade"]), meu_id_f))
+                        conn_up.commit()
+                        cursor_up.close()
+                        conn_up.close()
+                        
+                    if dados_extraidos.get("interesse"):
+                        conn_up = conectar_supabase()
+                        cursor_up = conn_up.cursor()
+                        cursor_up.execute("UPDATE usuarios SET procura_por = %s WHERE id = %s;", (str(dados_extraidos["interesse"]), meu_id_f))
+                        conn_up.commit()
+                        cursor_up.close()
+                        conn_up.close()
+                        
+                    if dados_extraidos.get("procura"):
+                        conn_up = conectar_supabase()
+                        cursor_up = conn_up.cursor()
+                        cursor_up.execute("UPDATE usuarios SET procura_relacionamento = %s WHERE id = %s;", (str(dados_extraidos["procura"]), meu_id_f))
+                        conn_up.commit()
+                        cursor_up.close()
+                        conn_up.close()
+                        
+                except Exception as erro_banco:
+                    # Opcional: mude para st.warning(f"Erro ao salvar dados: {erro_banco}") caso queira debugar
                     pass 
 
                 # Dispara o motor clássico de matches semânticos por 4 pilares
@@ -974,10 +986,12 @@ def template_chat_ia_completo():
                     id_parceiro_match = int(res_match["id_par"])
                     
                     parceiro_real_online = False
-                    conn_p = conectar_supabase(); cursor_p = conn_p.cursor()
+                    conn_p = conectar_supabase()
+                    cursor_p = conn_p.cursor()
                     cursor_p.execute("SELECT status FROM usuarios WHERE id = %s;", (id_parceiro_match,))
                     status_banco = cursor_p.fetchone()
-                    cursor_p.close(); conn_p.close()
+                    cursor_p.close()
+                    conn_p.close()
                     
                     if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
                         parceiro_real_online = True
@@ -989,6 +1003,8 @@ def template_chat_ia_completo():
                         "online": parceiro_real_online
                     } 
                     st.balloons() 
+                
+                # Executa o recarregamento final da tela com todas as atualizações prontas
                 st.rerun() 
                 
             except Exception as e: 
