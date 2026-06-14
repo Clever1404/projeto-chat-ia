@@ -955,53 +955,31 @@ def template_chat_ia_completo():
                 res_match = processar_afinidade_e_match(meu_id_f, prompt) 
                 
                 # ============================================================
-                # 👇 MODO DE TESTE: SIMULANDO MATCH COM USUÁRIO OFFLINE
+                # 👇 MODO DE TESTE CORRIGIDO: FORÇANDO MATCH ENTRE ID 2 E ID 3
                 # ============================================================
-                ID_PARCEIRO_TESTE = 2  
-                MATCH_ID_TESTE = 3     
+                ID_ALVO_TESTE = 3 if int(meu_id_f) == 2 else 2  # Define o parceiro (se você for o 2, o par é o 3, e vice-versa)
+                MATCH_ID_FIXO = 203  # O mesmo ID que inserimos no Passo 1
                 
-                res_match = {
-                    "match": True,
-                    "id_par": ID_PARCEIRO_TESTE,
-                    "match_id": MATCH_ID_TESTE,
-                    "nome_par": "Usuário Teste Dev (Offline)"
-                }
-                # ============================================================
-                
-                if res_match and res_match.get("match") == True: 
-                    id_parceiro_match = int(res_match["id_par"])
+                try:
+                    conn_t = conectar_supabase()
+                    cursor_t = conn_t.cursor()
+                    # Busca o nome real do usuário cadastrado (ID 2 ou 3)
+                    cursor_t.execute("SELECT nome FROM usuarios WHERE id = %s;", (ID_ALVO_TESTE,))
+                    resultado_nome = cursor_t.fetchone()
+                    cursor_t.close()
+                    conn_t.close()
                     
-                    parceiro_real_online = False
-                    conn_p = conectar_supabase()
-                    cursor_p = conn_p.cursor()
-                    cursor_p.execute("SELECT status FROM usuarios WHERE id = %s;", (id_parceiro_match,))
-                    status_banco = cursor_p.fetchone()
-                    cursor_p.close()
-                    conn_p.close()
+                    nome_parceiro_real = resultado_nome[0] if resultado_nome else f"Usuário ID {ID_ALVO_TESTE}"
                     
-                    # Força o status para offline no teste, ignorando o banco real se necessário
-                    # status_banco = ("Offline",) 
-                    
-                    if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
-                        parceiro_real_online = True
-                    else:
-                        #Garante que caia aqui no teste caso o ID 999 não exista ou esteja offline
-                        parceiro_real_online = False 
-
-                    st.session_state.alerta_match = {
-                        "match_id": int(res_match["match_id"]), 
-                        "id_par": id_parceiro_match, 
-                        "nome": res_match["nome_par"], 
-                        "online": parceiro_real_online  # Passará False para o estado
-                    } 
-                    st.balloons() 
-                    
-                    # SÓ executa o rerun global se o usuário NÃO estiver na Sala Privada conversando
-                    if st.session_state.opcao_menu != "🤝 Sala Privada":
-                        st.rerun() 
-
-            except Exception as e: 
-                st.error(f"Erro na IA: {e}")
+                    # Força a resposta simulada com as chaves válidas do banco
+                    res_match = {
+                        "match": True,
+                        "id_par": ID_ALVO_TESTE,
+                        "match_id": MATCH_ID_FIXO,
+                        "nome_par": nome_parceiro_real
+                    }
+                except Exception as e:
+                    st.error(f"Erro no setup de teste dos IDs 2 e 3: {e}")
                
 
             
