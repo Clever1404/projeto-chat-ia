@@ -949,45 +949,54 @@ def template_chat_ia_completo():
                         conn_up.close()
                         
                 except Exception as erro_banco:
-                    pass 
+                    pass
 
-                # Dispara o motor de matches semânticos
-                res_match = processar_afinidade_e_match(meu_id_f, prompt) 
-                
                 # ============================================================
-                # 👇 MODO DE TESTE CORRIGIDO: FORÇANDO MATCH ENTRE ID 2 E ID 3
+                # 🚀 SETUP DE TESTE BLINDADO (IDs 2 e 3)
                 # ============================================================
-                ID_ALVO_TESTE = 3 if int(meu_id_f) == 2 else 2  # Define o parceiro (se você for o 2, o par é o 3, e vice-versa)
-                MATCH_ID_FIXO = 290  # O mesmo ID que inserimos no Passo 1
+                ID_ALVO_TESTE = 3 if int(meu_id_f) == 2 else 2
+                MATCH_ID_FIXO = 203
                 
                 try:
                     conn_t = conectar_supabase()
                     cursor_t = conn_t.cursor()
-                    # Busca o nome real do usuário cadastrado (ID 2 ou 3)
-                    cursor_t.execute("SELECT nome FROM usuarios WHERE id = %s;", (ID_ALVO_TESTE,))
-                    resultado_nome = cursor_t.fetchone()
+                    
+                    try:
+                        # Tenta buscar pela coluna 'nome_par' ou 'nome'. Ajuste aqui se souber o nome real da coluna
+                        cursor_t.execute("SELECT nome FROM usuarios WHERE id = %s;", (ID_ALVO_TESTE,))
+                        resultado_nome = cursor_t.fetchone()
+                        nome_parceiro_real = resultado_nome[0] if resultado_nome else f"Usuário ID {ID_ALVO_TESTE}"
+                    except Exception:
+                        # Se a coluna 'nome' não existir, evita o crash e adota um nome fictício estável para o teste
+                        conn_t.rollback()
+                        nome_parceiro_real = f"Parceiro Simulado (ID {ID_ALVO_TESTE})"
+                        
                     cursor_t.close()
                     conn_t.close()
                     
-                    nome_parceiro_real = resultado_nome[0] if resultado_nome else f"Usuário ID {ID_ALVO_TESTE}"
-                    
-                    # Força a resposta simulada com as chaves válidas do banco
+                    # Força a resposta simulada para a estrutura do Dialog
                     res_match = {
                         "match": True,
                         "id_par": ID_ALVO_TESTE,
                         "match_id": MATCH_ID_FIXO,
-                        "nome_par": nome_parceiro_real
+                        "nome": nome_parceiro_real,     # Alinhado com dados_m['nome'] do dialog
+                        "nome_par": nome_parceiro_real, # Alinhado com o motor de match
+                        "online": False                 # Mantém offline para testar o botão de agendamento
                     }
-                except Exception as e:
-                    st.error(f"Erro no setup de teste dos IDs 2 e 3: {e}")
                     
-                    # SÓ executa o rerun global se o usuário NÃO estiver na Sala Privada conversando
-                    if st.session_state.opcao_menu != "🤝 Sala Privada":
-                        st.rerun() 
+                    # Alimenta o estado e estoura os balões
+                    st.session_state.alerta_match = res_match
+                    st.balloons()
+                    
+                except Exception as e:
+                    st.error(f"Erro interno no bloco de match de teste: {e}")
+
+                # Força a tela a recarregar e desenhar o histórico + disparar modal
+                st.rerun()
 
             except Exception as e: 
                 st.error(f"Erro na IA: {e}")
-               
+
 
             
 
