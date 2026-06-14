@@ -974,6 +974,9 @@ def template_chat_ia_completo():
                     cursor_t.close()
                     conn_t.close()
                     
+                    if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
+                        parceiro_real_online = Tru
+
                     # Força a resposta simulada para a estrutura do Dialog
                     res_match = {
                         "match": True,
