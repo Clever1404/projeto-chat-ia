@@ -473,7 +473,7 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
                 cursor.close()
                 conn.close()
                 
-                par_online = "Online" in str(status_par) or "🟢" in str(status_par)
+                #par_online = "Online" in str(status_par) or "🟢" in str(status_par)
                 
                 return {
                     "match": True, "match_id": match_id, "id_par": int(id_par), "nome_par": nome_par, "online": par_online
@@ -547,7 +547,7 @@ def modal_match_lucy(dados_m):
     if st.button("❌ Não tenho interesse", type="primary", use_container_width=True):
         st.rerun()
 
-        
+
 @st.dialog("📅 Reserva de Encontro")
 def modal_agendamento_encontro(dados_r):
     st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
@@ -982,11 +982,11 @@ def template_chat_ia_completo():
                     # Força o status para offline no teste, ignorando o banco real se necessário
                     # status_banco = ("Offline",) 
                     
-                    if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
-                        parceiro_real_online = True
-                    else:
+                    #if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
+                    #    parceiro_real_online = True
+                    #else:
                         # Garante que caia aqui no teste caso o ID 999 não exista ou esteja offline
-                        parceiro_real_online = False 
+                    #    parceiro_real_online = False 
 
                     st.session_state.alerta_match = {
                         "match_id": int(res_match["match_id"]), 
