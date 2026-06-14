@@ -354,7 +354,7 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
         minha_idade, meu_genero, o_que_eu_procuro_gen, o_que_eu_procuro_rel = meu_perfil
 
         # --- PILAR 4: IA SINTETIZA OS HOBBIES E INTERESSES RECENTES ---
-        resposta_sintese = client.models.generate_content(
+        resposta_sintese = client.chat.completions.create(
             model='gpt-4o-mini',
             contents=f"Baseado nesta interação recente do usuário, extraia e descreva em terceira pessoa uma lista de seus hobbies e interesses: {texto_atual}",
             config={"system_instruction": "Escreva apenas um parágrafo corrido contendo as palavras-chaves semânticas de interesses."},
@@ -844,7 +844,7 @@ def template_chat_ia_completo():
                     contexto_conversacao += f"Usuário: {u_p}\nVocê (Lucy): {ia_r}\n"
                 
                 # 3. EXECUTADOR DA PERSONA DIRECIONADA
-                resposta_streaming = client.models.generate_content(
+                resposta_streaming = client.chat.completions.create(
                     model='gpt-4o-mini',
                     contents=f"{contexto_conversacao}Dados atuais pendentes de extração:\n{dados_faltantes_contexto}\nUsuário: {prompt}\nVocê (Lucy):",
                     temperature=0.9,
@@ -881,7 +881,7 @@ def template_chat_ia_completo():
                 conn.close() 
 
                 # 4. ATUALIZAÇÃO AUTOMÁTICA DE ATRIBUTOS (EXTRATOR INTELIGENTE BACKEND)
-                resposta_extracao = client.models.generate_content(
+                resposta_extracao = client.chat.completions.create(
                     model='gpt-4o-mini',
                     contents=f"Analise o texto do usuário e extraia se ele respondeu alguma das perguntas. Texto: '{prompt}'",
                     temperature=0.9,
