@@ -1247,7 +1247,7 @@ def template_sala_privada():
             
 
         # 📥 MOTOR FRAGMENTADO AS SÍNCRONO REATIVO (ATUALIZA A CADA 2 SEGUNDOS)
-        @st.fragment(run_every=2)
+        #@st.fragment(run_every=2)
         def live_chat_privado_engine(m_id, my_id, p_nome_str):
             with st.container(height=410, border=False):
                 try:
