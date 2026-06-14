@@ -14,7 +14,7 @@ import time
 from streamlit_extras.stylable_container import stylable_container
 import psycopg2
 from openai import OpenAI
-import json as modulo_json
+
 
 UPLOAD_FOLDER = "uploads"
 load_dotenv()
@@ -940,7 +940,7 @@ def template_chat_ia_completo():
                 )
 
                 # 3. Captura a string de texto do JSON
-                texto_json = resposta_extracao.choices[0].message.content
+                texto_json = resposta_extracao.choices.message.content
 
                 # 4. Transforma a string em um dicionário Python para você usar no Supabase
                 dados_extraidos = modulo_json.loads(texto_json)
