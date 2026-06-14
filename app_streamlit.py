@@ -355,7 +355,7 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
 
         # --- PILAR 4: IA SINTETIZA OS HOBBIES E INTERESSES RECENTES ---
         resposta_sintese = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gpt-4o-mini',
             contents=f"Baseado nesta interação recente do usuário, extraia e descreva em terceira pessoa uma lista de seus hobbies e interesses: {texto_atual}",
             config={"system_instruction": "Escreva apenas um parágrafo corrido contendo as palavras-chaves semânticas de interesses."}
         )
@@ -363,7 +363,7 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
 
         # Gera o embedding (Vetor de 768 dimensões) focado estritamente em Hobbies e Interesses
         resposta_embedding = client.models.embed_content(
-            model="gemini-embedding-2", 
+            model="gpt-4o-mini", 
             contents=perfil_consolidado_texto,
             config={"output_dimensionality": 768}
         )
@@ -840,7 +840,7 @@ def template_chat_ia_completo():
                 
                 # 3. EXECUTADOR DA PERSONA DIRECIONADA
                 resposta_streaming = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gpt-4o-mini',
                     contents=f"{contexto_conversacao}Dados atuais pendentes de extração:\n{dados_faltantes_contexto}\nUsuário: {prompt}\nVocê (Lucy):",
                     config={
                         "system_instruction": (
@@ -875,7 +875,7 @@ def template_chat_ia_completo():
 
                 # 4. ATUALIZAÇÃO AUTOMÁTICA DE ATRIBUTOS (EXTRATOR INTELIGENTE BACKEND)
                 resposta_extracao = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gpt-4o-mini',
                     contents=f"Analise o texto do usuário e extraia se ele respondeu alguma das perguntas. Texto: '{prompt}'",
                     config={
                         "system_instruction": (
