@@ -958,7 +958,7 @@ def template_chat_ia_completo():
                 # 👇 MODO DE TESTE CORRIGIDO: FORÇANDO MATCH ENTRE ID 2 E ID 3
                 # ============================================================
                 ID_ALVO_TESTE = 3 if int(meu_id_f) == 2 else 2  # Define o parceiro (se você for o 2, o par é o 3, e vice-versa)
-                MATCH_ID_FIXO = 203  # O mesmo ID que inserimos no Passo 1
+                MATCH_ID_FIXO = 290  # O mesmo ID que inserimos no Passo 1
                 
                 try:
                     conn_t = conectar_supabase()
