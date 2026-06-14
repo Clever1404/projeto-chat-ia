@@ -1264,19 +1264,24 @@ def template_sala_privada():
                     if txt_in.strip():
                         try:
                             conn = conectar_supabase()
+                            # Garante que o banco salve as alterações imediatamente
+                            conn.autocommit = True 
                             cursor = conn.cursor()
-                            # Força a inserção da data atual (NOW()) direto na query SQL
+                            
                             cursor.execute(
                                 'INSERT INTO mensagens_chat (match_id, remetente_id, texto, data_envio) VALUES (%s, %s, %s, NOW());', 
                                 (int(m_id), int(my_id), txt_in.strip())
                             )
-                            conn.commit()
+                            
+                            # Dupla confirmação de gravação
+                            conn.commit() 
                             cursor.close()
                             conn.close()
+                            
+                            # Atualiza o fragmento para mostrar a nova mensagem
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao enviar: {e}")
-
 
 
             
