@@ -354,14 +354,27 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
         minha_idade, meu_genero, o_que_eu_procuro_gen, o_que_eu_procuro_rel = meu_perfil
 
         # --- PILAR 4: IA SINTETIZA OS HOBBIES E INTERESSES RECENTES ---
+       # 1. Estrutura as mensagens com as regras do sistema e o texto do usuário
+        mensagens_sintese = [
+            {
+                "role": "system",
+                "content": "Escreva apenas um parágrafo corrido contendo as palavras-chaves semânticas de interesses."
+            },
+            {
+                "role": "user",
+                "content": f"Baseado nesta interação recente do usuário, extraia e descreva em terceira pessoa uma lista de seus hobbies e interesses: {texto_atual}"
+            }
+        ]
+
+        # 2. Realiza a chamada no padrão da biblioteca OpenAI
         resposta_sintese = client.chat.completions.create(
             model='gpt-4o-mini',
-            messages=f"Baseado nesta interação recente do usuário, extraia e descreva em terceira pessoa uma lista de seus hobbies e interesses: {texto_atual}",
-            config={"system_instruction": "Escreva apenas um parágrafo corrido contendo as palavras-chaves semânticas de interesses."},
+            messages=mensagens_sintese,
             temperature=0.9
         )
-        
-        perfil_consolidado_texto = resposta_sintese.text
+
+        # 3. Captura o texto gerado corretamente
+        perfil_consolidado_texto = resposta_sintese.choices.message.content
 
         # Gera o embedding de 768 dimensões usando o modelo correto da OpenAI
         resposta_embedding = client.embeddings.create(
@@ -799,7 +812,8 @@ def template_chat_ia_completo():
             if ia_r: st.chat_message("assistant").write(ia_r) 
 
 
- 
+
+
     # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE (LUCY COGNITIVA INTERPESSOAL)
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
@@ -845,13 +859,12 @@ def template_chat_ia_completo():
                     contexto_conversacao += f"Usuário: {u_p}\nVocê (Lucy): {ia_r}\n"
                 
                 # 3. EXECUTADOR DA PERSONA DIRECIONADA
-                resposta_streaming = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=f"{contexto_conversacao}Dados atuais pendentes de extração:\n{dados_faltantes_contexto}\nUsuário: {prompt}\nVocê (Lucy):",
-                    temperature=0.9,
-                    config={
-                        "system_instruction": (
-                            "Você é Lucy, uma assistente virtual focada em criar conexões humana legítimas através de afinidades semânticas. "
+                # 1. Estruture as mensagens no formato correto da OpenAI (Lista de Dicionários)
+                mensagens_openai = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Você é Lucy, uma assistente virtual focada em criar conexões humanas legítimas através de afinidades semânticas. "
                             "Seu tom deve ser amigável, interpessoal, acolhedor e levemente curioso. "
                             "Sua missão secreta é descobrir 4 dados essenciais sobre o usuário, mas você DEVE fazer isso de forma embutida e fluida na conversa, "
                             "investigando APENAS UM DADO POR VEZ. Nunca faça uma lista de perguntas estilo questionário.\n\n"
@@ -867,10 +880,26 @@ def template_chat_ia_completo():
                             "- Exemplo para Intenção: 'Acho lindo como as pessoas buscam coisas diferentes... alguns querem só uma boa amizade para conversar, outros procuram um namoro sério. O que você está buscando por aqui hoje?'\n"
                             "- Sempre valide o prompt atual do usuário com empatia antes de introduzir a sua pergunta direcionada no final."
                         )
+                    },
+                    {
+                        "role": "user",
+                        "content": f"{contexto_conversacao}\nDados atuais pendentes de extração:\n{dados_faltantes_contexto}\nUsuário: {prompt}"
                     }
+                ]
+
+                # 2. Faça a chamada correta para a OpenAI
+                resposta_streaming = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=mensagens_openai,
+                    temperature=0.9,
+                    stream=False # Defina como True se for usar o st.write_stream depois
                 )
-                resposta_lucy = resposta_streaming.text
-                st.chat_message("assistant").write(resposta_lucy) 
+
+                # 3. Na OpenAI, capturamos o texto através de .choices[0].message.content
+                resposta_lucy = resposta_streaming.choices[0].message.content
+
+                # 4. Exibe no Streamlit
+                st.chat_message("assistant").write(resposta_lucy)
 
                 # Salva de forma estável no Postgres
                 conn = conectar_supabase()
@@ -881,22 +910,42 @@ def template_chat_ia_completo():
                 conn.close() 
 
                 # 4. ATUALIZAÇÃO AUTOMÁTICA DE ATRIBUTOS (EXTRATOR INTELIGENTE BACKEND)
-                resposta_extracao = client.chat.completions.create(
-                    model='gpt-4o-mini',
-                    messages=f"Analise o texto do usuário e extraia se ele respondeu alguma das perguntas. Texto: '{prompt}'",
-                    temperature=0.9,
-                    config={
-                        "system_instruction": (
-                            "Você é um parser de dados JSON rígido. Analise o texto e devolva APENAS um objeto JSON no formato: "
-                            '{"idade": null, "interesse": null, "procura": null} '
+                 # 1. Monta a estrutura correta de mensagens com System e User
+                mensagens_extracao = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Você é um parser de dados JSON rígido. Analise o texto e devolva APENAS um objeto JSON no formato:\n"
+                            '{"idade": null, "interesse": null, "procura": null}\n\n'
                             "regras:\n"
-                            "- idade: deve ser un número inteiro se ele mencionou a idade dele, senão null.\n"
+                            "- idade: deve ser um número inteiro se ele mencionou a idade dele, senão null.\n"
                             "- interesse: deve ser 'M' se ele disse que gosta de homens, 'F' para mulheres, 'O' para ambos/todos, senão null.\n"
                             "- procura: deve ser 'amizade' ou 'namoro' se ele declarou o objetivo dele, senão null.\n"
                             "Não escreva nenhuma palavra antes ou depois do JSON. Se não encontrar nada, envie tudo nulo."
                         )
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Analise o texto do usuário e extraia se ele respondeu alguma das perguntas. Texto: '{prompt}'"
                     }
+                ]
+
+                # 2. Faz a chamada forçando o formato JSON
+                resposta_extracao = client.chat.completions.create(
+                    model='gpt-4o-mini',
+                    messages=mensagens_extracao,
+                    temperature=0.0,  # Reduzido para 0.0 para garantir máxima precisão no JSON
+                    response_format={"type": "json_object"}  # Força a OpenAI a responder em JSON puro
                 )
+
+                # 3. Captura a string de texto do JSON
+                texto_json = resposta_extracao.choices.message.content
+
+                # 4. Transforma a string em um dicionário Python para você usar no Supabase
+                dados_extraidos = json.loads(texto_json)
+
+                # Exemplo de uso posterior:
+                # idade = dados_extraidos.get("idade")
                 
                 # Processamento e persistência das respostas pescadas pela Lucy
                 try:
