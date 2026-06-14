@@ -981,7 +981,7 @@ def template_chat_ia_completo():
                         "match_id": MATCH_ID_FIXO,
                         "nome": nome_parceiro_real,     # Alinhado com dados_m['nome'] do dialog
                         "nome_par": nome_parceiro_real, # Alinhado com o motor de match
-                        "online": False                 # Mantém offline para testar o botão de agendamento
+                                        # Mantém offline para testar o botão de agendamento
                     }
                     
                     # Alimenta o estado e estoura os balões
