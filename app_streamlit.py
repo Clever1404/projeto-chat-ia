@@ -953,6 +953,20 @@ def template_chat_ia_completo():
                 # Dispara o motor de matches semânticos
                 res_match = processar_afinidade_e_match(meu_id_f, prompt) 
                 
+                # ============================================================
+                # 👇 MODO DE TESTE: SIMULANDO MATCH COM USUÁRIO OFFLINE
+                # ============================================================
+                ID_PARCEIRO_TESTE = 2  
+                MATCH_ID_TESTE = 3     
+                
+                res_match = {
+                    "match": True,
+                    "id_par": ID_PARCEIRO_TESTE,
+                    "match_id": MATCH_ID_TESTE,
+                    "nome_par": "Usuário Teste Dev (Offline)"
+                }
+                # ============================================================
+                
                 if res_match and res_match.get("match") == True: 
                     id_parceiro_match = int(res_match["id_par"])
                     
@@ -964,16 +978,23 @@ def template_chat_ia_completo():
                     cursor_p.close()
                     conn_p.close()
                     
+                    # Força o status para offline no teste, ignorando o banco real se necessário
+                    # status_banco = ("Offline",) 
+                    
                     if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
                         parceiro_real_online = True
+                    else:
+                        # Garante que caia aqui no teste caso o ID 999 não exista ou esteja offline
+                        parceiro_real_online = False 
 
                     st.session_state.alerta_match = {
                         "match_id": int(res_match["match_id"]), 
                         "id_par": id_parceiro_match, 
                         "nome": res_match["nome_par"], 
-                        "online": parceiro_real_online 
+                        "online": parceiro_real_online  # Passará False para o estado
                     } 
                     st.balloons() 
+                    
                     # SÓ executa o rerun global se o usuário NÃO estiver na Sala Privada conversando
                     if st.session_state.opcao_menu != "🤝 Sala Privada":
                         st.rerun() 
