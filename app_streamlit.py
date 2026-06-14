@@ -19,13 +19,15 @@ UPLOAD_FOLDER = "uploads"
 load_dotenv()
 UPLOAD_FOLDER = 'static/uploads/perfis'
 
-# 1. Busca a chave do Gemini PRIORIZANDO o st.secrets (nuvem) e usando os.getenv como fallback (local)
+# Busca a chave com fallback seguro
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
 
-if not GEMINI_API_KEY or GEMINI_API_KEY == "SUA_CHAVE_API_AQUI":
-    st.error("Chave API do Gemini não configurada corretamente nos Secrets!")
+# Proteção caso a chave venha vazia ou com o texto de exemplo
+if not GEMINI_API_KEY or "SUA_CHAVE" in GEMINI_API_KEY:
+    st.error("ERRO CRÍTICO: A chave API do Gemini está vazia ou inválida nos Secrets!")
+    st.stop() # Interrompe a execução para não quebrar a biblioteca
 
-# Cria o objeto 'client'
+# Inicializa o cliente especificando estritamente a API Key
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 # 2. Função de conexão com o Supabase corrigida com SSL seguro
