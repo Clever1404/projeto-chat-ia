@@ -493,6 +493,63 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
 
 
 
+def gatilho_match_teste_forcado(usuario_id_atual, id_parceiro_teste=999, nome_parceiro_teste="Usuário Teste 🟢"):
+    """
+    Força a criação de um match imediato no banco de dados para testar a sala privada.
+    Substitua o id_parceiro_teste por um ID real que exista na sua tabela 'usuarios'.
+    """
+    try:
+        conn = conectar_supabase()
+        cursor = conn.cursor()
+        
+        # 1. Garante que o parceiro de teste existe ou busca o primeiro disponível se 999 não existir
+        cursor.execute("SELECT id, nome FROM usuarios WHERE id = %s;", (id_parceiro_teste,))
+        parceiro = cursor.fetchone()
+        
+        if not parceiro:
+            # Fallback: pega qualquer outro usuário do banco que não seja o atual para testar
+            cursor.execute("SELECT id, nome FROM usuarios WHERE id != %s LIMIT 1;", (usuario_id_atual,))
+            parceiro = cursor.fetchone()
+            
+        if not parceiro:
+            cursor.close()
+            conn.close()
+            return {"match": False, "erro": "Nenhum outro usuário encontrado no banco para simular o match."}
+            
+        id_par, nome_par = parceiro
+        
+        # 2. Insere o registro na sua tabela de matches (ajuste os nomes das colunas se necessário)
+        # Supondo que sua tabela gere um ID serial automaticamente
+        cursor.execute("""
+            INSERT INTO matches (usuario_id_1, usuario_id_2, ativo, data_criacao)
+            VALUES (%s, %s, true, NOW())
+            RETURNING id;
+        """, (usuario_id_atual, id_par))
+        
+        match_id = cursor.fetchone()[0]
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        # Retorna o dicionário no formato exato que seu código já consome
+        return {
+            "match": True,
+            "match_id": match_id,
+            "id_par": id_par,
+            "nome_par": nome_par
+        }
+        
+    except Exception as e:
+        if 'conn' in locals() and conn:
+            conn.rollback()
+        return {"match": False, "erro": str(e)}
+
+
+
+
+
+
 # NOVO: Página simples de Fale Conosco
 def template_fale_conosco():
     st.markdown("<h2>✉️ Fale Conosco</h2>", unsafe_allow_html=True)
@@ -979,8 +1036,18 @@ def template_chat_ia_completo():
                     # Opcional: mude para st.warning(f"Erro ao salvar dados: {erro_banco}") caso queira debugar
                     pass 
 
+
+
+
+
+                # 🛑 COMENTADO PARA TESTE: Dispara o motor clássico de matches semânticos
                 # Dispara o motor clássico de matches semânticos por 4 pilares
-                res_match = processar_afinidade_e_match(meu_id_f, prompt) 
+                #res_match = processar_afinidade_e_match(meu_id_f, prompt) 
+                
+
+
+                # 🚀 NOVO GATILHO DE TESTE: Força o match sempre com o ID 2 (ou troque pelo ID que quiser testar)
+                res_match = gatilho_match_teste_forcado(meu_id_f, id_parceiro_teste=2)
                 
                 if res_match and res_match.get("match") == True: 
                     id_parceiro_match = int(res_match["id_par"])
@@ -996,6 +1063,9 @@ def template_chat_ia_completo():
                     if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
                         parceiro_real_online = True
 
+                    # ⚠️ ALERTA DE CONFIGURAÇÃO DA SALA PRIVADA:
+                    # Certifique-se de que quando o usuário clica para entrar na sala, estes dados abaixo 
+                    # são passados para as variáveis que a sua tela de chat privado lê (ex: st.session_state.sala_atual_id)
                     st.session_state.alerta_match = {
                         "match_id": int(res_match["match_id"]), 
                         "id_par": id_parceiro_match, 
@@ -1004,7 +1074,9 @@ def template_chat_ia_completo():
                     } 
                     st.balloons() 
                 
-                # Executa o recarregamento final da tela com todas as atualizações prontas
+                elif "erro" in res_match:
+                    st.error(f"Erro no Gatilho de Match: {res_match['erro']}")
+                
                 st.rerun() 
                 
             except Exception as e: 
