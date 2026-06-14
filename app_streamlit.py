@@ -13,22 +13,22 @@ from werkzeug.security import generate_password_hash
 import time
 from streamlit_extras.stylable_container import stylable_container
 import psycopg2
-
+from openai import OpenAI
 
 UPLOAD_FOLDER = "uploads"
 load_dotenv()
 UPLOAD_FOLDER = 'static/uploads/perfis'
 
-# Busca a chave com fallback seguro
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
+# 1. Busca a chave da OpenAI priorizando os Secrets da nuvem
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
 
-# Proteção caso a chave venha vazia ou com o texto de exemplo
-if not GEMINI_API_KEY or "SUA_CHAVE" in GEMINI_API_KEY:
-    st.error("ERRO CRÍTICO: A chave API do Gemini está vazia ou inválida nos Secrets!")
-    st.stop() # Interrompe a execução para não quebrar a biblioteca
+if not OPENAI_API_KEY or "sua_chave" in OPENAI_API_KEY:
+    st.error("ERRO: Chave API da OpenAI não configurada nos Secrets!")
+    st.stop()
 
-# Inicializa o cliente especificando estritamente a API Key
-client = genai.Client(api_key=GEMINI_API_KEY)
+# 2. Inicializa o cliente da OpenAI de forma global
+client = OpenAI(api_key=OPENAI_API_KEY)
+
 
 # 2. Função de conexão com o Supabase corrigida com SSL seguro
 def conectar_supabase():
