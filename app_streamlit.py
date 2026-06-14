@@ -529,7 +529,10 @@ def modal_match_lucy(dados_m):
             st.session_state.match_id_atual = dados_m["match_id"]
             st.session_state.opcao_menu = "🤝 Sala Privada"
             st.rerun()
-            
+
+         # Segundo retângulo fica desativado neste cenário
+        st.button("📅 Agendar um encontro virtual (Disponível apenas offline)", type="secondary", disabled=True, use_container_width=True)
+
     # ⚪ COMPORTAMENTO SE O PAR ESTIVER OFFLINE: Mostra bloqueado e ativa o botão de agendamento
     else:
         st.button(f"⚪ {dados_m['nome']} está offline. Indisponível.", disabled=True, use_container_width=True)
@@ -545,6 +548,7 @@ def modal_match_lucy(dados_m):
             
     # ❌ Opção comum de rejeição em qualquer cenário
     if st.button("❌ Não tenho interesse", type="primary", use_container_width=True):
+        st.session_state.alerta_match = None
         st.rerun()
 
 
@@ -816,6 +820,13 @@ def template_chat_ia_completo():
     # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
+            
+            # 🚀 SOLUÇÃO DO SUMIÇO: Injeta imediatamente no estado para fixar na tela antes do banco
+            if "historico_volatil" not in st.session_state:
+                st.session_state.historico_volatil = []
+            st.session_state.historico_volatil.append(("user", prompt))
+            
+            # Força o desenho manual imediato na tela
             st.chat_message("user").write(prompt) 
             
             try:
@@ -881,6 +892,7 @@ def template_chat_ia_completo():
                 )
 
                 resposta_lucy = resposta_streaming.choices[0].message.content
+                st.session_state.historico_volatil.append(("assistant", resposta_lucy))
                 st.chat_message("assistant").write(resposta_lucy)
 
                 # Salva a conversa no banco PostgreSQL
@@ -952,7 +964,7 @@ def template_chat_ia_completo():
                     pass
 
                 # ============================================================
-                # 🚀 SETUP DE TESTE BLINDADO (IDs 2 e 3)
+                # 🚀 DETECTOR REAL DE STATUS ONLINE/OFFLINE (IDs 2 e 3)
                 # ============================================================
                 ID_ALVO_TESTE = 3 if int(meu_id_f) == 2 else 2
                 MATCH_ID_FIXO = 203
@@ -961,44 +973,43 @@ def template_chat_ia_completo():
                     conn_t = conectar_supabase()
                     cursor_t = conn_t.cursor()
                     
+                    # 1. Busca o nome e o status real do banco do outro usuário
+                    cursor_t.execute("SELECT status FROM usuarios WHERE id = %s;", (ID_ALVO_TESTE,))
+                    resultado_status = cursor_t.fetchone()
+                    
                     try:
-                        # Tenta buscar pela coluna 'nome_par' ou 'nome'. Ajuste aqui se souber o nome real da coluna
                         cursor_t.execute("SELECT nome FROM usuarios WHERE id = %s;", (ID_ALVO_TESTE,))
                         resultado_nome = cursor_t.fetchone()
                         nome_parceiro_real = resultado_nome[0] if resultado_nome else f"Usuário ID {ID_ALVO_TESTE}"
                     except Exception:
-                        # Se a coluna 'nome' não existir, evita o crash e adota um nome fictício estável para o teste
-                        conn_t.rollback()
                         nome_parceiro_real = f"Parceiro Simulado (ID {ID_ALVO_TESTE})"
                         
                     cursor_t.close()
                     conn_t.close()
                     
-                    if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
-                        parceiro_real_online = Tru
-
-                    # Força a resposta simulada para a estrutura do Dialog
+                    # 2. Varre o texto do status buscando marcadores de atividade
+                    parceiro_real_online = False
+                    if resultado_status:
+                        texto_status = str(resultado_status[0])
+                        if "Online" in texto_status or "🟢" in texto_status:
+                            parceiro_real_online = True
+                    
+                    # 3. Monta o payload dinâmico para o Dialog
                     res_match = {
                         "match": True,
                         "id_par": ID_ALVO_TESTE,
                         "match_id": MATCH_ID_FIXO,
-                        "nome": nome_parceiro_real,     # Alinhado com dados_m['nome'] do dialog
-                        "nome_par": nome_parceiro_real, # Alinhado com o motor de match
-                                        # Mantém offline para testar o botão de agendamento
+                        "nome": nome_parceiro_real,
+                        "online": parceiro_real_online  # 👈 DECTECTADO DINAMICAMENTE AQUI
                     }
                     
-                    # Alimenta o estado e estoura os balões
                     st.session_state.alerta_match = res_match
                     st.balloons()
                     
                 except Exception as e:
-                    st.error(f"Erro interno no bloco de match de teste: {e}")
+                    st.error(f"Erro no detector de status: {e}")
 
-                # Força a tela a recarregar e desenhar o histórico + disparar modal
                 st.rerun()
-
-            except Exception as e: 
-                st.error(f"Erro na IA: {e}")
 
 
             
