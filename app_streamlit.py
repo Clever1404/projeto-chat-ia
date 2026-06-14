@@ -980,6 +980,13 @@ def template_chat_ia_completo():
                     }
                 except Exception as e:
                     st.error(f"Erro no setup de teste dos IDs 2 e 3: {e}")
+                    
+                    # SÓ executa o rerun global se o usuário NÃO estiver na Sala Privada conversando
+                    if st.session_state.opcao_menu != "🤝 Sala Privada":
+                        st.rerun() 
+
+            except Exception as e: 
+                st.error(f"Erro na IA: {e}")
                
 
             
