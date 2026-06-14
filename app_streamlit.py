@@ -789,8 +789,22 @@ def renderizar_listas_sidebar_e_acoes():
 # 6. TELA DO CHAT IA PRINCIPAL (LAYOUT TOTALMENTE FIXO E ROLÁVEL NO MEIO) 
 # ============================================================================== 
 
+@st.fragment
+def renderizar_historico_ia(usuario_id):
+    """Garante que as mensagens fiquem fixas na tela e atualizem de forma independente."""
+    with st.container(height=440, border=False):
+        historico = buscar_memoria(usuario_id, limite=15) 
+        if not historico:
+            st.info("Inicie a conversa com a Lucy enviando uma mensagem abaixo!")
+            return
+            
+        for user_p, ia_r in historico: 
+            if user_p: 
+                with st.chat_message("user"): st.write(user_p) 
+            if ia_r: 
+                with st.chat_message("assistant"): st.write(ia_r)
+
 def template_chat_ia_completo(): 
-    # Linha superior de links de ação sem poluição visual
     col_titulos, col_botoes_topo = st.columns([2, 1])
     
     with col_titulos:
@@ -800,58 +814,39 @@ def template_chat_ia_completo():
     with col_botoes_topo:
         c_refresh, c_fc = st.columns(2)
         with c_refresh:
-            if st.button("🔄 Atualizar Dados", type="tertiary", help="Sincronizar mensagens e limpar cache sem deslogar"):
-                st.toast("Sincronizando dados com o PostgreSQL...")
+            if st.button("🔄 Atualizar Dados", type="tertiary", help="Sincronizar mensagens"):
                 st.rerun() 
         with c_fc:
-            if st.button("✉️ Fale Conosco", type="tertiary", help="Abrir suporte de atendimento"):
+            if st.button("✉️ Fale Conosco", type="tertiary"):
                 st.session_state.opcao_menu = "✉️ Fale Conosco"
                 st.rerun()
 
     st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
 
-    # Área de histórico com rolagem única interna
-    with st.container(height=440, border=False):
-        historico = buscar_memoria(st.session_state.usuario_id, limite=15) 
-        for user_p, ia_r in historico: 
-            if user_p: st.chat_message("user").write(user_p) 
-            if ia_r: st.chat_message("assistant").write(ia_r) 
+    meu_id_f = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
-    # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE
+    # Renderiza o histórico de forma isolada pelo fragmento (Acelera o app)
+    renderizar_historico_ia(meu_id_f)
+
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
             
-            # 🚀 SOLUÇÃO DO SUMIÇO: Injeta imediatamente no estado para fixar na tela antes do banco
+            # Corrige o sumiço mantendo o estado local ativo imediatamente
             if "historico_volatil" not in st.session_state:
                 st.session_state.historico_volatil = []
             st.session_state.historico_volatil.append(("user", prompt))
-            
-            # Força o desenho manual imediato na tela
             st.chat_message("user").write(prompt) 
             
             try:
-                meu_id_f = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
+                # --- OTIMIZAÇÃO 1: Consolidação de Queries de Leitura ---
+                conn = conectar_supabase()
+                cursor = conn.cursor()
                 
-                # --- BUSCA O ESTADO ATUAL DOS PILARES ---
-                conn_pilar = conectar_supabase()
-                cursor_pilar = conn_pilar.cursor()
-                
-                try:
-                    cursor_pilar.execute("""
-                        SELECT idade, genero, procura_por, procura_relacionamento 
-                        FROM usuarios WHERE id = %s;
-                    """, (meu_id_f,))
-                    pilar_dados = cursor_pilar.fetchone()
-                except Exception:
-                    conn_pilar.rollback()
-                    cursor_pilar.execute("""
-                        SELECT idade, genero, procura_por, 'namoro' 
-                        FROM usuarios WHERE id = %s;
-                    """, (meu_id_f,))
-                    pilar_dados = cursor_pilar.fetchone()
-                    
-                cursor_pilar.close()
-                conn_pilar.close()
+                cursor.execute("""
+                    SELECT idade, genero, procura_por, procura_relacionamento 
+                    FROM usuarios WHERE id = %s;
+                """, (meu_id_f,))
+                pilar_dados = cursor.fetchone()
                 
                 dados_faltantes_contexto = ""
                 if pilar_dados:
@@ -860,22 +855,29 @@ def template_chat_ia_completo():
                     if not proc_gen_b: dados_faltantes_contexto += "- Se ele tem interesse por HOMEM, MULHER ou AMBOS\n"
                     if not proc_rel_b: dados_faltantes_contexto += "- Se ele procura AMIZADE ou NAMORO\n"
                 
-                # Resgata a memória recente do chat
+                # Resgata memória recente
                 historico_previo = buscar_memoria(meu_id_f, limite=6)
-                contexto_conversacao = ""
-                for u_p, ia_r in historico_previo:
-                    contexto_conversacao += f"Usuário: {u_p}\nVocê (Lucy): {ia_r}\n"
+                contexto_conversacao = "".join([f"Usuário: {u}\nVocê (Lucy): {i}\n" for u, i in historico_previo])
                 
-                # Configuração da Persona
                 mensagens_openai = [
                     {
                         "role": "system",
                         "content": (
                             "Você é Lucy, uma assistente virtual focada em criar conexões humanas legítimas através de afinidades semânticas. "
                             "Seu tom deve ser amigável, interpessoal, acolhedor e levemente curioso. "
-                            "Sua missão secreta é descobrir 4 dados essenciais sobre o usuário, investigando APENAS UM DADO POR VEZ.\n\n"
-                            "Os 4 dados são:\n1. A idade dele.\n2. Se ele tem interesse por: Homem, Mulher ou Ambos.\n3. O que ele procura na plataforma (Amizade ou Namoro).\n4. Seus hobbies e interesses cotidianos.\n\n"
-                            "Sempre valide o prompt atual do usuário com empatia antes de introduzir a sua pergunta direcionada no final."
+                            "Sua missão secreta é descobrir 4 dados essenciais sobre o usuário, mas você DEVE fazer isso de forma embutida e fluida na conversa, "
+                            "investigando APENAS UM DADO POR VEZ. Nunca faça uma lista de perguntas estilo questionário.\n\n"
+                            "Os 4 dados são:\n"
+                            "1. A idade dele.\n"
+                            "2. Se ele tem interesse por: Homem, Mulher ou Ambos.\n"
+                            "3. O que ele procura na plataforma (Amizade ou Namoro).\n"
+                            "4. Seus hobbies e interesses cotidianos.\n\n"
+                            "Instruções de fluxo:\n"
+                            "- Analise a lista de 'Dados atuais pendentes de extração' que foi enviada no escopo.\n"
+                            "- Escolha o primeiro item da lista de pendências e conduza o assunto para aquele rumo.\n"
+                            "- Exemplo para Idade: Se ele falar de planos do dia, diga algo como 'Nossa, que legal! Isso me lembra quando eu ajudei um usuário da sua faixa de idade... por sinal, quantos anos você tem?'\n"
+                            "- Exemplo para Intenção: 'Acho lindo como as pessoas buscam coisas diferentes... alguns querem só uma boa amizade para conversar, outros procuram um namoro sério. O que você está buscando por aqui hoje?'\n"
+                            "- Sempre valide o prompt atual do usuário com empatia antes de introduzir a sua pergunta direcionada no final."
                         )
                     },
                     {
@@ -884,26 +886,26 @@ def template_chat_ia_completo():
                     }
                 ]
 
-                # Chamada do modelo GPT-4o-mini para gerar a resposta de chat
+                # Chamada GPT Chat
                 resposta_streaming = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=mensagens_openai,
                     temperature=0.9
                 )
-
                 resposta_lucy = resposta_streaming.choices[0].message.content
+                
+                # Atualiza o estado volátil
                 st.session_state.historico_volatil.append(("assistant", resposta_lucy))
                 st.chat_message("assistant").write(resposta_lucy)
 
-                # Salva a conversa no banco PostgreSQL
-                conn = conectar_supabase()
-                cursor = conn.cursor() 
-                cursor.execute("INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta, data_hora) VALUES (%s, %s, %s, %s);", (meu_id_f, prompt, resposta_lucy, datetime.now())) 
+                # Salva o histórico de conversa
+                cursor.execute(
+                    "INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta, data_hora) VALUES (%s, %s, %s, %s);", 
+                    (meu_id_f, prompt, resposta_lucy, datetime.now())
+                )
                 conn.commit()
-                cursor.close()
-                conn.close() 
 
-                # 4. ATUALIZAÇÃO AUTOMÁTICA DE ATRIBUTOS (EXTRATOR INTELIGENTE BACKEND)
+                # Extração Inteligente de Atributos via JSON
                 mensagens_extracao = [
                     {
                         "role": "system",
@@ -922,122 +924,78 @@ def template_chat_ia_completo():
                         "content": f"Analise o texto do usuário e extraia se ele respondeu alguma das perguntas. Texto: '{prompt}'"
                     }
                 ]
-
-                # Chamada forçando o formato JSON nativo da OpenAI
                 resposta_extracao = client.chat.completions.create(
                     model='gpt-4o-mini',
                     messages=mensagens_extracao,
                     temperature=0.0, 
                     response_format={"type": "json_object"} 
                 )
+                dados_extraidos = modulo_json.loads(resposta_extracao.choices[0].message.content)
 
-                texto_json = resposta_extracao.choices[0].message.content
-                dados_extraidos = modulo_json.loads(texto_json)
-
-                # Persistência das respostas pescadas pela Lucy no Banco
-                try:
-                    if dados_extraidos.get("idade"):
-                        conn_up = conectar_supabase()
-                        cursor_up = conn_up.cursor()
-                        cursor_up.execute("UPDATE usuarios SET idade = %s WHERE id = %s;", (int(dados_extraidos["idade"]), meu_id_f))
-                        conn_up.commit()
-                        cursor_up.close()
-                        conn_up.close()
-                        
-                    if dados_extraidos.get("interesse"):
-                        conn_up = conectar_supabase()
-                        cursor_up = conn_up.cursor()
-                        cursor_up.execute("UPDATE usuarios SET procura_por = %s WHERE id = %s;", (str(dados_extraidos["interesse"]), meu_id_f))
-                        conn_up.commit()
-                        cursor_up.close()
-                        conn_up.close()
-                        
-                    if dados_extraidos.get("procura"):
-                        conn_up = conectar_supabase()
-                        cursor_up = conn_up.cursor()
-                        cursor_up.execute("UPDATE usuarios SET procura_relacionamento = %s WHERE id = %s;", (str(dados_extraidos["procura"]), meu_id_f))
-                        conn_up.commit()
-                        cursor_up.close()
-                        conn_up.close()
-                        
-                except Exception as erro_banco:
-                    pass
-
-                # ============================================================
-                # 🚀 RESOLUÇÃO DEFINITIVA: CRIAÇÃO AUTOMÁTICA DE MATCH NO BANCO
-                # ============================================================
-                ID_ALVO_TESTE = 3 if int(meu_id_f) == 2 else 2
+                # --- OTIMIZAÇÃO 2: Atualização em Lote (Batch Update) na mesma conexão ---
+                updates = []
+                params = []
+                if dados_extraidos.get("idade"):
+                    updates.append("idade = %s")
+                    params.append(int(dados_extraidos["idade"]))
+                if dados_extraidos.get("interesse"):
+                    updates.append("procura_por = %s")
+                    params.append(str(dados_extraidos["interesse"]))
+                if dados_extraidos.get("procura"):
+                    updates.append("procura_relacionamento = %s")
+                    params.append(str(dados_extraidos["procura"]))
                 
-                try:
-                    conn_t = conectar_supabase()
-                    cursor_t = conn_t.cursor()
-                    
-                    # 1. Verifica se já existe um match entre esses dois usuários
-                    cursor_t.execute("""
-                        SELECT id FROM matches 
-                        WHERE (usuario_1_id = %s AND usuario_2_id = %s) 
-                           OR (usuario_1_id = %s AND usuario_2_id = %s);
-                    """, (int(meu_id_f), ID_ALVO_TESTE, ID_ALVO_TESTE, int(meu_id_f)))
-                    
-                    resultado_match = cursor_t.fetchone()
-                    
-                    if resultado_match:
-                        # Se já existir, captura o ID existente
-                        match_id_final = resultado_match[0]
-                    else:
-                        # Se NÃO existir, CRIA O MATCH AUTOMATICAMENTE AGORA
-                        # O 'RETURNING id' pede para o PostgreSQL devolver o ID gerado (útil para campos serial/auto-incremento)
-                        cursor_t.execute("""
-                            INSERT INTO matches (usuario_1_id, usuario_2_id) 
-                            VALUES (%s, %s) 
-                            RETURNING id;
-                        """, (int(meu_id_f), ID_ALVO_TESTE))
-                        
-                        match_id_final = cursor_t.fetchone()[0]
-                        conn_t.commit() # Grava a criação do match imediatamente
-                    
-                    # 2. Busca o status online/offline real do parceiro
-                    cursor_t.execute("SELECT status FROM usuarios WHERE id = %s;", (ID_ALVO_TESTE,))
-                    resultado_status = cursor_t.fetchone()
-                    
-                    # 3. Busca o nome real do parceiro
-                    try:
-                        cursor_t.execute("SELECT nome FROM usuarios WHERE id = %s;", (ID_ALVO_TESTE,))
-                        resultado_nome = cursor_t.fetchone()
-                        nome_parceiro_real = resultado_nome[0] if resultado_nome else f"Usuário ID {ID_ALVO_TESTE}"
-                    except Exception:
-                        nome_parceiro_real = f"Parceiro Simulado (ID {ID_ALVO_TESTE})"
-                        
-                    cursor_t.close()
-                    conn_t.close()
-                    
-                    # 4. Processa se está online
-                    parceiro_real_online = False
-                    if resultado_status and resultado_status[0]:
-                        texto_status = str(resultado_status[0])
-                        if "Online" in texto_status or "🟢" in texto_status:
-                            parceiro_real_online = True
-                    
-                    # 5. Monta o payload perfeitamente blindado para o Modal e Agendamento
-                    res_match = {
-                        "match": True,
-                        "id_par": ID_ALVO_TESTE,
-                        "match_id": match_id_final, # ID 100% real e existente no banco de dados
-                        "nome": nome_parceiro_real,
-                        "online": parceiro_real_online
-                    }
-                    
-                    st.session_state.alerta_match = res_match
-                    st.balloons()
-                    
-                except Exception as e:
-                    st.error(f"Erro na automação do match: {e}")
+                if updates:
+                    params.append(meu_id_f)
+                    query_update = f"UPDATE usuarios SET {', '.join(updates)} WHERE id = %s;"
+                    cursor.execute(query_update, tuple(params))
+                    conn.commit()
 
-                st.rerun()
+                cursor.close()
+                conn.close()
+
+                # ============================================================
+                # 🔥 MOTOR REAL DE MATCHES DA IA (REVERTIDO E SEGURO)
+                # ============================================================
+                res_match = processar_afinidade_e_match(meu_id_f, prompt) 
+                
+                if res_match and res_match.get("match") == True: 
+                    id_parceiro_match = int(res_match["id_par"])
+                    match_id_real = int(res_match["match_id"])
+                    
+                    # Verificação em tempo real se o parceiro do match está online
+                    parceiro_real_online = False
+                    conn_p = conectar_supabase()
+                    cursor_p = conn_p.cursor()
+                    cursor_p.execute("SELECT status FROM usuarios WHERE id = %s;", (id_parceiro_match,))
+                    status_banco = cursor_p.fetchone()
+                    
+                    try:
+                        cursor_p.execute("SELECT nome FROM usuarios WHERE id = %s;", (id_parceiro_match,))
+                        nome_banco = cursor_p.fetchone()
+                        nome_exibicao = nome_banco if nome_banco else res_match.get("nome_par", f"Usuário {id_parceiro_match}")
+                    except Exception:
+                        nome_exibicao = res_match.get("nome_par", f"Usuário {id_parceiro_match}")
+                        
+                    cursor_p.close()
+                    conn_p.close()
+                    
+                    if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
+                        parceiro_real_online = True
+
+                    # Alimenta os dados com o match_id gerado legitimamente pela IA
+                    st.session_state.alerta_match = {
+                        "match_id": match_id_real, 
+                        "id_par": id_parceiro_match, 
+                        "nome": nome_exibicao, 
+                        "online": parceiro_real_online 
+                    } 
+                    st.balloons() 
+                
+                st.rerun() 
 
             except Exception as e: 
                 st.error(f"Erro na IA: {e}")
-
 
             
 
