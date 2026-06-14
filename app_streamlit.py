@@ -12,26 +12,35 @@ import streamlit.components.v1 as components
 from werkzeug.security import generate_password_hash
 import time
 from streamlit_extras.stylable_container import stylable_container
-
+import psycopg2
+from openai import OpenAI
 
 UPLOAD_FOLDER = "uploads"
 load_dotenv()
 UPLOAD_FOLDER = 'static/uploads/perfis'
 
-# --- 2. INICIALIZAÇÃO DO CLIENTE GOOGLE GENAI ---
-# O código tenta ler a chave de API direto do seu arquivo .env ou sistema
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# 1. Busca a chave da OpenAI priorizando os Secrets da nuvem
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
 
-if not GEMINI_API_KEY:
-    # Caso não tenha configurado no .env, você pode colocar sua chave temporariamente aqui:
-    GEMINI_API_KEY = "SUA_CHAVE_API_AQUI" 
+if not OPENAI_API_KEY or "sua_chave" in OPENAI_API_KEY:
+    st.error("ERRO: Chave API da OpenAI não configurada nos Secrets!")
+    st.stop()
 
-# Cria o objeto 'client' com escopo global exigido pela função de match
-client = genai.Client(api_key=GEMINI_API_KEY)
+# 2. Inicializa o cliente da OpenAI de forma global
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-def obter_conexao():
-    DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres")
-    return psycopg.connect(DB_URL)
+
+# 2. Função de conexão com o Supabase corrigida com SSL seguro
+def conectar_supabase():
+    conn = psycopg2.connect(
+        host=st.secrets["postgres"]["host"],
+        database=st.secrets["postgres"]["database"],
+        user=st.secrets["postgres"]["user"],
+        password=st.secrets["postgres"]["password"],
+        port=st.secrets["postgres"]["port"],
+        sslmode="require"  # <--- ESSA LINHA EVITA O BLOQUEIO 403 DO SUPABASE
+    )
+    return conn
 
 
 # ==============================================================================
@@ -113,7 +122,7 @@ elif st.session_state.opcao_menu == "🔒 Login":
             pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed")
             if st.form_submit_button("Login", type="primary", width="stretch"):
                 try:
-                    conn = obter_conexao(); cursor = conn.cursor()
+                    conn = conectar_supabase(); cursor = conn.cursor()
                     cursor.execute("SELECT id, username, foto_perfil, is_admin, genero FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
                     res = cursor.fetchone()
                     if res:
@@ -175,7 +184,7 @@ elif st.session_state.opcao_menu == "🔒 Login":
                             return
 
                         try:
-                            conn = obter_conexao()
+                            conn = conectar_supabase()
                             cursor = conn.cursor()
                             
                             # 1. Verifica se o e-mail existe no banco PostgreSQL
@@ -246,7 +255,7 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
                 ):         
                     if st.form_submit_button("Cadastrar", width="stretch"):
                         try:
-                            conn = obter_conexao(); cursor = conn.cursor()
+                            conn = conectar_supabase(); cursor = conn.cursor()
                             cursor.execute("INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", (usuario, email, senha, genero))
                             st.session_state.usuario_id = cursor.fetchone()[0]
                             st.session_state.username = usuario
@@ -317,7 +326,7 @@ dia_atual_servidor = dias_semana_map[datetime.now().weekday()]
 
 def buscar_memoria(usuario_id, limite=15):
     try:
-        conn = obter_conexao(); cursor = conn.cursor()
+        conn = conectar_supabase(); cursor = conn.cursor()
         cursor.execute('SELECT usuario_pergunta, ia_resposta FROM historico_ia WHERE usuario_id = %s ORDER BY id ASC LIMIT %s;', (int(usuario_id), limite))
         hist = cursor.fetchall(); cursor.close(); conn.close()
         return hist
@@ -327,7 +336,7 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
     try:
         meu_id_limpo = usuario_id if not isinstance(usuario_id, (tuple, list)) else int(usuario_id)
 
-        conn = obter_conexao()
+        conn = conectar_supabase()
         cursor = conn.cursor()
         
         # --- PILAR 1, 2 e 3: BUSCA OS DADOS CADASTRAIS DO USUÁRIO LOGADO ---
@@ -346,18 +355,23 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
 
         # --- PILAR 4: IA SINTETIZA OS HOBBIES E INTERESSES RECENTES ---
         resposta_sintese = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gpt-4o-mini',
             contents=f"Baseado nesta interação recente do usuário, extraia e descreva em terceira pessoa uma lista de seus hobbies e interesses: {texto_atual}",
             config={"system_instruction": "Escreva apenas um parágrafo corrido contendo as palavras-chaves semânticas de interesses."}
+            temperature=0.9
         )
+        
         perfil_consolidado_texto = resposta_sintese.text
 
-        # Gera o embedding (Vetor de 768 dimensões) focado estritamente em Hobbies e Interesses
-        resposta_embedding = client.models.embed_content(
-            model="gemini-embedding-2", 
-            contents=perfil_consolidado_texto,
-            config={"output_dimensionality": 768}
+        # Gera o embedding de 768 dimensões usando o modelo correto da OpenAI
+        resposta_embedding = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=perfil_consolidado_texto,
+            dimensions=768  # Define nativamente o tamanho do vetor para 768
         )
+
+        # Extrai a lista de números (o vetor) para salvar no Supabase
+        vetor_embedding = resposta_embedding.data[0].embedding
         
         # Limpeza e extração por Regex para isolar o vetor de floats
         import re
@@ -569,7 +583,7 @@ def modal_agendamento_encontro(dados_r):
         parceiro_tem_algum_horario = False
         
         try:
-            conn_check = obter_conexao()
+            conn_check = conectar_supabase()
             cursor_check = conn_check.cursor()
             
             # Verifica se você possui o horário na grade
@@ -628,7 +642,7 @@ def modal_agendamento_encontro(dados_r):
         # Se passar em todas as validações, realiza o agendamento pendente
         else:
             try:
-                conn = obter_conexao()
+                conn = conectar_supabase()
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
@@ -677,7 +691,7 @@ def renderizar_listas_sidebar_e_acoes():
             if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER, exist_ok=True) 
             c_completo = os.path.join(UPLOAD_FOLDER, f"user_{st.session_state.usuario_id}.jpg") 
             with open(c_completo, "wb") as f: f.write(f_nova.getbuffer()) 
-            conn = obter_conexao(); cursor = conn.cursor() 
+            conn = conectar_supabase(); cursor = conn.cursor() 
             cursor.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s", (f"/{c_completo}", int(st.session_state.usuario_id))) 
             conn.commit(); cursor.close(); conn.close() 
             st.session_state.foto_perfil = f"/{c_completo}"; st.rerun() 
@@ -688,7 +702,7 @@ def renderizar_listas_sidebar_e_acoes():
         possui_convite_pendente = False
         try:
             meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
-            conn_b = obter_conexao(); cursor_b = conn_b.cursor()
+            conn_b = conectar_supabase(); cursor_b = conn_b.cursor()
             cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
             if cursor_b.fetchone() > 0: possui_convite_pendente = True
             cursor_b.close(); conn_b.close()
@@ -699,7 +713,7 @@ def renderizar_listas_sidebar_e_acoes():
         possui_convite_pendente = False
         try:
             meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
-            conn_b = obter_conexao()
+            conn_b = conectar_supabase()
             cursor_b = conn_b.cursor()
             # Conta se existem convites com status 'pendente' onde VOCÊ é o destinatário
             cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
@@ -736,7 +750,7 @@ def renderizar_listas_sidebar_e_acoes():
 
         if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", width="stretch"):
             try:
-                conn = obter_conexao(); cursor = conn.cursor()
+                conn = conectar_supabase(); cursor = conn.cursor()
                 cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(st.session_state.usuario_id),))
                 conn.commit(); cursor.close(); conn.close(); st.toast("Histórico limpo!"); st.rerun()
             except Exception as e: st.error(f"Erro: {e}")
@@ -744,7 +758,7 @@ def renderizar_listas_sidebar_e_acoes():
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
         if st.button("🚪 ENCERRAR SESSÃO", type="primary", width="stretch"):
             try:
-                conn_logout = obter_conexao(); cursor_logout = conn_logout.cursor()
+                conn_logout = conectar_supabase(); cursor_logout = conn_logout.cursor()
                 cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (int(st.session_state.usuario_id),))
                 conn_logout.commit(); cursor_logout.close(); conn_logout.close()
             except Exception: pass
@@ -795,7 +809,7 @@ def template_chat_ia_completo():
                 meu_id_f = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
                 
                 # --- BUSCA O ESTADO ATUAL DOS PILARES (RESOLVIDO: meu_id_f unificado) ---
-                conn_pilar = obter_conexao()
+                conn_pilar = conectar_supabase()
                 cursor_pilar = conn_pilar.cursor()
                 
                 try:
@@ -831,11 +845,13 @@ def template_chat_ia_completo():
                 
                 # 3. EXECUTADOR DA PERSONA DIRECIONADA
                 resposta_streaming = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gpt-4o-mini',
                     contents=f"{contexto_conversacao}Dados atuais pendentes de extração:\n{dados_faltantes_contexto}\nUsuário: {prompt}\nVocê (Lucy):",
+                    temperature=0.9,
                     config={
                         "system_instruction": (
                             "Você é Lucy, uma assistente virtual focada em criar conexões humana legítimas através de afinidades semânticas. "
+                            f"O nome do usuário é {username}. Use o nome dele(a) de forma natural nas suas respostas. "
                             "Seu tom deve ser amigável, interpessoal, acolhedor e levemente curioso. "
                             "Sua missão secreta é descobrir 4 dados essenciais sobre o usuário, mas você DEVE fazer isso de forma embutida e fluida na conversa, "
                             "investigando APENAS UM DADO POR VEZ. Nunca faça uma lista de perguntas estilo questionário.\n\n"
@@ -857,7 +873,7 @@ def template_chat_ia_completo():
                 st.chat_message("assistant").write(resposta_lucy) 
 
                 # Salva de forma estável no Postgres
-                conn = obter_conexao()
+                conn = conectar_supabase()
                 cursor = conn.cursor() 
                 cursor.execute("INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta, data_hora) VALUES (%s, %s, %s, %s);", (meu_id_f, prompt, resposta_lucy, datetime.now())) 
                 conn.commit()
@@ -866,8 +882,9 @@ def template_chat_ia_completo():
 
                 # 4. ATUALIZAÇÃO AUTOMÁTICA DE ATRIBUTOS (EXTRATOR INTELIGENTE BACKEND)
                 resposta_extracao = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gpt-4o-mini',
                     contents=f"Analise o texto do usuário e extraia se ele respondeu alguma das perguntas. Texto: '{prompt}'",
+                    temperature=0.9,
                     config={
                         "system_instruction": (
                             "Você é um parser de dados JSON rígido. Analise o texto e devolva APENAS um objeto JSON no formato: "
@@ -886,7 +903,7 @@ def template_chat_ia_completo():
                     import json
                     dados_json = json.loads(resposta_extracao.text.strip().replace("```json", "").replace("```", ""))
                     
-                    conn_up = obter_conexao()
+                    conn_up = conectar_supabase()
                     cursor_up = conn_up.cursor()
                     if dados_json.get("idade"):
                         cursor_up.execute("UPDATE usuarios SET idade = %s WHERE id = %s;", (int(dados_json["idade"]), meu_id_f))
@@ -907,7 +924,7 @@ def template_chat_ia_completo():
                     id_parceiro_match = int(res_match["id_par"])
                     
                     parceiro_real_online = False
-                    conn_p = obter_conexao(); cursor_p = conn_p.cursor()
+                    conn_p = conectar_supabase(); cursor_p = conn_p.cursor()
                     cursor_p.execute("SELECT status FROM usuarios WHERE id = %s;", (id_parceiro_match,))
                     status_banco = cursor_p.fetchone()
                     cursor_p.close(); conn_p.close()
@@ -944,7 +961,7 @@ def template_gerenciar_conexoes_completo():
         st.markdown("### 👥 Suas Afinidades")
         matches_dados = []
         try:
-            conn = obter_conexao(); cursor = conn.cursor()
+            conn = conectar_supabase(); cursor = conn.cursor()
             cursor.execute('SELECT m.id, u.username, u.foto_perfil, u.genero, u.id FROM matches m JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;', (meu_id_limpo, meu_id_limpo, meu_id_limpo))
             matches_dados = cursor.fetchall(); cursor.close(); conn.close()
         except Exception: pass
@@ -979,7 +996,7 @@ def template_gerenciar_conexoes_completo():
                     # RESTAURADO: Botão cinza para excluir afinidades indesejadas do banco
                     if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", width="stretch"):
                         try:
-                            conn = obter_conexao(); cursor = conn.cursor()
+                            conn = conectar_supabase(); cursor = conn.cursor()
                             cursor.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(m_id),))
                             cursor.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
                             cursor.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
@@ -992,7 +1009,7 @@ def template_gerenciar_conexoes_completo():
     with aba_e:
         st.markdown("### 📩 Convites Ativos da Semana")
         try:
-            conn = obter_conexao(); cursor = conn.cursor()
+            conn = conectar_supabase(); cursor = conn.cursor()
             cursor.execute("""
                 SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
                 CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
@@ -1021,7 +1038,7 @@ def template_gerenciar_conexoes_completo():
                     with col_b:
                         if status == 'pendente' and not eu_enviei:
                             if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", width="stretch"):
-                                conn = obter_conexao(); cursor = conn.cursor(); cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,)); conn.commit(); cursor.close(); conn.close(); st.rerun()
+                                conn = conectar_supabase(); cursor = conn.cursor(); cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,)); conn.commit(); cursor.close(); conn.close(); st.rerun()
                         elif status == 'aceito':
                             if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", width="stretch"):
                                 st.session_state.match_id_atual = m_id
@@ -1063,7 +1080,7 @@ def template_sala_privada():
     status_cor = "#a0aec0"
     
     try:
-        conn = obter_conexao()
+        conn = conectar_supabase()
         cursor = conn.cursor()
         
         # Garante ID como inteiro puro
@@ -1137,7 +1154,7 @@ def template_sala_privada():
             
         if st.button("🗑️ Limpar Histórico do Chat", type="secondary", width="stretch"):
             try:
-                conn = obter_conexao(); cursor = conn.cursor()
+                conn = conectar_supabase(); cursor = conn.cursor()
                 cursor.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(id_match_int),))
                 conn.commit(); cursor.close(); conn.close()
                 st.toast("Histórico da sala privada limpo com sucesso!")
@@ -1168,7 +1185,7 @@ def template_sala_privada():
         def live_chat_privado_engine(m_id, my_id, p_nome_str):
             with st.container(height=410, border=False):
                 try:
-                    conn = obter_conexao(); cursor = conn.cursor()
+                    conn = conectar_supabase(); cursor = conn.cursor()
                     cursor.execute('SELECT remetente_id, texto, data_envio FROM mensagens_chat WHERE match_id = %s ORDER BY data_envio ASC;', (int(m_id),))
                     rows = cursor.fetchall(); cursor.close(); conn.close()
                     for r_id, txt, dt in rows:
@@ -1186,7 +1203,7 @@ def template_sala_privada():
             if st.session_state.opcao_menu == "🤝 Sala Privada":
                 if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
                     if txt_in.strip():
-                        conn = obter_conexao(); cursor = conn.cursor()
+                        conn = conectar_supabase(); cursor = conn.cursor()
                         cursor.execute('INSERT INTO mensagens_chat (match_id, remetente_id, texto) VALUES (%s, %s, %s);', (int(m_id), int(my_id), txt_in.strip()))
                         conn.commit(); cursor.close(); conn.close()
                         st.rerun()
@@ -1217,7 +1234,7 @@ def template_painel_admin():
     total_salas_ativas = 0
 
     try:
-        conn = obter_conexao()
+        conn = conectar_supabase()
         cursor = conn.cursor()
         
         # Busca a lista completa de moderação de usuários
@@ -1408,7 +1425,7 @@ def template_painel_admin():
                     # NOVO: Função Excluir Usuário acoplada com deleção em cascata total no Postgres
                     if st.button("❌ Excluir Usuário", key=f"adm_drop_user_{u_id}", type="primary", width="stretch"):
                         try:
-                            conn_del = obter_conexao()
+                            conn_del = conectar_supabase()
                             cursor_del = conn_del.cursor()
                             
                             # Limpa cirurgicamente todas as tabelas amarradas por FK (Deleção em Cascata Garantida)
@@ -1448,7 +1465,7 @@ def template_disponibilidade():
     horarios_salvos = set()
     
     try:
-        conn = obter_conexao()
+        conn = conectar_supabase()
         cursor = conn.cursor()
         cursor.execute("SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
         for d_sem, per_id in cursor.fetchall():
@@ -1480,7 +1497,7 @@ def template_disponibilidade():
         
         if botao_salvar_ativo: 
             try:
-                conn = obter_conexao()
+                conn = conectar_supabase()
                 cursor = conn.cursor() 
                 cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
                 
@@ -1517,7 +1534,7 @@ def template_disponibilidade():
     with col_l:
         if st.button("🗑️ Limpar Grade Horária", type="secondary", width="stretch"):
             try:
-                conn = obter_conexao(); cursor = conn.cursor()
+                conn = conectar_supabase(); cursor = conn.cursor()
                 cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
                 conn.commit(); cursor.close(); conn.close()
                 st.toast("Toda a sua grade horária foi limpa!")
@@ -1554,7 +1571,7 @@ else:
     # 🔍 REPOSICIONAMENTO CRÍTICO: Só busca e exibe a notificação se o menu NÃO for a Sala Privada
     if st.session_state.opcao_menu != "🤝 Sala Privada":
         try:
-            conn_notif = obter_conexao()
+            conn_notif = conectar_supabase()
             cursor_notif = conn_notif.cursor()
             cursor_notif.execute('''
                 SELECT COUNT(*) FROM agendamentos_virtuais 
@@ -1630,6 +1647,3 @@ st.markdown("""
         <a href="#politicas" onclick="alert('Políticas de Privacidade:\\nSeus dados de chat e vídeo são confidenciais e protegidos de ponta a ponta.')">Políticas de Privacidade</a>
     </div>
 """, unsafe_allow_html=True)
-
-
-
