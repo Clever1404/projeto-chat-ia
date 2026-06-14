@@ -878,52 +878,40 @@ def template_chat_ia_completo():
             st.chat_message("user").write(prompt) 
             
             try:
-                # A variável nasce aqui como meu_id_f
                 meu_id_f = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
                 
-                # --- BUSCA O ESTADO ATUAL DOS PILARES (RESOLVIDO: meu_id_f unificado) ---
+                # --- BUSCA O ESTADO ATUAL DOS PILARES ---
                 conn_pilar = conectar_supabase()
                 cursor_pilar = conn_pilar.cursor()
-                
                 try:
-                    cursor_pilar.execute("""
-                        SELECT idade, genero, procura_por, procura_relacionamento 
-                        FROM usuarios WHERE id = %s;
-                    """, (meu_id_f,))
+                    cursor_pilar.execute("SELECT idade, genero, procura_por, procura_relacionamento FROM usuarios WHERE id = %s;", (meu_id_f,))
                     pilar_dados = cursor_pilar.fetchone()
                 except Exception:
-                    # Fallback preventivo caso a coluna de relacionamento ainda não tenha sido criada via ALTER TABLE
                     conn_pilar.rollback()
-                    cursor_pilar.execute("""
-                        SELECT idade, genero, procura_por, 'namoro' 
-                        FROM usuarios WHERE id = %s;
-                    """, (meu_id_f,))
+                    cursor_pilar.execute("SELECT idade, genero, procura_por, 'namoro' FROM usuarios WHERE id = %s;", (meu_id_f,))
                     pilar_dados = cursor_pilar.fetchone()
-                    
                 cursor_pilar.close()
                 conn_pilar.close()
                 
-                # Desempacota as variáveis de forma segura para montar o diagnóstico da Lucy
                 dados_faltantes_contexto = ""
                 if pilar_dados:
                     idade_b, gen_b, proc_gen_b, proc_rel_b = pilar_dados
                     if not idade_b: dados_faltantes_contexto += "- IDADE do usuário\n"
                     if not proc_gen_b: dados_faltantes_contexto += "- Se ele tem interesse por HOMEM, MULHER ou AMBOS\n"
                     if not proc_rel_b: dados_faltantes_contexto += "- Se ele procura AMIZADE ou NAMORO\n"
-                # 2. RESGATA A MEMÓRIA RECENTE DO CHAT
+
+                # --- RESGATA A MEMÓRIA RECENTE ---
                 historico_previo = buscar_memoria(meu_id_f, limite=6)
                 contexto_conversacao = ""
                 for u_p, ia_r in historico_previo:
                     contexto_conversacao += f"Usuário: {u_p}\nVocê (Lucy): {ia_r}\n"
                 
-                # 3. EXECUTADOR DA PERSONA DIRECIONADA
-                # 1. Estruture as mensagens no formato correto da OpenAI (Lista de Dicionários)
+                # --- 1. CHAMADA DA LUCY ---
                 mensagens_openai = [
                     {
                         "role": "system",
-                        "content": (
-                            "Você é Lucy, uma assistente virtual focada em criar conexões humanas legítimas através de afinidades semânticas. "
-                            "Seu tom deve ser amigável, interpessoal, acolhedor e levemente curioso. "
+                        "content": "Você é Lucy, uma assistente virtual focada em criar conexões humana legítimas através de afinidades semânticas. "
+                         "Seu tom deve ser amigável, interpessoal, acolhedor e levemente curioso. "
                             "Sua missão secreta é descobrir 4 dados essenciais sobre o usuário, mas você DEVE fazer isso de forma embutida e fluida na conversa, "
                             "investigando APENAS UM DADO POR VEZ. Nunca faça uma lista de perguntas estilo questionário.\n\n"
                             "Os 4 dados são:\n"
@@ -937,29 +925,23 @@ def template_chat_ia_completo():
                             "- Exemplo para Idade: Se ele falar de planos do dia, diga algo como 'Nossa, que legal! Isso me lembra quando eu ajudei um usuário da sua faixa de idade... por sinal, quantos anos você tem?'\n"
                             "- Exemplo para Intenção: 'Acho lindo como as pessoas buscam coisas diferentes... alguns querem só uma boa amizade para conversar, outros procuram um namoro sério. O que você está buscando por aqui hoje?'\n"
                             "- Sempre valide o prompt atual do usuário com empatia antes de introduzir a sua pergunta direcionada no final."
-                        )
-                    },
-                    {
+                        },
+                        {
                         "role": "user",
                         "content": f"{contexto_conversacao}\nDados atuais pendentes de extração:\n{dados_faltantes_contexto}\nUsuário: {prompt}"
-                    }
+                        }
                 ]
 
-                # 2. Faça a chamada correta para a OpenAI
                 resposta_streaming = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=mensagens_openai,
-                    temperature=0.9,
-                    stream=False # Defina como True se for usar o st.write_stream depois
+                    temperature=0.9
                 )
-
-                # 3. Na OpenAI, capturamos o texto através de .choices[0].message.content
                 resposta_lucy = resposta_streaming.choices[0].message.content
 
-                # 4. Exibe no Streamlit
+                # Exibe e grava a conversa imediatamente (Se o resto falhar, isso já funcionou)
                 st.chat_message("assistant").write(resposta_lucy)
-
-                # Salva de forma estável no Postgres
+                
                 conn = conectar_supabase()
                 cursor = conn.cursor() 
                 cursor.execute("INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta, data_hora) VALUES (%s, %s, %s, %s);", (meu_id_f, prompt, resposta_lucy, datetime.now())) 
@@ -967,120 +949,79 @@ def template_chat_ia_completo():
                 cursor.close()
                 conn.close() 
 
-                # 🚀 CORREÇÃO DO SUMIÇO: Força a página a recarregar e buscar o histórico atualizado do banco
-                st.rerun()
-
-                # 4. ATUALIZAÇÃO AUTOMÁTICA DE ATRIBUTOS (EXTRATOR INTELIGENTE BACKEND)
-                 # 1. Monta a estrutura correta de mensagens com System e User
-                mensagens_extracao = [
-                    {
-                        "role": "system",
-                        "content": (
-                            "Você é um parser de dados JSON rígido. Analise o texto e devolva APENAS um objeto JSON no formato:\n"
-                            '{"idade": null, "interesse": null, "procura": null}\n\n'
-                            "regras:\n"
-                            "- idade: deve ser um número inteiro se ele mencionou a idade dele, senão null.\n"
-                            "- interesse: deve ser 'M' se ele disse que gosta de homens, 'F' para mulheres, 'O' para ambos/todos, senão null.\n"
-                            "- procura: deve ser 'amizade' ou 'namoro' se ele declarou o objetivo dele, senão null.\n"
-                            "Não escreva nenhuma palavra antes ou depois do JSON. Se não encontrar nada, envie tudo nulo."
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Analise o texto do usuário e extraia se ele respondeu alguma das perguntas. Texto: '{prompt}'"
-                    }
-                ]
-
-                # 2. Faz a chamada forçando o formato JSON
-                resposta_extracao = client.chat.completions.create(
-                    model='gpt-4o-mini',
-                    messages=mensagens_extracao,
-                    temperature=0.0,  # Reduzido para 0.0 para garantir máxima precisão no JSON
-                    response_format={"type": "json_object"}  # Força a OpenAI a responder em JSON puro
-                )
-
-                 # 3. Captura a string de texto do JSON
-                texto_json = resposta_extracao.choices[0].message.content
-
-                # 4. Transforma a string em um dicionário Python para você usar no Supabase
-                dados_extraidos = modulo_json.loads(texto_json)
-
-                # --- RESOLVIDO: Processamento e persistência das respostas pescadas pela Lucy ---
+                # --- 2. EXTRATOR INTELIGENTE BACKEND (Isolado em um try/except próprio) ---
                 try:
-                    # Usamos diretamente o 'dados_extraidos' que já foi validado e convertido acima
-                    if dados_extraidos.get("idade"):
-                        conn_up = conectar_supabase()
-                        cursor_up = conn_up.cursor()
-                        cursor_up.execute("UPDATE usuarios SET idade = %s WHERE id = %s;", (int(dados_extraidos["idade"]), meu_id_f))
-                        conn_up.commit()
-                        cursor_up.close()
-                        conn_up.close()
-                        
-                    if dados_extraidos.get("interesse"):
-                        conn_up = conectar_supabase()
-                        cursor_up = conn_up.cursor()
-                        cursor_up.execute("UPDATE usuarios SET procura_por = %s WHERE id = %s;", (str(dados_extraidos["interesse"]), meu_id_f))
-                        conn_up.commit()
-                        cursor_up.close()
-                        conn_up.close()
-                        
-                    if dados_extraidos.get("procura"):
-                        conn_up = conectar_supabase()
-                        cursor_up = conn_up.cursor()
-                        cursor_up.execute("UPDATE usuarios SET procura_relacionamento = %s WHERE id = %s;", (str(dados_extraidos["procura"]), meu_id_f))
-                        conn_up.commit()
-                        cursor_up.close()
-                        conn_up.close()
-                        
-                except Exception as erro_banco:
-                    # Opcional: mude para st.warning(f"Erro ao salvar dados: {erro_banco}") caso queira debugar
-                    pass 
+                    mensagens_extracao = [
+                        {
+                            "role": "system",
+                            "content": "Você é um parser de dados JSON rígido. Analise o texto e devolva APENAS um objeto JSON no formato:\n"
+                                       '{"idade": null, "interesse": null, "procura": null}'
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Analise o texto do usuário e extraia se ele respondeu alguma das perguntas. Texto: '{prompt}'"
+                        }
+                    ]
 
-
-
-
-
-                # 🛑 COMENTADO PARA TESTE: Dispara o motor clássico de matches semânticos
-                # Dispara o motor clássico de matches semânticos por 4 pilares
-                #res_match = processar_afinidade_e_match(meu_id_f, prompt) 
-                
-
-
-                # 🚀 NOVO GATILHO DE TESTE: Força o match sempre com o ID 2 (ou troque pelo ID que quiser testar)
-                res_match = gatilho_match_teste_forcado(meu_id_f, id_parceiro_teste=2)
-                
-                if res_match and res_match.get("match") == True: 
-                    id_parceiro_match = int(res_match["id_par"])
+                    resposta_extracao = client.chat.completions.create(
+                        model='gpt-4o-mini',
+                        messages=mensagens_extracao,
+                        temperature=0.0,
+                        response_format={"type": "json_object"}
+                    )
                     
-                    parceiro_real_online = False
-                    conn_p = conectar_supabase()
-                    cursor_p = conn_p.cursor()
-                    cursor_p.execute("SELECT status FROM usuarios WHERE id = %s;", (id_parceiro_match,))
-                    status_banco = cursor_p.fetchone()
-                    cursor_p.close()
-                    conn_p.close()
+                    texto_json = resposta_extracao.choices[0].message.content
+                    dados_extraidos = modulo_json.loads(texto_json)
                     
-                    if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
-                        parceiro_real_online = True
+                    if dados_extraidos.get("idade") or dados_extraidos.get("interesse") or dados_extraidos.get("procura"):
+                        conn_up = conectar_supabase()
+                        cursor_up = conn_up.cursor()
+                        if dados_extraidos.get("idade"):
+                            cursor_up.execute("UPDATE usuarios SET idade = %s WHERE id = %s;", (int(dados_extraidos["idade"]), meu_id_f))
+                        if dados_extraidos.get("interesse"):
+                            cursor_up.execute("UPDATE usuarios SET procura_por = %s WHERE id = %s;", (str(dados_extraidos["interesse"]), meu_id_f))
+                        if dados_extraidos.get("procura"):
+                            cursor_up.execute("UPDATE usuarios SET procura_relacionamento = %s WHERE id = %s;", (str(dados_extraidos["procura"]), meu_id_f))
+                        conn_up.commit()
+                        cursor_up.close()
+                        conn_up.close()
+                except Exception as e_extracao:
+                    st.sidebar.warning(f"Erro silencioso na extração: {e_extracao}")
 
-                    # ⚠️ ALERTA DE CONFIGURAÇÃO DA SALA PRIVADA:
-                    # Certifique-se de que quando o usuário clica para entrar na sala, estes dados abaixo 
-                    # são passados para as variáveis que a sua tela de chat privado lê (ex: st.session_state.sala_atual_id)
-                    st.session_state.alerta_match = {
-                        "match_id": int(res_match["match_id"]), 
-                        "id_par": id_parceiro_match, 
-                        "nome": res_match["nome_par"], 
-                        "online": parceiro_real_online
-                    } 
-                    st.balloons() 
-                
-                elif "erro" in res_match:
-                    st.error(f"Erro no Gatilho de Match: {res_match['erro']}")
-                
+                # --- 3. GATILHO DE MATCH FORÇADO (Isolado para teste) ---
+                try:
+                    res_match = gatilho_match_teste_forcado(meu_id_f, id_parceiro_teste=2)
+                    
+                    if res_match and res_match.get("match") == True: 
+                        id_parceiro_match = int(res_match["id_par"])
+                        
+                        conn_p = conectar_supabase()
+                        cursor_p = conn_p.cursor()
+                        cursor_p.execute("SELECT status FROM usuarios WHERE id = %s;", (id_parceiro_match,))
+                        status_banco = cursor_p.fetchone()
+                        cursor_p.close()
+                        conn_p.close()
+                        
+                        parceiro_real_online = False
+                        if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
+                            parceiro_real_online = True
+
+                        st.session_state.alerta_match = {
+                            "match_id": int(res_match["match_id"]), 
+                            "id_par": id_parceiro_match, 
+                            "nome": res_match["nome_par"], 
+                            "online": parceiro_real_online
+                        } 
+                        st.balloons()
+                except Exception as e_match:
+                    st.sidebar.warning(f"Erro no match: {e_match}")
+
+                # Recarrega a página de forma limpa puxando os novos dados salvos
                 st.rerun() 
                 
             except Exception as e: 
-                st.error(f"Erro na IA: {e}")
+                # Se cair aqui, o Streamlit vai printar o erro exato na tela em vez de só sumir com o texto
+                st.error(f"Erro crítico na execução do Chat: {e}")
 
 # ==============================================================================
 # 7. TELA DE GESTÃO DE RELACIONAMENTOS (RESTAURAÇÃO COMPLETA DA LISTA DE MATCHES)
