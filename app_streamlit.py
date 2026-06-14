@@ -1248,12 +1248,21 @@ def template_sala_privada():
 
         # 📥 MOTOR FRAGMENTADO AS SÍNCRONO REATIVO (ATUALIZA A CADA 2 SEGUNDOS)
         #@st.fragment(run_every=2)
+        @st.fragment
         def live_chat_privado_engine(m_id, my_id, p_nome_str):
+            # Container com scroll para visualização das mensagens
             with st.container(height=410, border=False):
                 try:
-                    conn = conectar_supabase(); cursor = conn.cursor()
-                    cursor.execute('SELECT remetente_id, texto, data_envio FROM mensagens_chat WHERE match_id = %s ORDER BY data_envio ASC;', (int(m_id),))
-                    rows = cursor.fetchall(); cursor.close(); conn.close()
+                    conn = conectar_supabase()
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        'SELECT remetente_id, texto, data_envio FROM mensagens_chat WHERE match_id = %s ORDER BY data_envio ASC;', 
+                        (int(m_id),)
+                    )
+                    rows = cursor.fetchall()
+                    cursor.close()
+                    conn.close()
+                    
                     for r_id, txt, dt in rows:
                         hora_f = dt.strftime("%H:%M")
                         if int(r_id) == int(my_id):
@@ -1264,15 +1273,27 @@ def template_sala_privada():
                             with st.chat_message("assistant"):
                                 st.write(txt)
                                 st.caption(f"{p_nome_str.split('@')[0].capitalize()} — {hora_f}")
-                except Exception: pass
+                except Exception:
+                    pass
             
+            # Input de texto e lógica de envio dentro do fragmento
             if st.session_state.opcao_menu == "🤝 Sala Privada":
                 if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
                     if txt_in.strip():
-                        conn = conectar_supabase(); cursor = conn.cursor()
-                        cursor.execute('INSERT INTO mensagens_chat (match_id, remetente_id, texto) VALUES (%s, %s, %s);', (int(m_id), int(my_id), txt_in.strip()))
-                        conn.commit(); cursor.close(); conn.close()
-                        st.rerun()
+                        try:
+                            conn = conectar_supabase()
+                            cursor = conn.cursor()
+                            cursor.execute(
+                                'INSERT INTO mensagens_chat (match_id, remetente_id, texto) VALUES (%s, %s, %s);', 
+                                (int(m_id), int(my_id), txt_in.strip())
+                            )
+                            conn.commit()
+                            cursor.close()
+                            conn.close()
+                            # Recarrega apenas este fragmento instantaneamente
+                            st.rerun()
+                        except Exception:
+                            pass
 
 
             
