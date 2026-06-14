@@ -799,28 +799,7 @@ def template_chat_ia_completo():
             if ia_r: st.chat_message("assistant").write(ia_r) 
 
 
-    # Garanta que o histórico possui mensagens antes de enviar
-    if st.session_state.messages:
-        with st.chat_message("assistant"):
-            # Criamos a lista de mensagens explicitamente
-            mensagens_api = [
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ]
-            
-            # Chamada com argumentos nomeados explícitos
-            stream = client.chat.completions.create(
-                model="gpt-4o-mini",  # Certifique-se de que o nome do modelo está correto
-                messages=mensagens_api,
-                stream=True
-            )
-            response = st.write_stream(stream)
-
-
-
-
-
-
+ 
     # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE (LUCY COGNITIVA INTERPESSOAL)
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
