@@ -1009,7 +1009,12 @@ def template_chat_ia_completo():
                 except Exception as e:
                     st.error(f"Erro no detector de status: {e}")
 
+                
+                # Força a tela a recarregar e desenhar o histórico + disparar modal
                 st.rerun()
+
+            except Exception as e: 
+                st.error(f"Erro na IA: {e}")
 
 
             
