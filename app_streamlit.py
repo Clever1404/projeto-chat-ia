@@ -495,39 +495,40 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
 # ============================================================================== 
 # 6. TELA DO CHAT IA PRINCIPAL (LAYOUT TOTALMENTE FIXO E ROLÁVEL NO MEIO) 
 # ============================================================================== 
+# Garante que a memória do chat exista globalmente e nunca seja zerada nos reruns
+if "historico_volatil" not in st.session_state:
+    st.session_state.historico_volatil = []
 
 @st.fragment
 def renderizar_historico_ia(usuario_id):
-    """
-    Busca o histórico do banco e adiciona imediatamente as mensagens 
-    da memória volátil para evitar que o chat suma durante o Rerun.
-    """
+    """Exibe o chat combinando o banco de dados e a memória local instantânea."""
     with st.container(height=440, border=False):
-        # 1. Busca as mensagens já consolidadas no banco de dados
+        # 1. Recupera o histórico salvo no PostgreSQL
         historico = buscar_memoria(usuario_id, limite=15) 
         
-        # Inicializa a lista de exibição com os dados do banco
+        # Lista unificada que será desenhada na tela
         mensagens_para_exibir = []
+        
+        # Carrega o que já está consolidado no banco
         if historico:
             for user_p, ia_r in historico:
                 if user_p: mensagens_para_exibir.append(("user", user_p))
                 if ia_r: mensagens_para_exibir.append(("assistant", ia_r))
         
-        # 2. Se houver mensagens na memória que ainda não subiram pro banco, anexa elas
-        if "historico_volatil" in st.session_state:
-            for role, text in st.session_state.historico_volatil:
-                # Evita duplicar mensagens que já foram consolidadas no banco
-                if (role, text) not in mensagens_para_exibir:
-                    mensagens_para_exibir.append((role, text))
+        # 2. Une com as mensagens em tempo real da memória RAM
+        for role, text in st.session_state.historico_volatil:
+            if (role, text) not in mensagens_para_exibir:
+                mensagens_para_exibir.append((role, text))
         
         if not mensagens_para_exibir:
             st.info("Inicie a conversa com a Lucy enviando uma mensagem abaixo!")
             return
             
-        # 3. Renderiza a lista combinada e blindada na tela
+        # 3. Renderiza todas as mensagens sem deixar sumir nada
         for role, conteudo in mensagens_para_exibir:
             with st.chat_message(role):
                 st.write(conteudo)
+
 
 
 def template_chat_ia_completo(): 
@@ -559,20 +560,15 @@ def template_chat_ia_completo():
     # Renderiza o histórico (Chama a Função 1 de forma reativa)
     renderizar_historico_ia(meu_id_f)
 
-    # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE
+     # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
             
-            # Inicializa e grava na memória local imediatamente
-            if "historico_volatil" not in st.session_state:
-                st.session_state.historico_volatil = []
-                
-            # Salva o texto do usuário
+            # Adiciona imediatamente à memória segura do app
             st.session_state.historico_volatil.append(("user", prompt))
-            st.chat_message("user").write(prompt) 
             
             try:
-                # 🔌 CONEXÃO ÚNICA DA FUNÇÃO: Usada do início ao fim
+                # 🔌 CONEXÃO ÚNICA DA FUNÇÃO
                 conn = conectar_supabase()
                 cursor = conn.cursor()
                 
