@@ -453,7 +453,7 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
             id_par, nome_par, status_par, distancia = resultado
             
             # Se passou em todas as travas rígidas e a afinidade de interesses for boa (< 0.85)
-            if float(distancia) < 0.85:
+            if float(distancia) < 0.50:
                 id_min, id_max = min(meu_id_limpo, int(id_par)), max(meu_id_limpo, int(id_par))
                 
                 cursor.execute('''
