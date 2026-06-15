@@ -492,31 +492,16 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
     return {"match": False}
 
 
-@st.cache_data(ttl=60)  # Guarda o resultado na memória por 60 segundos
-def buscar_pilares_usuario_cached(usuario_id):
-    """Busca os dados de cadastro do usuário com cache para máxima velocidade."""
-    try:
-        conn = conectar_supabase()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT idade, genero, procura_por, procura_relacionamento 
-            FROM usuarios WHERE id = %s;
-        """, (int(usuario_id),))
-        dados = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        return dados
-    except Exception:
-        return None
-
-
 # ============================================================================== 
 # 6. TELA DO CHAT IA PRINCIPAL (LAYOUT TOTALMENTE FIXO E ROLÁVEL NO MEIO) 
 # ============================================================================== 
 
 @st.fragment
 def renderizar_historico_ia(usuario_id):
-    """Garante que as mensagens fiquem fixas na tela e atualizem de forma independente."""
+    """
+    Função 1: Histórico de Mensagens isolado.
+    Garante que as mensagens fiquem fixas na tela e atualizem de forma independente.
+    """
     with st.container(height=440, border=False):
         historico = buscar_memoria(usuario_id, limite=15) 
         if not historico:
@@ -525,11 +510,17 @@ def renderizar_historico_ia(usuario_id):
             
         for user_p, ia_r in historico: 
             if user_p: 
-                with st.chat_message("user"): st.write(user_p) 
+                with st.chat_message("user"): 
+                    st.write(user_p) 
             if ia_r: 
-                with st.chat_message("assistant"): st.write(ia_r)
+                with st.chat_message("assistant"): 
+                    st.write(ia_r)
 
 def template_chat_ia_completo(): 
+    """
+    Função 2: Gerencia a interface principal, chamadas OpenAI e banco de dados.
+    Abre e fecha EXATAMENTE uma conexão por ciclo de envio.
+    """
     col_titulos, col_botoes_topo = st.columns([2, 1])
     
     with col_titulos:
@@ -548,34 +539,34 @@ def template_chat_ia_completo():
 
     st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
 
+    # Identifica o ID do usuário de forma segura
     meu_id_f = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
-    # Renderiza o histórico de mensagens de forma isolada
+    # Renderiza o histórico (Chama a Função 1 de forma reativa)
     renderizar_historico_ia(meu_id_f)
 
     # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
             
-            # Corrige o sumiço mantendo o estado local ativo imediatamente
+            # Corrige o sumiço mantendo o estado local ativo imediatamente na tela
             if "historico_volatil" not in st.session_state:
                 st.session_state.historico_volatil = []
             st.session_state.historico_volatil.append(("user", prompt))
             st.chat_message("user").write(prompt) 
             
             try:
-                # 🔋 ABERTURA DE CONEXÃO ÚNICA: Usaremos este cursor para TODAS as operações deste clique
+                # 🔌 CONEXÃO ÚNICA DA FUNÇÃO: Usada do início ao fim
                 conn = conectar_supabase()
                 cursor = conn.cursor()
                 
-                # 1. Busca os dados dos pilares do usuário
+                # 1. BUSCA PILARES DO USUÁRIO
                 cursor.execute("""
                     SELECT idade, genero, procura_por, procura_relacionamento 
                     FROM usuarios WHERE id = %s;
                 """, (meu_id_f,))
                 pilar_dados = cursor.fetchone()
-
-              
+                
                 dados_faltantes_contexto = ""
                 if pilar_dados:
                     idade_b, gen_b, proc_gen_b, proc_rel_b = pilar_dados
@@ -583,11 +574,11 @@ def template_chat_ia_completo():
                     if not proc_gen_b: dados_faltantes_contexto += "- Se ele tem interesse por HOMEM, MULHER ou AMBOS\n"
                     if not proc_rel_b: dados_faltantes_contexto += "- Se ele procura AMIZADE ou NAMORO\n"
                 
-                # Resgata a memória recente
+                # Resgata a memória recente para o contexto da IA
                 historico_previo = buscar_memoria(meu_id_f, limite=6)
                 contexto_conversacao = "".join([f"Usuário: {u}\nVocê (Lucy): {i}\n" for u, i in historico_previo])
                 
-                # 2. Configura a Persona exigindo retorno unificado em JSON
+                # 2. CONFIGURAÇÃO DA PERSONA COM CHAMADA UNIFICADA (CHAT + EXTRAÇÃO)
                 mensagens_openai = [
                     {
                         "role": "system",
@@ -609,7 +600,7 @@ def template_chat_ia_completo():
                     {"role": "user", "content": f"{contexto_conversacao}\nDados pendentes:\n{dados_faltantes_contexto}\nUsuário: {prompt}"}
                 ]
 
-                # Chamada ÚNICA à OpenAI (Economiza metade do tempo de rede)
+                # Chamada ÚNICA à OpenAI (Economiza 50% de processamento e rede)
                 resposta_streaming = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=mensagens_openai,
@@ -617,23 +608,23 @@ def template_chat_ia_completo():
                     response_format={"type": "json_object"}
                 )
 
-                # Processa o retorno da IA na memória local
+                # Processa o retorno unificado diretamente na memória ram
                 resultado_unificado = modulo_json.loads(resposta_streaming.choices[0].message.content)
                 resposta_lucy = resultado_unificado.get("resposta_chat", "Estou processando seus interesses...")
                 dados_extraidos = resultado_unificado.get("extracao", {})
                 
-                # Exibe a resposta imediatamente na tela
+                # Exibe a resposta da Lucy na tela sem travar
                 st.session_state.historico_volatil.append(("assistant", resposta_lucy))
                 st.chat_message("assistant").write(resposta_lucy)
 
-                # 3. Salva a mensagem no histórico (Usando a mesma conexão aberta)
+                # 3. GRAVA HISTÓRICO DA IA (Aproveitando a conexão ativa)
                 cursor.execute(
                     "INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta, data_hora) VALUES (%s, %s, %s, %s);", 
                     (meu_id_f, prompt, resposta_lucy, datetime.now())
                 )
                 conn.commit()
 
-                # 4. Atualiza os dados pescados pela Lucy em LOTE (Batch Update)
+                # 4. ATUALIZA ATRIBUTOS DO USUÁRIO EM LOTE (Batch Update)
                 updates = []
                 params = []
                 if dados_extraidos.get("idade"):
@@ -652,23 +643,13 @@ def template_chat_ia_completo():
                     cursor.execute(query_update, tuple(params))
                     conn.commit()
 
-                # Fecha o cursor e a conexão de forma limpa
-                #cursor.close()
-                #conn.close()
-
-                # ============================================================
-                # 🤝 MOTOR REAL DE MATCHES DA IA (AUTOMATIZADO E PROTEGIDO)
-                # ============================================================
+                # 5. MOTOR REAL DE MATCHES DA IA (Seguro e Automatizado)
                 res_match = processar_afinidade_e_match(meu_id_f, prompt) 
                 
                 if res_match and res_match.get("match") == True: 
                     id_parceiro_match = int(res_match["id_par"])
                     
-                    # Abre uma nova conexão apenas se houver match real para validar o parceiro
-                    #conn_p = conectar_supabase()
-                    #cursor_p = conn_p.cursor()
-                    
-                    # 1. Garante que a relação exista ou cria ela no banco para não quebrar a FK do Agendamento
+                    # Verifica se a relação na tabela 'matches' existe para não quebrar a FK do Agendamento
                     cursor.execute("""
                         SELECT id FROM matches 
                         WHERE (usuario_1_id = %s AND usuario_2_id = %s) 
@@ -677,54 +658,52 @@ def template_chat_ia_completo():
                     resultado_match = cursor.fetchone()
                     
                     if resultado_match:
-                        match_id_final = resultado_match[0]
+                        # Extrai o valor se vier como tupla (ex: (123,))
+                        match_id_final = resultado_match[0] if isinstance(resultado_match, tuple) else resultado_match
                     else:
+                        # Se não existir relação criada pela IA no banco, cria de forma resiliente
                         cursor.execute("""
                             INSERT INTO matches (usuario_1_id, usuario_2_id) 
                             VALUES (%s, %s) RETURNING id;
                         """, (meu_id_f, id_parceiro_match))
-                        match_id_final = cursor.fetchone()[0]
+                        retorno_insert = cursor.fetchone()
+                        match_id_final = retorno_insert[0] if isinstance(retorno_insert, tuple) else retorno_insert
                         conn.commit()
 
-                    # 2. Busca o status e nome real do parceiro
-                    cursor_p.execute("SELECT status FROM usuarios WHERE id = %s;", (id_parceiro_match,))
+                    # Busca o status atualizado do parceiro
+                    cursor.execute("SELECT status FROM usuarios WHERE id = %s;", (id_parceiro_match,))
                     status_banco = cursor.fetchone()
 
+                    # Busca o nome do parceiro corrigindo o erro de NameError (cursor_p -> cursor)
                     try:
                         cursor.execute("SELECT nome FROM usuarios WHERE id = %s;", (id_parceiro_match,))
                         nome_banco = cursor.fetchone()
-                        # Extrai a string se o fetchone retornar uma tupla (ex: ('Carlos',))
-                        if nome_banco and isinstance(nome_banco, tuple):
-                            nome_exibicao = nome_banco[0]
-                        else:
-                            nome_exibicao = nome_banco if nome_banco else res_match.get("nome_par", f"Usuário {id_parceiro_match}")
+                        nome_exibicao = nome_banco[0] if nome_banco and isinstance(nome_banco, tuple) else (nome_banco if nome_banco else res_match.get("nome_par", f"Usuário {id_parceiro_match}"))
                     except Exception:
                         nome_exibicao = res_match.get("nome_par", f"Usuário {id_parceiro_match}")
-                        
-                    #cursor_p.close()
-                    #conn_p.close()
                     
                     parceiro_real_online = False
                     if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
                         parceiro_real_online = True
 
-                    # Alimenta os dados com o match_id legítimo e persistente
+                    # Alimenta os dados estruturados finais para o Dialog
                     st.session_state.alerta_match = {
                         "match_id": match_id_final, 
                         "id_par": id_parceiro_match, 
                         "nome": nome_exibicao, 
                         "online": parceiro_real_online 
                     } 
-                    st.balloons()
-
-
+                    st.balloons() 
+                
+                # 🛑 FECHAMENTO ÚNICO DA CONEXÃO NO FINAL DO PROCESSO
                 cursor.close()
                 conn.close()
-
-                # Recarrega a página atualizando todo o fluxo de uma vez
+                
+                # Sincroniza a tela redesenhando os dados atualizados
                 st.rerun() 
+
             except Exception as e: 
-                # Garante o fechamento seguro mesmo em caso de falha catastrófica
+                # Cláusula de resgate: Fecha o banco de qualquer forma se houver falhas catastróficas
                 try:
                     cursor.close()
                     conn.close()
