@@ -668,92 +668,81 @@ def template_chat_ia_completo():
                 # ============================================================
                 res_match = processar_afinidade_e_match(meu_id_f, prompt) 
                 
-                # ─── 🚨 ADICIONE ESTE BLOCO DE DEBUG DAQUI EM DIANTE ───
-                with st.sidebar:
-                    st.subheader("🕵️‍♂️ Debugger do Motor de Match")
-                    st.write("A função `processar_afinidade_e_match` foi executada.")
-                    
-                    if res_match is None:
-                        st.error("❌ A função retornou `None`. Verifique se há um erro de banco ou exceção silenciosa capturada no `except`.")
-                    elif isinstance(res_match, dict):
-                        st.json(res_match) # Mostra o dicionário de retorno completo na barra lateral
-                        
-                        if res_match.get("match") == True:
-                            st.success("✅ Condições de Match ATIVADAS!")
-                        else:
-                            st.warning("⚠️ Retornou match=False. Motivos possíveis:\n"
-                                       "1. A query SQL não encontrou ninguém com a mesma intenção/gênero/idade.\n"
-                                       "2. A distância de cosseno foi maior que 0.22 (afinidade fraca).\n"
-                                       "3. O vetor de embedding não foi gerado corretamente.")
-                # ─── FINISH DEBUG ───
-
                 if res_match and res_match.get("match") == True: 
                     id_parceiro_match = int(res_match["id_par"])
                     
-                    # Abre uma nova conexão apenas se houver match real para validar o parceiro
+                    # Abre uma conexão e cursor novos e exclusivos para este bloco de match
                     conn_p = conectar_supabase()
                     cursor_p = conn_p.cursor()
                     
-                    # 1. Garante que a relação exista ou cria ela no banco para não quebrar a FK do Agendamento
-                    cursor.execute("""
-                        SELECT id FROM matches 
-                        WHERE (usuario_1_id = %s AND usuario_2_id = %s) 
-                           OR (usuario_1_id = %s AND usuario_2_id = %s);
-                    """, (meu_id_f, id_parceiro_match, id_parceiro_match, meu_id_f))
-                    resultado_match = cursor.fetchone()
-                    
-                    if resultado_match:
-                        match_id_final = resultado_match[0]
-                    else:
-                        cursor.execute("""
-                            INSERT INTO matches (usuario_1_id, usuario_2_id) 
-                            VALUES (%s, %s) RETURNING id;
-                        """, (meu_id_f, id_parceiro_match))
-                        match_id_final = cursor.fetchone()[0]
-                        conn.commit()
-
-                    # 2. Busca o status e nome real do parceiro
-                    cursor_p.execute("SELECT status FROM usuarios WHERE id = %s;", (id_parceiro_match,))
-                    status_banco = cursor.fetchone()
-
                     try:
-                        cursor.execute("SELECT nome FROM usuarios WHERE id = %s;", (id_parceiro_match,))
-                        nome_banco = cursor.fetchone()
-                        # Extrai a string se o fetchone retornar uma tupla (ex: ('Carlos',))
-                        if nome_banco and isinstance(nome_banco, tuple):
-                            nome_exibicao = nome_banco[0]
-                        else:
-                            nome_exibicao = nome_banco if nome_banco else res_match.get("nome_par", f"Usuário {id_parceiro_match}")
-                    except Exception:
-                        nome_exibicao = res_match.get("nome_par", f"Usuário {id_parceiro_match}")
+                        # 1. Garante que a relação exista (Usando cursor_p de forma isolada)
+                        cursor_p.execute("""
+                            SELECT id FROM matches 
+                            WHERE (usuario_1_id = %s AND usuario_2_id = %s) 
+                               OR (usuario_1_id = %s AND usuario_2_id = %s);
+                        """, (meu_id_f, id_parceiro_match, id_parceiro_match, meu_id_f))
+                        resultado_match = cursor_p.fetchone()
                         
-                    #cursor_p.close()
-                    #conn_p.close()
+                        if resultado_match:
+                            match_id_final = resultado_match[0]
+                        else:
+                            cursor_p.execute("""
+                                INSERT INTO matches (usuario_1_id, usuario_2_id) 
+                                VALUES (%s, %s) RETURNING id;
+                            """, (meu_id_f, id_parceiro_match))
+                            match_id_final = cursor_p.fetchone()[0]
+                            conn_p.commit()
+
+                        # 2. Busca o status e nome real do parceiro
+                        cursor_p.execute("SELECT status, nome FROM usuarios WHERE id = %s;", (id_parceiro_match,))
+                        dados_parceiro = cursor_p.fetchone()
+                        
+                        status_banco = dados_parceiro[0] if dados_parceiro else None
+                        nome_banco = dados_parceiro[1] if dados_parceiro else None
+                        
+                        nome_exibicao = nome_banco if nome_banco else res_match.get("nome_par", f"Usuário {id_parceiro_match}")
+                        
+                        parceiro_real_online = False
+                        if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
+                            parceiro_real_online = True
+
+                        # Alimenta os dados no session_state para o interceptor do topo ler pós-rerun
+                        st.session_state.alerta_match = {
+                            "match_id": match_id_final, 
+                            "id_par": id_parceiro_match, 
+                            "nome": nome_exibicao, 
+                            "online": parceiro_real_online 
+                        } 
                     
-                    parceiro_real_online = False
-                    if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
-                        parceiro_real_online = True
+                    finally:
+                        # Garante o fechamento do cursor secundário de qualquer forma
+                        cursor_p.close()
+                        conn_p.close()
 
-                    # Alimenta os dados com o match_id legítimo e persistente
-                    st.session_state.alerta_match = {
-                        "match_id": match_id_final, 
-                        "id_par": id_parceiro_match, 
-                        "nome": nome_exibicao, 
-                        "online": parceiro_real_online 
-                    } 
-                    #st.balloons() # ❌ REMOVIDO: st.balloons() daqui, pois o st.rerun() o mataria
-
-
-                cursor.close()
-                conn.close()
-
-                # Recarrega a página de forma limpa, persistindo o alerta_match no session_state
-                st.rerun() 
-            except Exception as e: 
-                # Garante o fechamento seguro mesmo em caso de falha catastrófica
+                # --- FECHAMENTO DO CURSOR PRINCIPAL (LUCY CHAT) ---
+                # Verifica se o cursor principal ainda está ativo antes de fechar
                 try:
-                    cursor.close()
-                    conn.close()
+                    if cursor and not cursor.closed:
+                        cursor.close()
+                    if conn:
+                        conn.close()
+                except Exception:
+                    pass
+
+                # Recarrega a página atualizando todo o fluxo de uma vez de forma segura
+                st.rerun() 
+
+            except Exception as e: 
+                # O st.rerun() lança uma exceção interna chamada RerunException para parar o script.
+                # Se for essa exceção, nós apenas a repassamos para o Streamlit seguir o fluxo.
+                if e.__class__.__name__ == "RerunException":
+                    raise e
+                    
+                # Só limpa e mostra erro se for uma falha real de código/banco
+                try:
+                    if 'cursor' in locals() and cursor and not cursor.closed: cursor.close()
+                    if 'conn' in locals() and conn: conn.close()
                 except Exception:
                     pass
                 st.error(f"Erro na IA principal: {e}")
