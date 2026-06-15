@@ -805,7 +805,7 @@ def renderizar_historico_ia(usuario_id):
                 with st.chat_message("assistant"): st.write(ia_r)
 
 def template_chat_ia_completo(): 
-    col_titulos, col_botoes_topo = st.columns([2, 1])
+    col_titulos, col_botoes_topo = st.columns()
     
     with col_titulos:
         st.markdown("<h2 style='margin-top:0; margin-bottom:2px; font-size: 24px;'>🤖 Olá, Seja bem-vindo ao Lucy Chat IA</h2>", unsafe_allow_html=True) 
@@ -825,9 +825,10 @@ def template_chat_ia_completo():
 
     meu_id_f = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
-    # Renderiza o histórico de forma isolada pelo fragmento (Acelera o app)
+    # Renderiza o histórico de mensagens de forma isolada
     renderizar_historico_ia(meu_id_f)
 
+    # CAIXA DE DIGITAÇÃO FIXA NO RODAPÉ DA INTERFACE
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
             
@@ -838,10 +839,11 @@ def template_chat_ia_completo():
             st.chat_message("user").write(prompt) 
             
             try:
-                # --- OTIMIZAÇÃO 1: Consolidação de Queries de Leitura ---
+                # 🔋 ABERTURA DE CONEXÃO ÚNICA: Usaremos este cursor para TODAS as operações deste clique
                 conn = conectar_supabase()
                 cursor = conn.cursor()
                 
+                # 1. Busca os dados dos pilares do usuário
                 cursor.execute("""
                     SELECT idade, genero, procura_por, procura_relacionamento 
                     FROM usuarios WHERE id = %s;
@@ -855,84 +857,57 @@ def template_chat_ia_completo():
                     if not proc_gen_b: dados_faltantes_contexto += "- Se ele tem interesse por HOMEM, MULHER ou AMBOS\n"
                     if not proc_rel_b: dados_faltantes_contexto += "- Se ele procura AMIZADE ou NAMORO\n"
                 
-                # Resgata memória recente
+                # Resgata a memória recente
                 historico_previo = buscar_memoria(meu_id_f, limite=6)
                 contexto_conversacao = "".join([f"Usuário: {u}\nVocê (Lucy): {i}\n" for u, i in historico_previo])
                 
+                # 2. Configura a Persona exigindo retorno unificado em JSON
                 mensagens_openai = [
                     {
                         "role": "system",
                         "content": (
                             "Você é Lucy, uma assistente virtual focada em criar conexões humanas legítimas através de afinidades semânticas. "
                             "Seu tom deve ser amigável, interpessoal, acolhedor e levemente curioso. "
-                            "Sua missão secreta é descobrir 4 dados essenciais sobre o usuário, mas você DEVE fazer isso de forma embutida e fluida na conversa, "
-                            "investigando APENAS UM DADO POR VEZ. Nunca faça uma lista de perguntas estilo questionário.\n\n"
-                            "Os 4 dados são:\n"
-                            "1. A idade dele.\n"
-                            "2. Se ele tem interesse por: Homem, Mulher ou Ambos.\n"
-                            "3. O que ele procura na plataforma (Amizade ou Namoro).\n"
-                            "4. Seus hobbies e interesses cotidianos.\n\n"
-                            "Instruções de fluxo:\n"
-                            "- Analise a lista de 'Dados atuais pendentes de extração' que foi enviada no escopo.\n"
-                            "- Escolha o primeiro item da lista de pendências e conduza o assunto para aquele rumo.\n"
-                            "- Exemplo para Idade: Se ele falar de planos do dia, diga algo como 'Nossa, que legal! Isso me lembra quando eu ajudei um usuário da sua faixa de idade... por sinal, quantos anos você tem?'\n"
-                            "- Exemplo para Intenção: 'Acho lindo como as pessoas buscam coisas diferentes... alguns querem só uma boa amizade para conversar, outros procuram um namoro sério. O que você está buscando por aqui hoje?'\n"
-                            "- Sempre valide o prompt atual do usuário com empatia antes de introduzir a sua pergunta direcionada no final."
+                            "Sua missão secreta é descobrir 4 dados essenciais sobre o usuário, investigando APENAS UM DADO POR VEZ.\n\n"
+                            "Os 4 dados são:\n1. A idade dele.\n2. Se ele tem interesse por: Homem, Mulher ou Ambos.\n3. O que ele procura na plataforma (Amizade ou Namoro).\n4. Seus hobbies e interesses cotidianos.\n\n"
+                            "Sempre valide o prompt atual do usuário com empatia antes de introduzir a sua pergunta direcionada no final.\n\n"
+                            "REGRAS DE RESPOSTA OBRIGATÓRIAS:\n"
+                            "Você deve responder RIGIDAMENTE com um objeto JSON contendo duas chaves primárias:\n"
+                            "1. 'resposta_chat': O texto em linguagem natural amigável que será exibido para o usuário na tela.\n"
+                            "2. 'extracao': Um objeto contendo a análise do ÚLTIMO texto enviado pelo usuário. Formato interno:\n"
+                            "   - 'idade': Número inteiro se ele mencionou a idade dele, senão null.\n"
+                            "   - 'interesse': 'M' para homens, 'F' para mulheres, 'O' para ambos/todos, senão null.\n"
+                            "   - 'procura': 'amizade' ou 'namoro' se ele declarou o objetivo, senão null."
                         )
                     },
-                    {
-                        "role": "user",
-                        "content": f"{contexto_conversacao}\nDados atuais pendentes de extração:\n{dados_faltantes_contexto}\nUsuário: {prompt}"
-                    }
+                    {"role": "user", "content": f"{contexto_conversacao}\nDados pendentes:\n{dados_faltantes_contexto}\nUsuário: {prompt}"}
                 ]
 
-                # Chamada GPT Chat
+                # Chamada ÚNICA à OpenAI (Economiza metade do tempo de rede)
                 resposta_streaming = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=mensagens_openai,
-                    temperature=0.9
+                    temperature=0.8,
+                    response_format={"type": "json_object"}
                 )
-                resposta_lucy = resposta_streaming.choices[0].message.content
+
+                # Processa o retorno da IA na memória local
+                resultado_unificado = modulo_json.loads(resposta_streaming.choices.message.content)
+                resposta_lucy = resultado_unificado.get("resposta_chat", "Estou processando seus interesses...")
+                dados_extraidos = resultado_unificado.get("extracao", {})
                 
-                # Atualiza o estado volátil
+                # Exibe a resposta imediatamente na tela
                 st.session_state.historico_volatil.append(("assistant", resposta_lucy))
                 st.chat_message("assistant").write(resposta_lucy)
 
-                # Salva o histórico de conversa
+                # 3. Salva a mensagem no histórico (Usando a mesma conexão aberta)
                 cursor.execute(
                     "INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta, data_hora) VALUES (%s, %s, %s, %s);", 
                     (meu_id_f, prompt, resposta_lucy, datetime.now())
                 )
                 conn.commit()
 
-                # Extração Inteligente de Atributos via JSON
-                mensagens_extracao = [
-                    {
-                        "role": "system",
-                        "content": (
-                            "Você é um parser de dados JSON rígido. Analise o texto e devolva APENAS um objeto JSON no formato:\n"
-                            '{"idade": null, "interesse": null, "procura": null}\n\n'
-                            "regras:\n"
-                            "- idade: deve ser um número inteiro se ele mencionou a idade dele, senão null.\n"
-                            "- interesse: deve ser 'M' se ele disse que gosta de homens, 'F' para mulheres, 'O' para ambos/todos, senão null.\n"
-                            "- procura: deve ser 'amizade' ou 'namoro' se ele declarou o objetivo dele, senão null.\n"
-                            "Não escreva nenhuma palavra antes ou depois do JSON. Se não encontrar nada, envie tudo nulo."
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Analise o texto do usuário e extraia se ele respondeu alguma das perguntas. Texto: '{prompt}'"
-                    }
-                ]
-                resposta_extracao = client.chat.completions.create(
-                    model='gpt-4o-mini',
-                    messages=mensagens_extracao,
-                    temperature=0.0, 
-                    response_format={"type": "json_object"} 
-                )
-                dados_extraidos = modulo_json.loads(resposta_extracao.choices[0].message.content)
-
-                # --- OTIMIZAÇÃO 2: Atualização em Lote (Batch Update) na mesma conexão ---
+                # 4. Atualiza os dados pescados pela Lucy em LOTE (Batch Update)
                 updates = []
                 params = []
                 if dados_extraidos.get("idade"):
@@ -951,51 +926,77 @@ def template_chat_ia_completo():
                     cursor.execute(query_update, tuple(params))
                     conn.commit()
 
+                # Fecha o cursor e a conexão de forma limpa
                 cursor.close()
                 conn.close()
 
                 # ============================================================
-                # 🔥 MOTOR REAL DE MATCHES DA IA (REVERTIDO E SEGURO)
+                # 🤝 MOTOR REAL DE MATCHES DA IA (AUTOMATIZADO E PROTEGIDO)
                 # ============================================================
                 res_match = processar_afinidade_e_match(meu_id_f, prompt) 
                 
                 if res_match and res_match.get("match") == True: 
                     id_parceiro_match = int(res_match["id_par"])
-                    match_id_real = int(res_match["match_id"])
                     
-                    # Verificação em tempo real se o parceiro do match está online
-                    parceiro_real_online = False
+                    # Abre uma nova conexão apenas se houver match real para validar o parceiro
                     conn_p = conectar_supabase()
                     cursor_p = conn_p.cursor()
+                    
+                    # 1. Garante que a relação exista ou cria ela no banco para não quebrar a FK do Agendamento
+                    cursor_p.execute("""
+                        SELECT id FROM matches 
+                        WHERE (usuario_1_id = %s AND usuario_2_id = %s) 
+                           OR (usuario_1_id = %s AND usuario_2_id = %s);
+                    """, (meu_id_f, id_parceiro_match, id_parceiro_match, meu_id_f))
+                    resultado_match = cursor_p.fetchone()
+                    
+                    if resultado_match:
+                        match_id_final = resultado_match
+                    else:
+                        cursor_p.execute("""
+                            INSERT INTO matches (usuario_1_id, usuario_2_id) 
+                            VALUES (%s, %s) RETURNING id;
+                        """, (meu_id_f, id_parceiro_match))
+                        match_id_final = cursor_p.fetchone()
+                        conn_p.commit()
+
+                    # 2. Busca o status e nome real do parceiro
                     cursor_p.execute("SELECT status FROM usuarios WHERE id = %s;", (id_parceiro_match,))
                     status_banco = cursor_p.fetchone()
                     
                     try:
                         cursor_p.execute("SELECT nome FROM usuarios WHERE id = %s;", (id_parceiro_match,))
                         nome_banco = cursor_p.fetchone()
-                        nome_exibicao = nome_banco if nome_banco else res_match.get("nome_par", f"Usuário {id_parceiro_match}")
+                        # Extrai a string se o fetchone retornar uma tupla (ex: ('Carlos',))
+                        if nome_banco and isinstance(nome_banco, tuple):
+                            nome_exibicao = nome_banco[0]
+                        else:
+                            nome_exibicao = nome_banco if nome_banco else res_match.get("nome_par", f"Usuário {id_parceiro_match}")
                     except Exception:
                         nome_exibicao = res_match.get("nome_par", f"Usuário {id_parceiro_match}")
                         
                     cursor_p.close()
                     conn_p.close()
                     
+                    parceiro_real_online = False
                     if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
                         parceiro_real_online = True
 
-                    # Alimenta os dados com o match_id gerado legitimamente pela IA
+                    # Alimenta os dados com o match_id legítimo e persistente
                     st.session_state.alerta_match = {
-                        "match_id": match_id_real, 
+                        "match_id": match_id_final, 
                         "id_par": id_parceiro_match, 
                         "nome": nome_exibicao, 
                         "online": parceiro_real_online 
                     } 
                     st.balloons() 
                 
+                # Recarrega a página atualizando todo o fluxo de uma vez
                 st.rerun() 
 
-            except Exception as e: 
-                st.error(f"Erro na IA: {e}")
+        except Exception as e: 
+            st.error(f"Erro na IA principal: {e}")
+
 
             
 
