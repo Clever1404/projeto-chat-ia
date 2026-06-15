@@ -21,6 +21,13 @@ UPLOAD_FOLDER = "uploads"
 load_dotenv()
 UPLOAD_FOLDER = 'static/uploads/perfis'
 
+# --- SIMULAÇÃO DE DADOS (Substitua pelas consultas ao Supabase) ---
+id_usuario_atual = st.session_state.get("id_usuario_logado", "123")
+
+# Simulando dados que viriam do Supabase sobre o usuário LOGADO
+status_autor = "gratis"  # 'gratis' ou 'vip'
+saldo_moedas = 5         # quantidade de créditos que ele tem
+
 # 1. Busca a chave da OpenAI priorizando os Secrets da nuvem
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
 
@@ -271,6 +278,96 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
             st.session_state.opcao_menu = "divulgacao"
             st.rerun()
 
+
+# Inicializa o SDK do Mercado Pago
+sdk = mercadopago.SDK("SEU_ACCESS_TOKEN_DO_MERCADO_PAGO")
+
+# --- CONTROLE DE SESSÃO DO USUÁRIO ---
+id_usuario = st.session_state.get("id_usuario_logado", "123")
+
+# Busca dados em tempo real do Supabase
+user_db = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario).single().execute()
+status_usuario = user_db.data["status"] if user_db.data else "gratis"
+saldo_moedas = user_db.data["creditos"] if user_db.data else 0
+
+st.title("Plataforma de Planos IA")
+st.caption(f"Status: **{status_usuario.upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+
+# --- VARIÁVEIS DE CONTROLE DE PAGAMENTO EM ANDAMENTO ---
+if "id_pagamento_pendente" not in st.session_state:
+    st.session_state.id_pagamento_pendente = None
+if "tipo_pagamento_pendente" not in st.session_state:
+    st.session_state.tipo_pagamento_pendente = None
+
+# =========================================================================
+# SEÇÃO DE COMPRAS (MERCADO PAGO)
+# =========================================================================
+st.sidebar.header("🛒 Loja do App")
+
+opcoes_compra = st.sidebar.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
+
+if st.sidebar.button("Gerar Pix de Pagamento"):
+    # Configura o valor e descrição baseado na escolha do menu lateral
+    if "VIP" in opcoes_compra:
+        valor, desc, tipo = 19.90, "Plano VIP 30 dias", "vip"
+    else:
+        valor, desc, tipo = 5.00, "Pacote de 10 Moedas", "moedas"
+
+    payment_data = {
+        "transaction_amount": valor,
+        "description": desc,
+        "payment_method_id": "pix",
+        "payer": {"email": "cliente@email.com"},
+        "external_reference": f"{id_usuario}:{tipo}"
+    }
+
+    # Criando o Pix na API do Mercado Pago
+    payment_response = sdk.payment().create(payment_data)
+    payment = payment_response["response"]
+
+    if "point_of_interaction" in payment:
+        # Salva o ID do pagamento gerado para checar depois
+        st.session_state.id_pagamento_pendente = payment["id"]
+        st.session_state.tipo_pagamento_pendente = tipo
+        
+        # Dados para exibição do Pix
+        st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+        st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+        st.sidebar.success("Pix gerado com sucesso!")
+    else:
+        st.sidebar.error("Erro ao gerar pagamento. Verifique as credenciais.")
+
+# Exibe o Pix gerado se ele existir na sessão atual
+if st.session_state.id_pagamento_pendente:
+    st.sidebar.markdown("---")
+    st.sidebar.image(f"data:image/jpeg;base64,{st.session_state.qr_code_img}", width=200)
+    st.sidebar.text_input("Copia e Cola:", value=st.session_state.qr_code_texto)
+    
+    # BOTÃO CHAVE: O usuário clica após pagar para o código validar na hora
+    if st.sidebar.button("🔄 Já paguei, liberar meu acesso"):
+        # Consulta o status do pagamento direto na API do Mercado Pago
+        id_pag = st.session_state.id_pagamento_pendente
+        tipo_pag = st.session_state.tipo_pagamento_pendente
+        
+        check_payment = sdk.payment().get(id_pag)["response"]
+        status_pagamento = check_payment.get("status")
+
+        if status_pagamento == "approved":
+            if tipo_pag == "vip":
+                # Atualiza para VIP no Supabase
+                supabase.table("usuarios").update({"status": "vip"}).eq("id", id_usuario).execute()
+                st.success("🎉 Parabéns! Seu plano VIP foi ativado.")
+            elif tipo_pag == "moedas":
+                # Soma as novas moedas no Supabase
+                novo_saldo = saldo_moedas + 10
+                supabase.table("usuarios").update({"creditos": novo_saldo}).eq("id", id_usuario).execute()
+                st.success("🪙 10 Moedas adicionadas com sucesso ao seu saldo!")
+            
+            # Limpa as variáveis de pagamento pendente da tela
+            st.session_state.id_pagamento_pendente = None
+            st.rerun()
+        else:
+            st.sidebar.warning("⚠️ Pagamento ainda não consta como aprovado. Aguarde alguns instantes e tente novamente.")
 
 
 
@@ -795,32 +892,41 @@ def template_chat_ia_completo():
 def modal_match_lucy(dados_m):
     st.markdown(f"Lucy identificou uma excelente afinidade entre você e **{dados_m['nome']}**!")
     
-    # 🟢 COMPORTAMENTO SE O PAR ESTIVER ONLINE: Libera o chat imediato
+   # 🟢 COMPORTAMENTO SE O PAR ESTIVER ONLINE: Libera o chat imediato
     if dados_m["online"]:
-        if st.button(f"🟢 {dados_m['nome']} está online. Gostaria de conversar agora!", type="primary", use_container_width=True):
-            st.session_state.match_id_atual = dados_m["match_id"]
-            st.session_state.opcao_menu = "🤝 Sala Privada"
-            st.rerun()
-
-         # Segundo retângulo fica desativado neste cenário
-        st.button("📅 Agendar um encontro virtual (Disponível apenas offline)", type="secondary", disabled=True, use_container_width=True)
-
+        if st.button(f"🟢 {dados_m['nome']} está online. Gostaria de conversar agora!", type="primary", width="stretch"):
+            if saldo_moedas >= 2:
+                if st.button("🪙 Entrar na Sala Privada (Gasta 2 moedas)"):
+                    supabase.table("usuarios").update({"creditos": saldo_moedas - 2}).eq("id", id_usuario).execute())
+                    st.success("Moedas debitadas! Sala privada liberada. Pode conversar!")
+                    st.session_state.match_id_atual = dados_m["match_id"]
+                    st.session_state.opcao_menu = "🤝 Sala Privada"
+                    st.rerun()
+            else:
+                st.warning("🔒 Saldo insuficiente para abrir uma sala privada.")
+                       
+            
     # ⚪ COMPORTAMENTO SE O PAR ESTIVER OFFLINE: Mostra bloqueado e ativa o botão de agendamento
     else:
-        st.button(f"⚪ {dados_m['nome']} está offline. Indisponível.", disabled=True, use_container_width=True)
+        st.button(f"⚪ {dados_m['nome']} está offline. Indisponível.", disabled=True, width="stretch")
         
         # O botão azul agora herda os IDs e aciona de forma atômica o modal de agendamentos no próximo ciclo
-        if st.button("📅 Agende um encontro virtual", type="secondary", use_container_width=True):
-            st.session_state.abrir_reserva_fluxo = {
-                "id_par": dados_m["id_par"], 
-                "nome_par": dados_m["nome"], 
-                "m_id": dados_m["match_id"]
-            }
-            st.rerun()
+        if st.button("📅 Agende um encontro virtual", type="secondary", width="stretch"):
+            if status_usuario == "vip":
+                st.session_state.abrir_reserva_fluxo = {
+                    "id_par": dados_m["id_par"], 
+                    "nome_par": dados_m["nome"], 
+                    "m_id": dados_m["match_id"]
+                }
+                st.rerun()
             
+            else:
+                # Bloqueio para usuários grátis
+                st.warning("🔒 O agendamento de encontros virtuais é exclusivo para Assinantes VIP.")
+              
+
     # ❌ Opção comum de rejeição em qualquer cenário
-    if st.button("❌ Não tenho interesse", type="primary", use_container_width=True):
-        st.session_state.alerta_match = None
+    if st.button("❌ Não tenho interesse", type="primary", width="stretch"):
         st.rerun()
 
 
