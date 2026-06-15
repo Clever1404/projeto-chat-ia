@@ -82,8 +82,7 @@ if st.session_state.opcao_menu == "divulgacao":
         unsafe_allow_html=True
     )
 
-   
-    # Cria duas colunas para os botões de Login e Cadastro ficarem lado a lado
+     # Cria duas colunas para os botões de Login e Cadastro ficarem lado a lado
     col1, col2 = st.columns(2)
     
     with col1:
@@ -110,7 +109,7 @@ if st.session_state.opcao_menu == "divulgacao":
                 st.session_state.opcao_menu = "📝 Cadastro"
                 st.rerun()
 
-           
+                         
 
 # ==============================================================================
 # ENCAIXE DAS SUAS FUNÇÕES EXISTENTES DE FLUXO DE CONTA
@@ -122,7 +121,7 @@ elif st.session_state.opcao_menu == "🔒 Login":
         with st.form("form_login"):
             user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed")
             pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed")
-            if st.form_submit_button("Login", type="primary", width="stretch"):
+            if st.form_submit_button("Login", type="primary", use_container_width=True):
                 try:
                     conn = conectar_supabase(); cursor = conn.cursor()
                     cursor.execute("SELECT id, username, foto_perfil, is_admin, genero FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
@@ -255,18 +254,18 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
                         }
                     """,
                 ):         
-                    if st.form_submit_button("Cadastrar", width="stretch"):
-                        try:
-                            conn = conectar_supabase(); cursor = conn.cursor()
-                            cursor.execute("INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", (usuario, email, senha, genero))
-                            st.session_state.usuario_id = cursor.fetchone()[0]
-                            st.session_state.username = usuario
-                            st.session_state.genero = genero
-                            conn.commit(); cursor.close(); conn.close()
-                            st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                            st.rerun()
-                        except Exception as e: st.error(f"Erro: {e}")
-        if st.button("Voltar para o Login", width="stretch"):
+                if st.form_submit_button("Cadastrar", use_container_width=True):
+                    try:
+                        conn = conectar_supabase(); cursor = conn.cursor()
+                        cursor.execute("INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", (usuario, email, senha, genero))
+                        st.session_state.usuario_id = cursor.fetchone()[0]
+                        st.session_state.username = usuario
+                        st.session_state.genero = genero
+                        conn.commit(); cursor.close(); conn.close()
+                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                        st.rerun()
+                    except Exception as e: st.error(f"Erro: {e}")
+        if st.button("Voltar para o Login", use_container_width=True):
             st.session_state.opcao_menu = "🔒 Login"; st.rerun()
         if st.button("⬅️ Voltar para a Home", use_container_width=True):
             st.session_state.opcao_menu = "divulgacao"
@@ -340,7 +339,7 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
         conn = conectar_supabase()
         cursor = conn.cursor()
         
-        # --- PILAR 1, 2 e 3: BUSCA OS DADOS CADASTRAIS DO USUÁRIO LOGADO ---
+        # --- PILAR 1, 2 e 3: BUSCA OS DADOS CADASTRAIS DO USUÁRIO ---
         cursor.execute("""
             SELECT idade, genero, procura_por, procura_relacionamento 
             FROM usuarios 
@@ -354,12 +353,11 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
             
         minha_idade, meu_genero, o_que_eu_procuro_gen, o_que_eu_procuro_rel = meu_perfil
 
-        # --- PILAR 4: IA SINTETIZA OS HOBBIES E INTERESSES RECENTES ---
-       # 1. Estrutura as mensagens com as regras do sistema e o texto do usuário
+        # --- PILAR 4: IA SINTETIZA OS HOBBIES (Temperatura baixa para maior consistência)
         mensagens_sintese = [
             {
                 "role": "system",
-                "content": "Escreva apenas um parágrafo corrido contendo as palavras-chaves semânticas de interesses."
+                "content": "Escreva apenas um parágrafo corrido contendo as palavras-chaves semânticas de interesses e estilo de vida."
             },
             {
                 "role": "user",
@@ -367,55 +365,34 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
             }
         ]
 
-        # 2. Realiza a chamada no padrão da biblioteca OpenAI
         resposta_sintese = client.chat.completions.create(
             model='gpt-4o-mini',
             messages=mensagens_sintese,
-            temperature=0.9
+            temperature=0.3  # Reduzido de 0.9 para evitar respostas caóticas e instáveis
         )
 
-        # 3. Captura o texto gerado corretamente
         perfil_consolidado_texto = resposta_sintese.choices[0].message.content
 
-        # Gera o embedding de 768 dimensões usando o modelo correto da OpenAI
+        # Gera o embedding nativo de 768 dimensões
         resposta_embedding = client.embeddings.create(
             model="text-embedding-3-small",
             input=perfil_consolidado_texto,
-            dimensions=768  # Define nativamente o tamanho do vetor para 768
+            dimensions=768
         )
 
-        # Extrai a lista de números (o vetor) para salvar no Supabase
-        vetor_embedding = resposta_embedding.data[0].embedding
-        
-        # Limpeza e extração por Regex para isolar o vetor de floats
-        import re
-        texto_objeto = str(resposta_embedding)
-        match_texto = re.search(r'values=\s*\[(.*?)\]', texto_objeto, re.DOTALL)
-        if match_texto:
-            linhas_num = match_texto.group(1).replace('\n', '').replace(' ', '')
-            vetor_atual = [float(x) for x in linhas_num.split(',') if x]
-        else:
-            vetor_atual = getattr(resposta_embedding, 'values', None)
-
-        if not vetor_atual or not isinstance(vetor_atual, list):
-            cursor.close(); conn.close()
-            return {"match": False}
-
+        # FIX CRÍTICO: Captura direta da lista de floats sem usar Regex destrutivo
+        vetor_atual = resposta_embedding.data[0].embedding
         vetor_formatado_postgres = str(vetor_atual)
 
-        # Atualiza a biografia de interesses do usuário conectado no banco
+        # Atualiza a biografia substituindo ou limitando o acréscimo para não inflar o banco
         cursor.execute('''
             UPDATE usuarios 
-            SET biografia = COALESCE(biografia, '') || ' ' || %s, embedding_interesses = %s 
+            SET biografia = %s, embedding_interesses = %s 
             WHERE id = %s;
         ''', (perfil_consolidado_texto, vetor_formatado_postgres, meu_id_limpo))
 
-        # --- EXECUÇÃO DO FILTRO DOS 4 PILARES DIRETOS NO SQL ---
-        # Pilar 1: Idade aproximada (Margem de segurança de até 5 anos para mais ou para menos)
-        # Pilar 2: Orientação mútua (Eu procuro o gênero dele E ele procura o meu gênero)
-        # Pilar 3: Intenção mútua (Buscamos o mesmo tipo de relacionamento: Amizade ou Namoro)
-        # Pilar 4: Afinidade Semântica ( pgvector Ordenando por proximidade de interesses)
-        
+        # --- EXECUÇÃO DO FILTRO DOS 4 PILARES NO SQL ---
+        # Nota: <=> é a Distância de Cosseno. Quanto MENOR a distância, MAIOR a afinidade.
         cursor.execute('''
             SELECT id, username, status, (embedding_interesses <=> %s::vector) AS distancia 
             FROM usuarios 
@@ -423,27 +400,27 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
               AND is_admin = FALSE 
               AND embedding_interesses IS NOT NULL
               
-              -- PILAR 1: Filtro de Idade por margem
+              -- PILAR 1: Filtro de Idade
               AND (idade BETWEEN %s - 5 AND %s + 5)
               
-              -- PILAR 3: Filtro de Objetivo (Amizade ou Namoro devem bater)
+              -- PILAR 3: Filtro de Objetivo de Relacionamento
               AND LOWER(TRIM(procura_relacionamento)) = LOWER(TRIM(%s))
               
-              -- PILAR 2: Filtro Cruzado de Gênero/Interesse (Trava Biológica e de Orientação)
+              -- PILAR 2: Filtro Cruzado de Gênero
               AND (
-                  (%s = 'O' OR procura_por = %s OR procura_por = 'O') -- O outro aceita meu gênero
+                  (%s = 'O' OR procura_por = %s OR procura_por = 'O')
                   AND 
-                  (%s = 'O' OR %s = genero OR %s = 'O') -- Eu aceito o gênero do outro
+                  (%s = 'O' OR %s = genero OR %s = 'O')
               )
               
             ORDER BY (embedding_interesses <=> %s::vector) ASC, id ASC LIMIT 1;
         ''', (
             vetor_formatado_postgres, 
             meu_id_limpo, 
-            int(minha_idade), int(minha_idade), # Pilar 1
-            str(o_que_eu_procuro_rel),          # Pilar 3
-            str(meu_genero), str(meu_genero),   # Pilar 2 (o outro me aceita)
-            str(o_que_eu_procuro_gen), str(o_que_eu_procuro_gen), str(meu_genero), # Pilar 2 (eu aceito o outro)
+            int(minha_idade), int(minha_idade),
+            str(o_que_eu_procuro_rel),
+            str(meu_genero), str(meu_genero),
+            str(o_que_eu_procuro_gen), str(o_que_eu_procuro_gen), str(meu_genero),
             vetor_formatado_postgres
         ))
         
@@ -451,9 +428,18 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
         
         if resultado:
             id_par, nome_par, status_par, distancia = resultado
+            distancia_val = float(distancia)
             
-            # Se passou em todas as travas rígidas e a afinidade de interesses for boa (< 0.85)
-            if float(distancia) < 0.50:
+            # CALIBRAÇÃO DO MATCH NATURAL:
+            # Distância de cosseno abaixo de 0.22 indica excelente afinidade semântica na OpenAI.
+            # Se quiser ser ainda mais rígido e natural, mude para 0.18.
+            if distancia_val <= 0.22:
+                
+                # Conversão matemática opcional para exibir a afinidade em % humana na sua interface:
+                # Ex: Distância 0.12 vira ~90% de match. Distância 0.22 vira ~70% de match.
+                similaridade_bruta = 1.0 - distancia_val
+                porcentagem_match = max(0.0, min(100.0, (similaridade_bruta - 0.75) / (0.88 - 0.75) * 100))
+                
                 id_min, id_max = min(meu_id_limpo, int(id_par)), max(meu_id_limpo, int(id_par))
                 
                 cursor.execute('''
@@ -461,12 +447,12 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
                     VALUES (%s, %s) ON CONFLICT DO NOTHING RETURNING id;
                 ''', (id_min, id_max))
                 match_id_row = cursor.fetchone()
-                match_id = match_id_row if match_id_row and not isinstance(match_id_row, (tuple, list)) else match_id_row
+                match_id = match_id_row[0] if match_id_row else None
 
                 if not match_id:
                     cursor.execute('SELECT id FROM matches WHERE usuario_1_id = %s AND usuario_2_id = %s;', (id_min, id_max))
                     res_ex = cursor.fetchone()
-                    match_id = res_ex if res_ex and not isinstance(res_ex, (tuple, list)) else res_ex
+                    match_id = res_ex[0] if res_ex else None
 
                 conn.commit()
                 cursor.close()
@@ -475,7 +461,12 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
                 par_online = "Online" in str(status_par) or "🟢" in str(status_par)
                 
                 return {
-                    "match": True, "match_id": match_id, "id_par": int(id_par), "nome_par": nome_par, "online": par_online
+                    "match": True, 
+                    "match_id": match_id, 
+                    "id_par": int(id_par), 
+                    "nome_par": nome_par, 
+                    "online": par_online,
+                    "afinidade_porcentagem": round(porcentagem_match, 1) # Retorna a porcentagem calibrada
                 }
 
         conn.commit()
@@ -486,11 +477,10 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
         print(f"⚠️ Erro no Mecanismo Match 4 Pilares: {e}")
         if 'conn' in locals() and conn:
             conn.rollback()
-            cursor.close()
+            if 'cursor' in locals() and cursor: cursor.close()
             conn.close()
             
     return {"match": False}
-
 
 
 
@@ -514,6 +504,39 @@ def renderizar_historico_ia(usuario_id):
                 with st.chat_message("assistant"): st.write(ia_r)
 
 def template_chat_ia_completo(): 
+    # ==============================================================================
+    # 1. INICIALIZAÇÃO SEGURA DE ESTADOS GLOBAIS (Sempre no início da execução)
+    # ==============================================================================
+    if "opcao_menu" not in st.session_state:
+        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+    if "match_id_atual" not in st.session_state:
+        st.session_state.match_id_atual = None
+    if "abrir_reserva_fluxo" not in st.session_state:
+        st.session_state.abrir_reserva_fluxo = None
+
+    # Resgata e limpa o ID do usuário conectado
+    meu_id_f = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
+
+    # ==============================================================================
+    # 2. INTERCEPTORES DE EVENTOS (Gatilhos pós-rerun)
+    # ==============================================================================
+    
+    # GATILHO A: Captura o Match assim que o motor do banco dá o Rerun
+    if "alerta_match" in st.session_state and st.session_state.alerta_match is not None:
+        dados_m = st.session_state.alerta_match
+        
+        # Limpa o estado imediatamente para evitar loops infinitos de abertura
+        st.session_state.alerta_match = None 
+        
+        # Dispara os balões comemorativos e abre o modal dialog
+        st.balloons()
+        modal_match_lucy(dados_m)  
+    
+    # ==============================================================================
+    # 4. DESIGN DO TOPO DO CHAT PADRÃO DA LUCY (Só roda se os menus acima forem falsos)
+    # ==============================================================================
+
+    
     col_titulos, col_botoes_topo = st.columns([2, 1])
     
     with col_titulos:
@@ -637,20 +660,39 @@ def template_chat_ia_completo():
                     conn.commit()
 
                 # Fecha o cursor e a conexão de forma limpa
-                #cursor.close()
-                #conn.close()
+                cursor.close()
+                conn.close()
 
                 # ============================================================
                 # 🤝 MOTOR REAL DE MATCHES DA IA (AUTOMATIZADO E PROTEGIDO)
                 # ============================================================
                 res_match = processar_afinidade_e_match(meu_id_f, prompt) 
                 
+                # ─── 🚨 ADICIONE ESTE BLOCO DE DEBUG DAQUI EM DIANTE ───
+                with st.sidebar:
+                    st.subheader("🕵️‍♂️ Debugger do Motor de Match")
+                    st.write("A função `processar_afinidade_e_match` foi executada.")
+                    
+                    if res_match is None:
+                        st.error("❌ A função retornou `None`. Verifique se há um erro de banco ou exceção silenciosa capturada no `except`.")
+                    elif isinstance(res_match, dict):
+                        st.json(res_match) # Mostra o dicionário de retorno completo na barra lateral
+                        
+                        if res_match.get("match") == True:
+                            st.success("✅ Condições de Match ATIVADAS!")
+                        else:
+                            st.warning("⚠️ Retornou match=False. Motivos possíveis:\n"
+                                       "1. A query SQL não encontrou ninguém com a mesma intenção/gênero/idade.\n"
+                                       "2. A distância de cosseno foi maior que 0.22 (afinidade fraca).\n"
+                                       "3. O vetor de embedding não foi gerado corretamente.")
+                # ─── FINISH DEBUG ───
+
                 if res_match and res_match.get("match") == True: 
                     id_parceiro_match = int(res_match["id_par"])
                     
                     # Abre uma nova conexão apenas se houver match real para validar o parceiro
-                    #conn_p = conectar_supabase()
-                    #cursor_p = conn_p.cursor()
+                    conn_p = conectar_supabase()
+                    cursor_p = conn_p.cursor()
                     
                     # 1. Garante que a relação exista ou cria ela no banco para não quebrar a FK do Agendamento
                     cursor.execute("""
@@ -699,13 +741,13 @@ def template_chat_ia_completo():
                         "nome": nome_exibicao, 
                         "online": parceiro_real_online 
                     } 
-                    st.balloons()
+                    #st.balloons() # ❌ REMOVIDO: st.balloons() daqui, pois o st.rerun() o mataria
 
 
                 cursor.close()
                 conn.close()
 
-                # Recarrega a página atualizando todo o fluxo de uma vez
+                # Recarrega a página de forma limpa, persistindo o alerta_match no session_state
                 st.rerun() 
             except Exception as e: 
                 # Garante o fechamento seguro mesmo em caso de falha catastrófica
@@ -784,7 +826,7 @@ def modal_agendamento_encontro(dados_r):
 
     hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
     
-    if st.button("💾 Confirmar Reserva e Enviar", type="primary", width="stretch"):
+    if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True):
         hora_int = hor_s.hour
         
         # Função para limpar IDs de tuplas aninhadas de forma absoluta
@@ -972,12 +1014,12 @@ def template_sala_privada():
             </div>
         """, unsafe_allow_html=True)
         
-        if st.button("🚪 Sair da Sala Privada", type="primary", width="stretch"):
+        if st.button("🚪 Sair da Sala Privada", type="primary", use_container_width=True):
             st.session_state.match_id_atual = None
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
             st.rerun()
             
-        if st.button("🗑️ Limpar Histórico do Chat", type="secondary", width="stretch"):
+        if st.button("🗑️ Limpar Histórico do Chat", type="secondary", use_container_width=True):
             try:
                 conn = conectar_supabase(); cursor = conn.cursor()
                 cursor.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(id_match_int),))
@@ -1157,17 +1199,17 @@ def renderizar_listas_sidebar_e_acoes():
             label_gestao = "🤝 ABRIR GESTÃO"
 
         # Renderiza o botão com o rótulo atualizado
-        if st.button(label_gestao, type="secondary", width="stretch", key="btn_sidebar_gestao_rel"):
+        if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel"):
             st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
             st.rerun()
-        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", width="stretch"): 
+        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True): 
             st.session_state.opcao_menu = "📅 Disponibilidade"; st.rerun() 
 
         if st.session_state.eh_admin or st.session_state.username in ['admin', 'Clever1404']:
-            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", width="stretch"):
+            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True):
                 st.session_state.opcao_menu = "🛠️ Painel Admin"; st.rerun()
 
-        if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", width="stretch"):
+        if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True):
             try:
                 conn = conectar_supabase(); cursor = conn.cursor()
                 cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(st.session_state.usuario_id),))
@@ -1175,7 +1217,7 @@ def renderizar_listas_sidebar_e_acoes():
             except Exception as e: st.error(f"Erro: {e}")
 
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
-        if st.button("🚪 ENCERRAR SESSÃO", type="primary", width="stretch"):
+        if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True):
             try:
                 conn_logout = conectar_supabase(); cursor_logout = conn_logout.cursor()
                 cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (int(st.session_state.usuario_id),))
@@ -1220,10 +1262,10 @@ def template_disponibilidade():
 
     # --- 1. ESCOPO DO FORMULÁRIO EXCLUSIVO PARA O SALVAMENTO DA PLANILHA ---
     with st.form("container_formulario_grade_horaria", clear_on_submit=False):
-        grade_editada = st.data_editor(df_grade, column_config=config_c, width="stretch", hide_index=True, key="grade_horaria_editor") 
+        grade_editada = st.data_editor(df_grade, column_config=config_c, use_container_width=True, hide_index=True, key="grade_horaria_editor") 
         
         # O único botão dentro do form deve ser o submit de gravação
-        botao_salvar_ativo = st.form_submit_button("💾 Salvar Alterações", type="primary", width="stretch")
+        botao_salvar_ativo = st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True)
         
         if botao_salvar_ativo: 
             try:
@@ -1262,7 +1304,7 @@ def template_disponibilidade():
     col_l, col_v = st.columns(2)
     
     with col_l:
-        if st.button("🗑️ Limpar Grade Horária", type="secondary", width="stretch"):
+        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True):
             try:
                 conn = conectar_supabase(); cursor = conn.cursor()
                 cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
@@ -1273,7 +1315,7 @@ def template_disponibilidade():
                 st.error(f"Erro: {e}")
             
     with col_v: 
-        if st.button("Voltar ao Chat", width="stretch"): 
+        if st.button("Voltar ao Chat", use_container_width=True): 
             st.session_state.opcao_menu = "💬 Conversar com Lucy" 
             st.rerun()
 
@@ -1323,13 +1365,13 @@ def template_gerenciar_conexoes_completo():
                     st.markdown(f"<p style='font-size:15px; font-weight:bold; margin-top:5px; color:#f0f6fc;'>{str(m_nome).split('@')[0].capitalize()}</p>", unsafe_allow_html=True)
                     
                 with c_go_c:
-                    if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", width="stretch"):
+                    if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", use_container_width=True):
                         st.session_state.match_id_atual = m_id
                         st.session_state.opcao_menu = "🤝 Sala Privada"; st.rerun()
                         
                 with c_del_c:
                     # RESTAURADO: Botão cinza para excluir afinidades indesejadas do banco
-                    if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", width="stretch"):
+                    if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", use_container_width=True):
                         try:
                             conn = conectar_supabase(); cursor = conn.cursor()
                             cursor.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(m_id),))
@@ -1372,10 +1414,10 @@ def template_gerenciar_conexoes_completo():
                         st.caption(f"Status: {status.upper()}")
                     with col_b:
                         if status == 'pendente' and not eu_enviei:
-                            if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", width="stretch"):
+                            if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True):
                                 conn = conectar_supabase(); cursor = conn.cursor(); cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,)); conn.commit(); cursor.close(); conn.close(); st.rerun()
                         elif status == 'aceito':
-                            if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", width="stretch"):
+                            if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True):
                                 st.session_state.match_id_atual = m_id
                                 st.session_state.opcao_menu = "🤝 Sala Privada"
                                 st.rerun()
@@ -1545,16 +1587,16 @@ def template_painel_admin():
             df_usuarios_mod["Gênero_Nome"] = df_usuarios_mod["Gênero"].map({"M": "Homem", "F": "Mulher", "O": "Outros"}).fillna("Não Informado")
             contagem_genero = df_usuarios_mod["Gênero_Nome"].value_counts()
             
-            # 🔍 CORREÇÃO: Trocado 'use_container_width=True' por 'width="stretch"'
-            st.bar_chart(contagem_genero, color="#1f6feb", height=180, width="stretch")
+            # 🔍 CORREÇÃO: Trocado 'use_container_width=True' por 'use_container_width=True'
+            st.bar_chart(contagem_genero, color="#1f6feb", height=180, use_container_width=True)
             
         with col_piz2:
             st.markdown("<p style='font-size:14px; font-weight:bold; text-align:center; color:#f0f6fc;'>Orientação de Interesse (Procura Por)</p>", unsafe_allow_html=True)
             df_usuarios_mod["Procura_Nome"] = df_usuarios_mod["Procura Por"].map({"M": "Procura Homem", "F": "Procura Mulher", "O": "Procura Ambos"}).fillna("Não Configurado")
             contagem_procura = df_usuarios_mod["Procura_Nome"].value_counts()
             
-            # 🔍 CORREÇÃO: Trocado 'use_container_width=True' por 'width="stretch"'
-            st.bar_chart(contagem_procura, color="#238636", height=180, width="stretch")
+            # 🔍 CORREÇÃO: Trocado 'use_container_width=True' por 'use_container_width=True'
+            st.bar_chart(contagem_procura, color="#238636", height=180, use_container_width=True)
 
     # ==============================================================================
     # ABA 2: MODERAÇÃO DE CONTAS E BARRA DE BUSCA AVANÇADA
@@ -1573,8 +1615,8 @@ def template_painel_admin():
         else:
             df_filtrado = df_usuarios_mod
 
-        # 🔍 CORREÇÃO: Trocado 'use_container_width=True' por 'width="stretch"' na tabela de moderação
-        st.dataframe(df_filtrado, width="stretch", hide_index=True)
+        # 🔍 CORREÇÃO: Trocado 'use_container_width=True' por 'use_container_width=True' na tabela de moderação
+        st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
 
@@ -1600,7 +1642,7 @@ def template_painel_admin():
                 with col_botao_u:
                     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
                     # NOVO: Função Excluir Usuário acoplada com deleção em cascata total no Postgres
-                    if st.button("❌ Excluir Usuário", key=f"adm_drop_user_{u_id}", type="primary", width="stretch"):
+                    if st.button("❌ Excluir Usuário", key=f"adm_drop_user_{u_id}", type="primary", use_container_width=True):
                         try:
                             conn_del = conectar_supabase()
                             cursor_del = conn_del.cursor()
@@ -1626,7 +1668,7 @@ def template_painel_admin():
 
     # Botão de retorno na base do painel
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("← Voltar ao Chat Principal", type="secondary", width="stretch", key="btn_admin_back_to_lucy"):
+    if st.button("← Voltar ao Chat Principal", type="secondary", use_container_width=True, key="btn_admin_back_to_lucy"):
         st.session_state.opcao_menu = "💬 Conversar com Lucy"
         st.rerun()
 
@@ -1643,7 +1685,7 @@ def template_fale_conosco():
         email_contato = st.text_input("Seu E-mail de Contato:")
         descricao_contato = st.text_area("Escreva sua Mensagem / Sugestão:")
         
-        if st.form_submit_button("Enviar por E-mail", type="primary", width="stretch"):
+        if st.form_submit_button("Enviar por E-mail", type="primary", use_container_width=True):
             if not email_contato or not descricao_contato:
                 st.error("❌ Por favor, preencha seu e-mail e a descrição da mensagem.")
             else:
