@@ -492,6 +492,23 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
     return {"match": False}
 
 
+@st.cache_data(ttl=60)  # Guarda o resultado na memória por 60 segundos
+def buscar_pilares_usuario_cached(usuario_id):
+    """Busca os dados de cadastro do usuário com cache para máxima velocidade."""
+    try:
+        conn = conectar_supabase()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT idade, genero, procura_por, procura_relacionamento 
+            FROM usuarios WHERE id = %s;
+        """, (int(usuario_id),))
+        dados = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return dados
+    except Exception:
+        return None
+
 
 # ============================================================================== 
 # 6. TELA DO CHAT IA PRINCIPAL (LAYOUT TOTALMENTE FIXO E ROLÁVEL NO MEIO) 
@@ -556,8 +573,12 @@ def template_chat_ia_completo():
                     SELECT idade, genero, procura_por, procura_relacionamento 
                     FROM usuarios WHERE id = %s;
                 """, (meu_id_f,))
-                pilar_dados = cursor.fetchone()
-                
+                #pilar_dados = cursor.fetchone()
+
+                # Substitua o bloco de código antigo de leitura de pilares por isso:
+                pilar_dados = buscar_pilares_usuario_cached(meu_id_f)
+
+
                 dados_faltantes_contexto = ""
                 if pilar_dados:
                     idade_b, gen_b, proc_gen_b, proc_rel_b = pilar_dados
@@ -635,8 +656,8 @@ def template_chat_ia_completo():
                     conn.commit()
 
                 # Fecha o cursor e a conexão de forma limpa
-                cursor.close()
-                conn.close()
+                #cursor.close()
+                #conn.close()
 
                 # ============================================================
                 # 🤝 MOTOR REAL DE MATCHES DA IA (AUTOMATIZADO E PROTEGIDO)
@@ -647,8 +668,8 @@ def template_chat_ia_completo():
                     id_parceiro_match = int(res_match["id_par"])
                     
                     # Abre uma nova conexão apenas se houver match real para validar o parceiro
-                    conn_p = conectar_supabase()
-                    cursor_p = conn_p.cursor()
+                    #conn_p = conectar_supabase()
+                    #cursor_p = conn_p.cursor()
                     
                     # 1. Garante que a relação exista ou cria ela no banco para não quebrar a FK do Agendamento
                     cursor_p.execute("""
@@ -683,8 +704,8 @@ def template_chat_ia_completo():
                     except Exception:
                         nome_exibicao = res_match.get("nome_par", f"Usuário {id_parceiro_match}")
                         
-                    cursor_p.close()
-                    conn_p.close()
+                    #cursor_p.close()
+                    #conn_p.close()
                     
                     parceiro_real_online = False
                     if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
@@ -697,8 +718,12 @@ def template_chat_ia_completo():
                         "nome": nome_exibicao, 
                         "online": parceiro_real_online 
                     } 
-                    st.balloons() 
-                
+                    st.balloons()
+
+
+                cursor.close()
+                conn.close()
+
                 # Recarrega a página atualizando todo o fluxo de uma vez
                 st.rerun() 
 
