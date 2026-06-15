@@ -694,14 +694,19 @@ def template_chat_ia_completo():
                             match_id_final = cursor_p.fetchone()[0]
                             conn_p.commit()
 
-                        # 2. Busca o status e nome real do parceiro
-                        cursor_p.execute("SELECT status, nome FROM usuarios WHERE id = %s;", (id_parceiro_match,))
+                        # 2. Busca o status e o username real do parceiro (Corrigido para 'username')
+                        cursor_p.execute("SELECT status, username FROM usuarios WHERE id = %s;", (id_parceiro_match,))
                         dados_parceiro = cursor_p.fetchone()
                         
-                        status_banco = dados_parceiro[0] if dados_parceiro else None
-                        nome_banco = dados_parceiro[1] if dados_parceiro else None
+                        if dados_parceiro:
+                            status_banco = dados_parceiro[0]
+                            username_banco = dados_parceiro[1]
+                        else:
+                            status_banco = None
+                            username_banco = None
                         
-                        nome_exibicao = nome_banco if nome_banco else res_match.get("nome_par", f"Usuário {id_parceiro_match}")
+                        # Define o nome que vai aparecer na tela para o usuário
+                        nome_exibicao = username_banco if username_banco else res_match.get("nome_par", f"Usuário {id_parceiro_match}")
                         
                         parceiro_real_online = False
                         if status_banco and ("Online" in str(status_banco) or "🟢" in str(status_banco)):
