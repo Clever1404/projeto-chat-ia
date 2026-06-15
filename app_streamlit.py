@@ -594,26 +594,56 @@ def template_chat_ia_completo():
                 historico_previo = buscar_memoria(meu_id_f, limite=6)
                 contexto_conversacao = "".join([f"Usuário: {u}\nVocê (Lucy): {i}\n" for u, i in historico_previo])
                 
-                # 2. Configura a Persona exigindo retorno unificado em JSON
+                # --- BUSCA OS DADOS QUE JÁ EXISTEM NO BANCO ---
+                # Criamos um texto amigável dizendo à Lucy o que ela JÁ SABE sobre o usuário
+                dados_ja_salvos_contexto = "Dados que você JÁ DESCOBRIU sobre este usuário (NÃO PERGUNTE NOVAMENTE):\n"
+                if pilar_dados:
+                    idade_b, gen_b, proc_gen_b, proc_rel_b = pilar_dados
+                    dados_ja_salvos_contexto += f"- Idade: {idade_b if idade_b else 'Ainda não sabe'}\n"
+                    
+                    traducao_genero = {'M': 'Homens', 'F': 'Mulheres', 'O': 'Ambos/Todos'}.get(proc_gen_b, 'Ainda não sabe')
+                    dados_ja_salvos_contexto += f"- Interesse por: {traducao_genero}\n"
+                    dados_ja_salvos_contexto += f"- O que procura: {proc_rel_b if proc_rel_b else 'Ainda não sabe'}\n"
+
+                # ==============================================================================
+                # RECONSTRUTOR DO PROMPT DA LUCY (Fase de Interesse + Transição para Humor)
+                # ==============================================================================
                 mensagens_openai = [
                     {
                         "role": "system",
                         "content": (
-                            "Você é Lucy, uma assistente virtual focada em criar conexões humanas legítimas através de afinidades semânticas. "
-                            "Seu tom deve ser amigável, interpessoal, acolhedor e levemente curioso. "
-                            "Sua missão secreta é descobrir 4 dados essenciais sobre o usuário, investigando APENAS UM DADO POR VEZ.\n\n"
-                            "Os 4 dados são:\n1. A idade dele.\n2. Se ele tem interesse por: Homem, Mulher ou Ambos.\n3. O que ele procura na plataforma (Amizade ou Namoro).\n4. Seus hobbies e interesses cotidianos.\n\n"
-                            "Sempre valide o prompt atual do usuário com empatia antes de introduzir a sua pergunta direcionada no final.\n\n"
+                            "Você é Lucy, uma assistente virtual focada em criar conexões humanas legítimas. "
+                            "Seu tom deve ser amigável, interpessoal, acolhedor, empático e levemente curioso.\n\n"
+                            
+                            "SUA MISSÃO EM DUAS FASES:\n"
+                            "FASE 1 - INVESTIGAÇÃO DE PERFIL: Descubra os 4 dados essenciais do usuário (Idade, Interesse por Gênero, O que procura e Hobbies). "
+                            "Olhe a seção 'Dados que você JÁ DESCOBRIU'. Se algum dado estiver como 'Ainda não sabe', investigue apenas UM por vez. "
+                            "Se o usuário já forneceu a informação no último prompt, NÃO PERGUNTE DE NOVO.\n\n"
+                            
+                            "FASE 2 - TRANSIÇÃO PARA O HUMOR: Se os 4 dados essenciais já foram preenchidos (ou seja, se você já sabe a Idade, Interesse e Procura), "
+                            "mude de assunto imediatamente! Ignore o questionário anterior e passe a investigar o humor atual do usuário.\n"
+                            "Descubra se ele está se sentindo: Triste, Feliz, Bravo(a), Tranquilo(a), Preguiça ou Apaixonado(a).\n"
+                            "Conforme o humor que ele relatar, mude sua abordagem: use frases de incentivo se estiver triste/bravo, seja contagiante se estiver feliz/apaixonado, ou acolhedora se estiver com preguiça.\n\n"
+                            
                             "REGRAS DE RESPOSTA OBRIGATÓRIAS:\n"
-                            "Você deve responder RIGIDAMENTE com um objeto JSON contendo duas chaves primárias:\n"
-                            "1. 'resposta_chat': O texto em linguagem natural amigável que será exibido para o usuário na tela.\n"
+                            "Responda RIGIDAMENTE com um objeto JSON contendo duas chaves primárias:\n"
+                            "1. 'resposta_chat': O texto em linguagem natural que será exibido na tela. Sempre valide o prompt atual do usuário com muita empatia antes de prosseguir.\n"
                             "2. 'extracao': Um objeto contendo a análise do ÚLTIMO texto enviado pelo usuário. Formato interno:\n"
-                            "   - 'idade': Número inteiro se ele mencionou a idade dele, senão null.\n"
-                            "   - 'interesse': 'M' para homens, 'F' para mulheres, 'O' para ambos/todos, senão null.\n"
-                            "   - 'procura': 'amizade' ou 'namoro' se ele declarou o objetivo, senão null."
+                            "   - 'idade': Número inteiro se ele mencionou agora, senão null.\n"
+                            "   - 'interesse': 'M' para homens, 'F' para mulheres, 'O' para ambos/todos se mencionou agora, senão null.\n"
+                            "   - 'procura': 'amizade' ou 'namoro' se declarou agora, senão null.\n"
+                            "   - 'humor': Extraia uma das palavras exatas se ele disser como está se sentindo ('Triste', 'Feliz', 'Bravo(a)', 'Tranquilo(a)', 'Preguiça', 'Apaixonado(a)'), senão null."
                         )
                     },
-                    {"role": "user", "content": f"{contexto_conversacao}\nDados pendentes:\n{dados_faltantes_contexto}\nUsuário: {prompt}"}
+                    {
+                        "role": "user", 
+                        "content": (
+                            f"{contexto_conversacao}\n"
+                            f"{dados_ja_salvos_contexto}\n"
+                            f"Dados pendentes gerais:\n{dados_faltantes_contexto}\n"
+                            f"Última mensagem do Usuário: {prompt}"
+                        )
+                    }
                 ]
 
                 # Chamada ÚNICA à OpenAI (Economiza metade do tempo de rede)
@@ -633,14 +663,14 @@ def template_chat_ia_completo():
                 st.session_state.historico_volatil.append(("assistant", resposta_lucy))
                 st.chat_message("assistant").write(resposta_lucy)
 
-                # 3. Salva a mensagem no histórico (Usando a mesma conexão aberta)
+                # Salva a mensagem no histórico de conversas
                 cursor.execute(
                     "INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta, data_hora) VALUES (%s, %s, %s, %s);", 
                     (meu_id_f, prompt, resposta_lucy, datetime.now())
                 )
                 conn.commit()
 
-                # 4. Atualiza os dados pescados pela Lucy em LOTE (Batch Update)
+                # --- ATUALIZAÇÃO EM LOTE (Apenas os dados estruturais do match) ---
                 updates = []
                 params = []
                 if dados_extraidos.get("idade"):
@@ -652,6 +682,9 @@ def template_chat_ia_completo():
                 if dados_extraidos.get("procura"):
                     updates.append("procura_relacionamento = %s")
                     params.append(str(dados_extraidos["procura"]))
+                
+                # O campo dados_extraidos.get("humor") é intencionalmente ignorado aqui!
+                # Ele serve apenas para guiar a 'resposta_chat' da IA no próximo turno.
                 
                 if updates:
                     params.append(meu_id_f)
