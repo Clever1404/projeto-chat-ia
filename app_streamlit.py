@@ -325,7 +325,6 @@ dias_semana_map = {0: 'Segunda-feira', 1: 'Terça-feira', 2: 'Quarta-feira', 3: 
 dia_atual_servidor = dias_semana_map[datetime.now().weekday()]
 
 
-
 def buscar_memoria(usuario_id, limite=15):
     try:
         conn = conectar_supabase(); cursor = conn.cursor()
@@ -492,297 +491,6 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
             
     return {"match": False}
 
-
-
-# NOVO: Página simples de Fale Conosco
-def template_fale_conosco():
-    st.markdown("<h2>✉️ Fale Conosco</h2>", unsafe_allow_html=True)
-    st.caption("Envie suas dúvidas, críticas ou sugestões de melhoria para a equipe de suporte Lucy IA.")
-    st.markdown("<hr style='border-color: #30363d; margin: 10px 0 25px 0;'>", unsafe_allow_html=True)
-    
-    with st.form("form_fale_conosco", clear_on_submit=True):
-        nome_contato = st.text_input("Seu Nome:", value=st.session_state.username if st.session_state.username else "")
-        email_contato = st.text_input("Seu E-mail de Contato:")
-        descricao_contato = st.text_area("Escreva sua Mensagem / Sugestão:")
-        
-        if st.form_submit_button("Enviar por E-mail", type="primary", width="stretch"):
-            if not email_contato or not descricao_contato:
-                st.error("❌ Por favor, preencha seu e-mail e a descrição da mensagem.")
-            else:
-                # Aqui você plugaria seu SMTP real (Ex: smtplib ou API SendGrid)
-                st.success("🎉 Sua mensagem foi enviada para o e-mail de suporte (suporte@lucyia.com) com sucesso!")
-                
-    if st.button("← Voltar para o Chat Principal", type="secondary"):
-        st.session_state.opcao_menu = "💬 Conversar com Lucy"
-        st.rerun()
-
-# ==============================================================================
-# 3. DIALOGS RECALIBRADOS (CORREÇÃO DA JANELA MATCH INTELIGENTE TRIPLA)
-# ==============================================================================
-@st.dialog("🤖 Lucy Notou Afinidade!")
-def modal_match_lucy(dados_m):
-    st.markdown(f"Lucy identificou uma excelente afinidade entre você e **{dados_m['nome']}**!")
-    
-    # 🟢 COMPORTAMENTO SE O PAR ESTIVER ONLINE: Libera o chat imediato
-    if dados_m["online"]:
-        if st.button(f"🟢 {dados_m['nome']} está online. Gostaria de conversar agora!", type="primary", use_container_width=True):
-            st.session_state.match_id_atual = dados_m["match_id"]
-            st.session_state.opcao_menu = "🤝 Sala Privada"
-            st.rerun()
-
-         # Segundo retângulo fica desativado neste cenário
-        st.button("📅 Agendar um encontro virtual (Disponível apenas offline)", type="secondary", disabled=True, use_container_width=True)
-
-    # ⚪ COMPORTAMENTO SE O PAR ESTIVER OFFLINE: Mostra bloqueado e ativa o botão de agendamento
-    else:
-        st.button(f"⚪ {dados_m['nome']} está offline. Indisponível.", disabled=True, use_container_width=True)
-        
-        # O botão azul agora herda os IDs e aciona de forma atômica o modal de agendamentos no próximo ciclo
-        if st.button("📅 Agende um encontro virtual", type="secondary", use_container_width=True):
-            st.session_state.abrir_reserva_fluxo = {
-                "id_par": dados_m["id_par"], 
-                "nome_par": dados_m["nome"], 
-                "m_id": dados_m["match_id"]
-            }
-            st.rerun()
-            
-    # ❌ Opção comum de rejeição em qualquer cenário
-    if st.button("❌ Não tenho interesse", type="primary", use_container_width=True):
-        st.session_state.alerta_match = None
-        st.rerun()
-
-
-@st.dialog("📅 Reserva de Encontro")
-def modal_agendamento_encontro(dados_r):
-    st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
-    st.caption("A Lucy cruzará sua grade horária com a do seu par antes de validar o convite.")
-    
-    # 1. Configuração dos eixos de tempo
-    dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
-    dia_s = st.selectbox("Escolha o Dia da Semana:", dias, key="dg_res_dia")
-    
-    opcoes_periodo = [
-        "🌅 Manhã (06:00 às 11:59)", 
-        "☀️ Tarde (12:00 às 17:59)", 
-        "🌙 Noite (18:00 às 23:59)"
-    ]
-    per_exibicao = st.selectbox("Escolha o Período:", opcoes_periodo, key="dg_res_per")
-    
-    # Mapeamento limpo para os IDs do banco
-    if "Manhã" in per_exibicao:
-        per_s = "manha"
-        horario_sugestao = datetime.strptime("09:00", "%H:%M").time()
-    elif "Tarde" in per_exibicao:
-        per_s = "tarde"
-        horario_sugestao = datetime.strptime("14:00", "%H:%M").time()
-    else:
-        per_s = "noite"
-        horario_sugestao = datetime.strptime("20:00", "%H:%M").time()
-
-    hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
-    
-    if st.button("💾 Confirmar Reserva e Enviar", type="primary", width="stretch"):
-        hora_int = hor_s.hour
-        
-        # Função para limpar IDs de tuplas aninhadas de forma absoluta
-        def limpar_id_absoluto(id_bruto):
-            while isinstance(id_bruto, (tuple, list)):
-                if len(id_bruto) > 0: id_bruto = id_bruto[0]
-                else: return 0
-            try: return int(id_bruto)
-            except (TypeError, ValueError): return 0
-
-        # Limpeza cirúrgica das chaves
-        m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
-        meu_id_limpo = limpar_id_absoluto(st.session_state.usuario_id)
-        parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
-
-        # --- 2. TRAVA DE DISPONIBILIDADE DIRETA NO POSTGRESQL (CRUZAMENTO SEGURO) ---
-        meu_registro_existe = False
-        parceiro_registro_existe = False
-        parceiro_tem_algum_horario = False
-        
-        try:
-            conn_check = conectar_supabase()
-            cursor_check = conn_check.cursor()
-            
-            # Verifica se você possui o horário na grade
-            cursor_check.execute("""
-                SELECT COUNT(*) FROM disponibilidade_usuarios 
-                WHERE usuario_id = %s 
-                  AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
-                  AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-            """, (meu_id_limpo, str(dia_s), str(per_s)))
-            meu_count = cursor_check.fetchone()[0]
-            meu_registro_existe = (meu_count > 0)
-            
-            # Verifica se o parceiro possui ALGUNS horários cadastrados no banco (para saber se a grade dele está vazia)
-            cursor_check.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
-            total_parceiro = cursor_check.fetchone()[0]
-            parceiro_tem_algum_horario = (total_parceiro > 0)
-            
-            # Verifica se o parceiro possui ESTE horário específico na grade
-            cursor_check.execute("""
-                SELECT COUNT(*) FROM disponibilidade_usuarios 
-                WHERE usuario_id = %s 
-                  AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
-                  AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-            """, (parceiro_id_limpo, str(dia_s), str(per_s)))
-            parceiro_count = cursor_check.fetchone()[0]
-            parceiro_registro_existe = (parceiro_count > 0)
-            
-            cursor_check.close()
-            conn_check.close()
-            
-            # Painel de depuração limpo
-            with st.expander("🔍 Depurador de Agenda (Debug)"):
-                st.write(f"**Seu ID ({st.session_state.username}):** {meu_id_limpo} | Possui este horário? `{'Sim' if meu_registro_existe else 'Não'}`")
-                st.write(f"**ID do Par ({dados_r['nome_par']}):** {parceiro_id_limpo} | Possui este horário? `{'Sim' if parceiro_registro_existe else 'Não'}`")
-                st.write(f"**O parceiro já preencheu a grade alguma vez?** `{'Sim' if parceiro_tem_algum_horario else 'Não'}`")
-            
-        except Exception as e:
-            st.error(f"Erro ao consultar o banco de dados: {e}")
-
-        # --- 3. EXECUÇÃO DAS TRAVAS DE HORÁRIO ---
-        if per_s == 'manha' and (hora_int < 6 or hora_int >= 12):
-            st.error("❌ Horário inválido! Para o período da manhã, ajuste entre **06:00 e 11:59**.")
-        elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18):
-            st.error("❌ Horário inválido! Para o período da tarde, ajuste entre **12:00 e 17:59**.")
-        elif per_s == 'noite' and (hora_int < 18 or hora_int > 23):
-            st.error("❌ Horário inválido! Para o período da noite, ajuste entre **18:00 e 23:59**.")
-            
-        # Alerta de recusa: Se você não marcou o dia na sua própria grade
-        elif not meu_registro_existe:
-            st.error(f"❌ **Agendamento Recusado:** Você ({st.session_state.username}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar.")
-            
-        # Alerta de recusa: Se o parceiro tem horários configurados mas não marcou este dia específico
-        elif parceiro_tem_algum_horario and not parceiro_registro_existe:
-            st.error(f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado.")
-            
-        # Se passar em todas as validações, realiza o agendamento pendente
-        else:
-            try:
-                conn = conectar_supabase()
-                cursor = conn.cursor()
-                cursor.execute('''
-                    INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
-                    VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
-                ''', (m_id_limpo, meu_id_limpo, parceiro_id_limpo, dia_s, per_s, hor_s))
-                conn.commit()
-                cursor.close()
-                conn.close()
-                
-                st.success("🎉 Convite de encontro enviado com sucesso!")
-                st.session_state.abrir_reserva_fluxo = None
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ Erro ao gravar agendamento: {e}")
-
-
-def renderizar_listas_sidebar_e_acoes(): 
-    with st.sidebar: 
-        # --- PERFIL DO USUÁRIO ---
-        avatar_html = ""
-        caminho_minha_foto = str(st.session_state.foto_perfil).strip().lstrip('/')
-        if st.session_state.foto_perfil and os.path.exists(caminho_minha_foto):
-            try:
-                with open(caminho_minha_foto, "rb") as image_file:
-                    encoded_string = base64.b64encode(image_file.read()).decode()
-                avatar_html = f'<img src="data:image/jpeg;base64,{encoded_string}" style="width:65px; height:65px; border-radius:50%; object-fit:cover; border:2px solid #30363d; margin:0 auto 10px auto; display:block;">'
-            except Exception:
-                avatar_html = f'<div style="font-size: 35px; text-align:center;">👩</div>'
-        else:
-            avatar_html = f'<div style="font-size: 35px; text-align:center;">👩</div>'
-
-        # --- CORREÇÃO DA LINHA 480 (EXTRAÇÃO DO ÍNDICE [0] DA STRING SPLIT) ---
-        nome_usuario_puro = str(st.session_state.username).split('@')[0].capitalize()
-
-        st.markdown(f"""
-            <div class="box-perfil-fixo" style="background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 15px;">
-                {avatar_html}
-                <h3 style="margin: 0; font-size: 15px; font-weight: bold; color: #f0f6fc;">{nome_usuario_puro}</h3>
-                <p style="color: #48bb78; font-weight: bold; font-size: 12px; margin: 3px 0 0 0;">🟢 Online</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-        st.caption("📷 Enviar nova foto de perfil:")
-        f_nova = st.file_uploader("Alterar Foto", type=["png","jpg","jpeg"], key="side_f_up", label_visibility="collapsed") 
-        if f_nova: 
-            if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER, exist_ok=True) 
-            c_completo = os.path.join(UPLOAD_FOLDER, f"user_{st.session_state.usuario_id}.jpg") 
-            with open(c_completo, "wb") as f: f.write(f_nova.getbuffer()) 
-            conn = conectar_supabase(); cursor = conn.cursor() 
-            cursor.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s", (f"/{c_completo}", int(st.session_state.usuario_id))) 
-            conn.commit(); cursor.close(); conn.close() 
-            st.session_state.foto_perfil = f"/{c_completo}"; st.rerun() 
-
-        st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
-
-        # 🔍 MOTOR DE BUSCA DA NOTIFICAÇÃO DA BARRA LATERAL (BOLINHA VERMELHA)
-        possui_convite_pendente = False
-        try:
-            meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
-            conn_b = conectar_supabase(); cursor_b = conn_b.cursor()
-            cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
-            if cursor_b.fetchone() > 0: possui_convite_pendente = True
-            cursor_b.close(); conn_b.close()
-        except Exception: pass
-
-        # --- BLOCO 3: BOTÕES DE NAVEGAÇÃO INTERNA COM NOTIFICAÇÃO DINÂMICA ---
-        # 🔍 MOTOR DE BUSCA DA NOTIFICAÇÃO DA BARRA LATERAL (BOLINHA VERMELHA)
-        possui_convite_pendente = False
-        try:
-            meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
-            conn_b = conectar_supabase()
-            cursor_b = conn_b.cursor()
-            # Conta se existem convites com status 'pendente' onde VOCÊ é o destinatário
-            cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
-            count_res = cursor_b.fetchone()
-            if count_res and count_res[0] > 0: 
-                possui_convite_pendente = True
-            cursor_b.close()
-            conn_b.close()
-        except Exception as e: 
-            print(f"Erro ao checar notificações: {e}")
-
-        # Configura o rótulo do botão dinamicamente com base na presença de convites
-        if possui_convite_pendente:
-            # Rótulo ganha o emoji de alerta visual vermelho piscante
-            label_gestao = "🤝 ABRIR GESTÃO 🔴"
-            st.markdown("""
-                <div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'>
-                    <span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span>
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            label_gestao = "🤝 ABRIR GESTÃO"
-
-        # Renderiza o botão com o rótulo atualizado
-        if st.button(label_gestao, type="secondary", width="stretch", key="btn_sidebar_gestao_rel"):
-            st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
-            st.rerun()
-        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", width="stretch"): 
-            st.session_state.opcao_menu = "📅 Disponibilidade"; st.rerun() 
-
-        if st.session_state.eh_admin or st.session_state.username in ['admin', 'Clever1404']:
-            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", width="stretch"):
-                st.session_state.opcao_menu = "🛠️ Painel Admin"; st.rerun()
-
-        if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", width="stretch"):
-            try:
-                conn = conectar_supabase(); cursor = conn.cursor()
-                cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(st.session_state.usuario_id),))
-                conn.commit(); cursor.close(); conn.close(); st.toast("Histórico limpo!"); st.rerun()
-            except Exception as e: st.error(f"Erro: {e}")
-
-        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
-        if st.button("🚪 ENCERRAR SESSÃO", type="primary", width="stretch"):
-            try:
-                conn_logout = conectar_supabase(); cursor_logout = conn_logout.cursor()
-                cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (int(st.session_state.usuario_id),))
-                conn_logout.commit(); cursor_logout.close(); conn_logout.close()
-            except Exception: pass
-            st.session_state.usuario_id = None; st.session_state.username = None; st.session_state.opcao_menu = "🔒 Login"; st.rerun()
 
 
 # ============================================================================== 
@@ -998,120 +706,169 @@ def template_chat_ia_completo():
                 st.error(f"Erro na IA principal: {e}")
 
 
-            
 
 # ==============================================================================
-# 7. TELA DE GESTÃO DE RELACIONAMENTOS (RESTAURAÇÃO COMPLETA DA LISTA DE MATCHES)
+# 3. DIALOGS RECALIBRADOS (CORREÇÃO DA JANELA MATCH INTELIGENTE TRIPLA)
 # ==============================================================================
+@st.dialog("🤖 Lucy Notou Afinidade!")
+def modal_match_lucy(dados_m):
+    st.markdown(f"Lucy identificou uma excelente afinidade entre você e **{dados_m['nome']}**!")
+    
+    # 🟢 COMPORTAMENTO SE O PAR ESTIVER ONLINE: Libera o chat imediato
+    if dados_m["online"]:
+        if st.button(f"🟢 {dados_m['nome']} está online. Gostaria de conversar agora!", type="primary", use_container_width=True):
+            st.session_state.match_id_atual = dados_m["match_id"]
+            st.session_state.opcao_menu = "🤝 Sala Privada"
+            st.rerun()
 
-def template_gerenciar_conexoes_completo(): 
-    st.title("🤝 Gestão de Relacionamentos") 
-    if st.button("← Voltar para o Chat da Lucy", type="secondary"):
-        st.session_state.opcao_menu = "💬 Conversar com Lucy"
-        st.rerun()
+         # Segundo retângulo fica desativado neste cenário
+        st.button("📅 Agendar um encontro virtual (Disponível apenas offline)", type="secondary", disabled=True, use_container_width=True)
+
+    # ⚪ COMPORTAMENTO SE O PAR ESTIVER OFFLINE: Mostra bloqueado e ativa o botão de agendamento
+    else:
+        st.button(f"⚪ {dados_m['nome']} está offline. Indisponível.", disabled=True, use_container_width=True)
         
-    aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
-    meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
+        # O botão azul agora herda os IDs e aciona de forma atômica o modal de agendamentos no próximo ciclo
+        if st.button("📅 Agende um encontro virtual", type="secondary", use_container_width=True):
+            st.session_state.abrir_reserva_fluxo = {
+                "id_par": dados_m["id_par"], 
+                "nome_par": dados_m["nome"], 
+                "m_id": dados_m["match_id"]
+            }
+            st.rerun()
+            
+    # ❌ Opção comum de rejeição em qualquer cenário
+    if st.button("❌ Não tenho interesse", type="primary", use_container_width=True):
+        st.session_state.alerta_match = None
+        st.rerun()
 
-    with aba_m:
-        st.markdown("### 👥 Suas Afinidades")
-        matches_dados = []
+
+@st.dialog("📅 Reserva de Encontro")
+def modal_agendamento_encontro(dados_r):
+    st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
+    st.caption("A Lucy cruzará sua grade horária com a do seu par antes de validar o convite.")
+    
+    # 1. Configuração dos eixos de tempo
+    dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
+    dia_s = st.selectbox("Escolha o Dia da Semana:", dias, key="dg_res_dia")
+    
+    opcoes_periodo = [
+        "🌅 Manhã (06:00 às 11:59)", 
+        "☀️ Tarde (12:00 às 17:59)", 
+        "🌙 Noite (18:00 às 23:59)"
+    ]
+    per_exibicao = st.selectbox("Escolha o Período:", opcoes_periodo, key="dg_res_per")
+    
+    # Mapeamento limpo para os IDs do banco
+    if "Manhã" in per_exibicao:
+        per_s = "manha"
+        horario_sugestao = datetime.strptime("09:00", "%H:%M").time()
+    elif "Tarde" in per_exibicao:
+        per_s = "tarde"
+        horario_sugestao = datetime.strptime("14:00", "%H:%M").time()
+    else:
+        per_s = "noite"
+        horario_sugestao = datetime.strptime("20:00", "%H:%M").time()
+
+    hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
+    
+    if st.button("💾 Confirmar Reserva e Enviar", type="primary", width="stretch"):
+        hora_int = hor_s.hour
+        
+        # Função para limpar IDs de tuplas aninhadas de forma absoluta
+        def limpar_id_absoluto(id_bruto):
+            while isinstance(id_bruto, (tuple, list)):
+                if len(id_bruto) > 0: id_bruto = id_bruto[0]
+                else: return 0
+            try: return int(id_bruto)
+            except (TypeError, ValueError): return 0
+
+        # Limpeza cirúrgica das chaves
+        m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
+        meu_id_limpo = limpar_id_absoluto(st.session_state.usuario_id)
+        parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
+
+        # --- 2. TRAVA DE DISPONIBILIDADE DIRETA NO POSTGRESQL (CRUZAMENTO SEGURO) ---
+        meu_registro_existe = False
+        parceiro_registro_existe = False
+        parceiro_tem_algum_horario = False
+        
         try:
-            conn = conectar_supabase(); cursor = conn.cursor()
-            cursor.execute('SELECT m.id, u.username, u.foto_perfil, u.genero, u.id FROM matches m JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;', (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-            matches_dados = cursor.fetchall(); cursor.close(); conn.close()
-        except Exception: pass
-
-        if not matches_dados: st.info("Nenhum par localizado.")
-        for m_id, m_nome, m_foto, m_gen, par_id in matches_dados:
-            with st.container(border=True):
-                # Estrutura em colunas equilibradas para reduzir o tamanho do retângulo
-                c_av_c, c_nm_c, c_go_c, c_del_c = st.columns([0.6, 2, 1, 1])
-                
-                with c_av_c:
-                    caminho_par_img = str(m_foto).strip().lstrip('/')
-                    if m_foto and os.path.exists(caminho_par_img):
-                        try:
-                            with open(caminho_par_img, "rb") as image_file:
-                                enc_str = base64.b64encode(image_file.read()).decode()
-                            st.markdown(f'<img src="data:image/jpeg;base64,{enc_str}" class="foto-match-central">', unsafe_allow_html=True)
-                        except Exception: st.write("👩" if m_gen == 'F' else "👨")
-                    else:
-                        st.subheader("👩" if m_gen == 'F' else "👨")
-                        
-                with c_nm_c:
-                    # Fonte aumentada para 15px e em negrito igual ao botão entrar
-                    st.markdown(f"<p style='font-size:15px; font-weight:bold; margin-top:5px; color:#f0f6fc;'>{str(m_nome).split('@')[0].capitalize()}</p>", unsafe_allow_html=True)
-                    
-                with c_go_c:
-                    if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", width="stretch"):
-                        st.session_state.match_id_atual = m_id
-                        st.session_state.opcao_menu = "🤝 Sala Privada"; st.rerun()
-                        
-                with c_del_c:
-                    # RESTAURADO: Botão cinza para excluir afinidades indesejadas do banco
-                    if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", width="stretch"):
-                        try:
-                            conn = conectar_supabase(); cursor = conn.cursor()
-                            cursor.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(m_id),))
-                            cursor.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
-                            cursor.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
-                            conn.commit(); cursor.close(); conn.close()
-                            st.toast("Match removido!")
-                            st.rerun()
-                        except Exception as e: st.error(f"Erro: {e}")
-
-
-    with aba_e:
-        st.markdown("### 📩 Convites Ativos da Semana")
-        try:
-            conn = conectar_supabase(); cursor = conn.cursor()
-            cursor.execute("""
-                SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
-                CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
-                FROM agendamentos_virtuais a JOIN matches m ON m.id = a.match_id JOIN usuarios u1 ON u1.id = m.usuario_1_id JOIN usuarios u2 ON u2.id = m.usuario_2_id
-                WHERE a.remetente_id = %s OR a.destinatario_id = %s ORDER BY a.id DESC;
-            """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-            encontros = cursor.fetchall(); cursor.close(); conn.close()
+            conn_check = conectar_supabase()
+            cursor_check = conn_check.cursor()
             
-            # Separa registros Ativos e Passados baseado no dia do servidor
-            encontros_ativos = [e for e in encontros if str(e[1]).lower() == str(dia_atual_servidor).lower() or str(e[4]).lower() == 'pendente']
-            encontros_passados = [e for e in encontros if str(e[1]).lower() != str(dia_atual_servidor).lower() and str(e[4]).lower() == 'aceito']
+            # Verifica se você possui o horário na grade
+            cursor_check.execute("""
+                SELECT COUNT(*) FROM disponibilidade_usuarios 
+                WHERE usuario_id = %s 
+                  AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
+                  AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+            """, (meu_id_limpo, str(dia_s), str(per_s)))
+            meu_count = cursor_check.fetchone()[0]
+            meu_registro_existe = (meu_count > 0)
             
-            if not encontros_ativos:
-                st.caption("Nenhum convite pendente ou encontro ativo para hoje.")
-                
-            for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_ativos:
-                eu_enviei = (int(rem_id) == meu_id_limpo)
-                # 🔍 CORREÇÃO 2: Adicionado [0] no split do parceiro ativo
-                parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize()
-                
-                with st.container(border=True):
-                    col_i, col_b = st.columns([3, 1])
-                    with col_i:
-                        st.write(f"📅 **Encontro com {parceiro_limpo}:** {dia} às {str(hora)[:5]}")
-                        st.caption(f"Status: {status.upper()}")
-                    with col_b:
-                        if status == 'pendente' and not eu_enviei:
-                            if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", width="stretch"):
-                                conn = conectar_supabase(); cursor = conn.cursor(); cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,)); conn.commit(); cursor.close(); conn.close(); st.rerun()
-                        elif status == 'aceito':
-                            if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", width="stretch"):
-                                st.session_state.match_id_atual = m_id
-                                st.session_state.opcao_menu = "🤝 Sala Privada"
-                                st.rerun()
+            # Verifica se o parceiro possui ALGUNS horários cadastrados no banco (para saber se a grade dele está vazia)
+            cursor_check.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
+            total_parceiro = cursor_check.fetchone()[0]
+            parceiro_tem_algum_horario = (total_parceiro > 0)
             
-            # --- COMPONENTE: HISTÓRICO DE ENCONTROS PASSADOS ---
-            st.markdown("<br><hr style='border-color: #21262d;'>", unsafe_allow_html=True)
-            st.markdown("### 📚 Histórico de Encontros Concluídos")
-            if not encontros_passados:
-                st.caption("Nenhum registro antigo arquivado.")
-            for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados:
-                # 🔍 CORREÇÃO 3: Adicionado [0] no split do parceiro no histórico antigo
-                parceiro_antigo_limpo = str(parceiro_nome).split('@')[0].capitalize()
-                st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
+            # Verifica se o parceiro possui ESTE horário específico na grade
+            cursor_check.execute("""
+                SELECT COUNT(*) FROM disponibilidade_usuarios 
+                WHERE usuario_id = %s 
+                  AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
+                  AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+            """, (parceiro_id_limpo, str(dia_s), str(per_s)))
+            parceiro_count = cursor_check.fetchone()[0]
+            parceiro_registro_existe = (parceiro_count > 0)
+            
+            cursor_check.close()
+            conn_check.close()
+            
+            # Painel de depuração limpo
+            with st.expander("🔍 Depurador de Agenda (Debug)"):
+                st.write(f"**Seu ID ({st.session_state.username}):** {meu_id_limpo} | Possui este horário? `{'Sim' if meu_registro_existe else 'Não'}`")
+                st.write(f"**ID do Par ({dados_r['nome_par']}):** {parceiro_id_limpo} | Possui este horário? `{'Sim' if parceiro_registro_existe else 'Não'}`")
+                st.write(f"**O parceiro já preencheu a grade alguma vez?** `{'Sim' if parceiro_tem_algum_horario else 'Não'}`")
+            
+        except Exception as e:
+            st.error(f"Erro ao consultar o banco de dados: {e}")
+
+        # --- 3. EXECUÇÃO DAS TRAVAS DE HORÁRIO ---
+        if per_s == 'manha' and (hora_int < 6 or hora_int >= 12):
+            st.error("❌ Horário inválido! Para o período da manhã, ajuste entre **06:00 e 11:59**.")
+        elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18):
+            st.error("❌ Horário inválido! Para o período da tarde, ajuste entre **12:00 e 17:59**.")
+        elif per_s == 'noite' and (hora_int < 18 or hora_int > 23):
+            st.error("❌ Horário inválido! Para o período da noite, ajuste entre **18:00 e 23:59**.")
+            
+        # Alerta de recusa: Se você não marcou o dia na sua própria grade
+        elif not meu_registro_existe:
+            st.error(f"❌ **Agendamento Recusado:** Você ({st.session_state.username}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar.")
+            
+        # Alerta de recusa: Se o parceiro tem horários configurados mas não marcou este dia específico
+        elif parceiro_tem_algum_horario and not parceiro_registro_existe:
+            st.error(f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado.")
+            
+        # Se passar em todas as validações, realiza o agendamento pendente
+        else:
+            try:
+                conn = conectar_supabase()
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
+                    VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
+                ''', (m_id_limpo, meu_id_limpo, parceiro_id_limpo, dia_s, per_s, hor_s))
+                conn.commit()
+                cursor.close()
+                conn.close()
                 
-        except Exception as e: st.error(f"Erro: {e}")
+                st.success("🎉 Convite de encontro enviado com sucesso!")
+                st.session_state.abrir_reserva_fluxo = None
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Erro ao gravar agendamento: {e}")
+
 
 # ==============================================================================
 # 8. REESTRUTURAÇÃO DA SALA PRIVADA (LAYOUT FIXO, FOTO REAL E LIMPAR HISTÓRICO)
@@ -1306,6 +1063,323 @@ def template_sala_privada():
         
         # Passa a string limpa do nome obtida no banco para dentro do fragmento
         live_chat_privado_engine(live_sala_id, meu_id_sala, parceiro_nome)
+
+
+
+def renderizar_listas_sidebar_e_acoes(): 
+    with st.sidebar: 
+        # --- PERFIL DO USUÁRIO ---
+        avatar_html = ""
+        caminho_minha_foto = str(st.session_state.foto_perfil).strip().lstrip('/')
+        if st.session_state.foto_perfil and os.path.exists(caminho_minha_foto):
+            try:
+                with open(caminho_minha_foto, "rb") as image_file:
+                    encoded_string = base64.b64encode(image_file.read()).decode()
+                avatar_html = f'<img src="data:image/jpeg;base64,{encoded_string}" style="width:65px; height:65px; border-radius:50%; object-fit:cover; border:2px solid #30363d; margin:0 auto 10px auto; display:block;">'
+            except Exception:
+                avatar_html = f'<div style="font-size: 35px; text-align:center;">👩</div>'
+        else:
+            avatar_html = f'<div style="font-size: 35px; text-align:center;">👩</div>'
+
+        # --- CORREÇÃO DA LINHA 480 (EXTRAÇÃO DO ÍNDICE [0] DA STRING SPLIT) ---
+        nome_usuario_puro = str(st.session_state.username).split('@')[0].capitalize()
+
+        st.markdown(f"""
+            <div class="box-perfil-fixo" style="background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 15px;">
+                {avatar_html}
+                <h3 style="margin: 0; font-size: 15px; font-weight: bold; color: #f0f6fc;">{nome_usuario_puro}</h3>
+                <p style="color: #48bb78; font-weight: bold; font-size: 12px; margin: 3px 0 0 0;">🟢 Online</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        st.caption("📷 Enviar nova foto de perfil:")
+        f_nova = st.file_uploader("Alterar Foto", type=["png","jpg","jpeg"], key="side_f_up", label_visibility="collapsed") 
+        if f_nova: 
+            if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER, exist_ok=True) 
+            c_completo = os.path.join(UPLOAD_FOLDER, f"user_{st.session_state.usuario_id}.jpg") 
+            with open(c_completo, "wb") as f: f.write(f_nova.getbuffer()) 
+            conn = conectar_supabase(); cursor = conn.cursor() 
+            cursor.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s", (f"/{c_completo}", int(st.session_state.usuario_id))) 
+            conn.commit(); cursor.close(); conn.close() 
+            st.session_state.foto_perfil = f"/{c_completo}"; st.rerun() 
+
+        st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
+
+        # 🔍 MOTOR DE BUSCA DA NOTIFICAÇÃO DA BARRA LATERAL (BOLINHA VERMELHA)
+        possui_convite_pendente = False
+        try:
+            meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
+            conn_b = conectar_supabase(); cursor_b = conn_b.cursor()
+            cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
+            if cursor_b.fetchone() > 0: possui_convite_pendente = True
+            cursor_b.close(); conn_b.close()
+        except Exception: pass
+
+        # --- BLOCO 3: BOTÕES DE NAVEGAÇÃO INTERNA COM NOTIFICAÇÃO DINÂMICA ---
+        # 🔍 MOTOR DE BUSCA DA NOTIFICAÇÃO DA BARRA LATERAL (BOLINHA VERMELHA)
+        possui_convite_pendente = False
+        try:
+            meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
+            conn_b = conectar_supabase()
+            cursor_b = conn_b.cursor()
+            # Conta se existem convites com status 'pendente' onde VOCÊ é o destinatário
+            cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
+            count_res = cursor_b.fetchone()
+            if count_res and count_res[0] > 0: 
+                possui_convite_pendente = True
+            cursor_b.close()
+            conn_b.close()
+        except Exception as e: 
+            print(f"Erro ao checar notificações: {e}")
+
+        # Configura o rótulo do botão dinamicamente com base na presença de convites
+        if possui_convite_pendente:
+            # Rótulo ganha o emoji de alerta visual vermelho piscante
+            label_gestao = "🤝 ABRIR GESTÃO 🔴"
+            st.markdown("""
+                <div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'>
+                    <span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span>
+                </div>
+            """, unsafe_allow_html=True)
+        else:
+            label_gestao = "🤝 ABRIR GESTÃO"
+
+        # Renderiza o botão com o rótulo atualizado
+        if st.button(label_gestao, type="secondary", width="stretch", key="btn_sidebar_gestao_rel"):
+            st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
+            st.rerun()
+        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", width="stretch"): 
+            st.session_state.opcao_menu = "📅 Disponibilidade"; st.rerun() 
+
+        if st.session_state.eh_admin or st.session_state.username in ['admin', 'Clever1404']:
+            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", width="stretch"):
+                st.session_state.opcao_menu = "🛠️ Painel Admin"; st.rerun()
+
+        if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", width="stretch"):
+            try:
+                conn = conectar_supabase(); cursor = conn.cursor()
+                cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(st.session_state.usuario_id),))
+                conn.commit(); cursor.close(); conn.close(); st.toast("Histórico limpo!"); st.rerun()
+            except Exception as e: st.error(f"Erro: {e}")
+
+        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
+        if st.button("🚪 ENCERRAR SESSÃO", type="primary", width="stretch"):
+            try:
+                conn_logout = conectar_supabase(); cursor_logout = conn_logout.cursor()
+                cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (int(st.session_state.usuario_id),))
+                conn_logout.commit(); cursor_logout.close(); conn_logout.close()
+            except Exception: pass
+            st.session_state.usuario_id = None; st.session_state.username = None; st.session_state.opcao_menu = "🔒 Login"; st.rerun()
+
+
+def template_disponibilidade(): 
+    st.subheader("📅 Sua Grade de Disponibilidade") 
+    st.caption("Marque os dias da semana em que você está disponível. Seus matches verão apenas os dias da semanas que você está disponível.")
+
+    dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'] 
+    periodos = [{"id": "manha", "nome": "Manhã"}, {"id": "tarde", "nome": "Tarde"}, {"id": "noite", "nome": "Noite"}] 
+
+    meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
+    horarios_salvos = set()
+    
+    try:
+        conn = conectar_supabase()
+        cursor = conn.cursor()
+        cursor.execute("SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
+        for d_sem, per_id in cursor.fetchall():
+            horarios_salvos.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
+        cursor.close()
+        conn.close()
+    except Exception:
+        pass
+
+    matriz = [] 
+    for per in periodos: 
+        linha = {"Período": per["nome"]} 
+        for d in dias: 
+            linha[d] = f"{d}_{per['id']}" in horarios_salvos
+        matriz.append(linha) 
+
+    df_grade = pd.DataFrame(matriz) 
+    
+    config_c = {"Período": st.column_config.TextColumn(disabled=True)} 
+    for d in dias: 
+        config_c[d] = st.column_config.CheckboxColumn(default=False) 
+
+    # --- 1. ESCOPO DO FORMULÁRIO EXCLUSIVO PARA O SALVAMENTO DA PLANILHA ---
+    with st.form("container_formulario_grade_horaria", clear_on_submit=False):
+        grade_editada = st.data_editor(df_grade, column_config=config_c, width="stretch", hide_index=True, key="grade_horaria_editor") 
+        
+        # O único botão dentro do form deve ser o submit de gravação
+        botao_salvar_ativo = st.form_submit_button("💾 Salvar Alterações", type="primary", width="stretch")
+        
+        if botao_salvar_ativo: 
+            try:
+                conn = conectar_supabase()
+                cursor = conn.cursor() 
+                cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
+                
+                for idx, row in grade_editada.iterrows(): 
+                    p_id = periodos[idx]["id"]
+                    for d in dias: 
+                        if row[d]: 
+                            cursor.execute("""
+                                INSERT INTO disponibilidade_usuarios (usuario_id, dia_semana, periodo) 
+                                VALUES (%s, %s, %s);
+                            """, (meu_id_limpo, str(d), str(p_id))) 
+                
+                # ... CÓDIGO DA SUA QUERY DE INSERT CONTINUA IGUAL ...
+                conn.commit()
+                cursor.close()
+                conn.close() 
+                
+                # 🔍 CORREÇÃO: Alerta flutuante que persiste mesmo com o st.rerun() imediato
+                st.toast("🎉 Sua grade horária foi salva com sucesso no banco de dados!")
+                
+                # Importa e segura o ciclo por 1 segundo para o usuário ler o aviso na tela
+                import time
+                time.sleep(1)
+                
+                st.rerun() 
+            except Exception as e:
+                st.error(f"Erro crítico ao salvar no banco: {e}")
+
+    # --- 2. ÁREA EXTERNA AO FORMULÁRIO (RESOLVE O STREAMLITAPIEXCEPTION) ---
+    # Os botões comuns abaixo agora nascem fora do container do form, operando livremente
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    col_l, col_v = st.columns(2)
+    
+    with col_l:
+        if st.button("🗑️ Limpar Grade Horária", type="secondary", width="stretch"):
+            try:
+                conn = conectar_supabase(); cursor = conn.cursor()
+                cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
+                conn.commit(); cursor.close(); conn.close()
+                st.toast("Toda a sua grade horária foi limpa!")
+                st.rerun()
+            except Exception as e: 
+                st.error(f"Erro: {e}")
+            
+    with col_v: 
+        if st.button("Voltar ao Chat", width="stretch"): 
+            st.session_state.opcao_menu = "💬 Conversar com Lucy" 
+            st.rerun()
+
+
+
+# ==============================================================================
+# 7. TELA DE GESTÃO DE RELACIONAMENTOS (RESTAURAÇÃO COMPLETA DA LISTA DE MATCHES)
+# ==============================================================================
+
+def template_gerenciar_conexoes_completo(): 
+    st.title("🤝 Gestão de Relacionamentos") 
+    if st.button("← Voltar para o Chat da Lucy", type="secondary"):
+        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+        st.rerun()
+        
+    aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
+    meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
+
+    with aba_m:
+        st.markdown("### 👥 Suas Afinidades")
+        matches_dados = []
+        try:
+            conn = conectar_supabase(); cursor = conn.cursor()
+            cursor.execute('SELECT m.id, u.username, u.foto_perfil, u.genero, u.id FROM matches m JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;', (meu_id_limpo, meu_id_limpo, meu_id_limpo))
+            matches_dados = cursor.fetchall(); cursor.close(); conn.close()
+        except Exception: pass
+
+        if not matches_dados: st.info("Nenhum par localizado.")
+        for m_id, m_nome, m_foto, m_gen, par_id in matches_dados:
+            with st.container(border=True):
+                # Estrutura em colunas equilibradas para reduzir o tamanho do retângulo
+                c_av_c, c_nm_c, c_go_c, c_del_c = st.columns([0.6, 2, 1, 1])
+                
+                with c_av_c:
+                    caminho_par_img = str(m_foto).strip().lstrip('/')
+                    if m_foto and os.path.exists(caminho_par_img):
+                        try:
+                            with open(caminho_par_img, "rb") as image_file:
+                                enc_str = base64.b64encode(image_file.read()).decode()
+                            st.markdown(f'<img src="data:image/jpeg;base64,{enc_str}" class="foto-match-central">', unsafe_allow_html=True)
+                        except Exception: st.write("👩" if m_gen == 'F' else "👨")
+                    else:
+                        st.subheader("👩" if m_gen == 'F' else "👨")
+                        
+                with c_nm_c:
+                    # Fonte aumentada para 15px e em negrito igual ao botão entrar
+                    st.markdown(f"<p style='font-size:15px; font-weight:bold; margin-top:5px; color:#f0f6fc;'>{str(m_nome).split('@')[0].capitalize()}</p>", unsafe_allow_html=True)
+                    
+                with c_go_c:
+                    if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", width="stretch"):
+                        st.session_state.match_id_atual = m_id
+                        st.session_state.opcao_menu = "🤝 Sala Privada"; st.rerun()
+                        
+                with c_del_c:
+                    # RESTAURADO: Botão cinza para excluir afinidades indesejadas do banco
+                    if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", width="stretch"):
+                        try:
+                            conn = conectar_supabase(); cursor = conn.cursor()
+                            cursor.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(m_id),))
+                            cursor.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
+                            cursor.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
+                            conn.commit(); cursor.close(); conn.close()
+                            st.toast("Match removido!")
+                            st.rerun()
+                        except Exception as e: st.error(f"Erro: {e}")
+
+
+    with aba_e:
+        st.markdown("### 📩 Convites Ativos da Semana")
+        try:
+            conn = conectar_supabase(); cursor = conn.cursor()
+            cursor.execute("""
+                SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
+                CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
+                FROM agendamentos_virtuais a JOIN matches m ON m.id = a.match_id JOIN usuarios u1 ON u1.id = m.usuario_1_id JOIN usuarios u2 ON u2.id = m.usuario_2_id
+                WHERE a.remetente_id = %s OR a.destinatario_id = %s ORDER BY a.id DESC;
+            """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
+            encontros = cursor.fetchall(); cursor.close(); conn.close()
+            
+            # Separa registros Ativos e Passados baseado no dia do servidor
+            encontros_ativos = [e for e in encontros if str(e[1]).lower() == str(dia_atual_servidor).lower() or str(e[4]).lower() == 'pendente']
+            encontros_passados = [e for e in encontros if str(e[1]).lower() != str(dia_atual_servidor).lower() and str(e[4]).lower() == 'aceito']
+            
+            if not encontros_ativos:
+                st.caption("Nenhum convite pendente ou encontro ativo para hoje.")
+                
+            for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_ativos:
+                eu_enviei = (int(rem_id) == meu_id_limpo)
+                # 🔍 CORREÇÃO 2: Adicionado [0] no split do parceiro ativo
+                parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize()
+                
+                with st.container(border=True):
+                    col_i, col_b = st.columns([3, 1])
+                    with col_i:
+                        st.write(f"📅 **Encontro com {parceiro_limpo}:** {dia} às {str(hora)[:5]}")
+                        st.caption(f"Status: {status.upper()}")
+                    with col_b:
+                        if status == 'pendente' and not eu_enviei:
+                            if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", width="stretch"):
+                                conn = conectar_supabase(); cursor = conn.cursor(); cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,)); conn.commit(); cursor.close(); conn.close(); st.rerun()
+                        elif status == 'aceito':
+                            if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", width="stretch"):
+                                st.session_state.match_id_atual = m_id
+                                st.session_state.opcao_menu = "🤝 Sala Privada"
+                                st.rerun()
+            
+            # --- COMPONENTE: HISTÓRICO DE ENCONTROS PASSADOS ---
+            st.markdown("<br><hr style='border-color: #21262d;'>", unsafe_allow_html=True)
+            st.markdown("### 📚 Histórico de Encontros Concluídos")
+            if not encontros_passados:
+                st.caption("Nenhum registro antigo arquivado.")
+            for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados:
+                # 🔍 CORREÇÃO 3: Adicionado [0] no split do parceiro no histórico antigo
+                parceiro_antigo_limpo = str(parceiro_nome).split('@')[0].capitalize()
+                st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
+                
+        except Exception as e: st.error(f"Erro: {e}")     
+
 
 
 # ==============================================================================
@@ -1545,99 +1619,28 @@ def template_painel_admin():
         st.rerun()
 
 
-def template_disponibilidade(): 
-    st.subheader("📅 Sua Grade de Disponibilidade") 
-    st.caption("Marque os dias da semana em que você está disponível. Seus matches verão apenas os dias da semanas que você está disponível.")
 
-    dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'] 
-    periodos = [{"id": "manha", "nome": "Manhã"}, {"id": "tarde", "nome": "Tarde"}, {"id": "noite", "nome": "Noite"}] 
-
-    meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
-    horarios_salvos = set()
+# NOVO: Página simples de Fale Conosco
+def template_fale_conosco():
+    st.markdown("<h2>✉️ Fale Conosco</h2>", unsafe_allow_html=True)
+    st.caption("Envie suas dúvidas, críticas ou sugestões de melhoria para a equipe de suporte Lucy IA.")
+    st.markdown("<hr style='border-color: #30363d; margin: 10px 0 25px 0;'>", unsafe_allow_html=True)
     
-    try:
-        conn = conectar_supabase()
-        cursor = conn.cursor()
-        cursor.execute("SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
-        for d_sem, per_id in cursor.fetchall():
-            horarios_salvos.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
-        cursor.close()
-        conn.close()
-    except Exception:
-        pass
-
-    matriz = [] 
-    for per in periodos: 
-        linha = {"Período": per["nome"]} 
-        for d in dias: 
-            linha[d] = f"{d}_{per['id']}" in horarios_salvos
-        matriz.append(linha) 
-
-    df_grade = pd.DataFrame(matriz) 
-    
-    config_c = {"Período": st.column_config.TextColumn(disabled=True)} 
-    for d in dias: 
-        config_c[d] = st.column_config.CheckboxColumn(default=False) 
-
-    # --- 1. ESCOPO DO FORMULÁRIO EXCLUSIVO PARA O SALVAMENTO DA PLANILHA ---
-    with st.form("container_formulario_grade_horaria", clear_on_submit=False):
-        grade_editada = st.data_editor(df_grade, column_config=config_c, width="stretch", hide_index=True, key="grade_horaria_editor") 
+    with st.form("form_fale_conosco", clear_on_submit=True):
+        nome_contato = st.text_input("Seu Nome:", value=st.session_state.username if st.session_state.username else "")
+        email_contato = st.text_input("Seu E-mail de Contato:")
+        descricao_contato = st.text_area("Escreva sua Mensagem / Sugestão:")
         
-        # O único botão dentro do form deve ser o submit de gravação
-        botao_salvar_ativo = st.form_submit_button("💾 Salvar Alterações", type="primary", width="stretch")
-        
-        if botao_salvar_ativo: 
-            try:
-                conn = conectar_supabase()
-                cursor = conn.cursor() 
-                cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
+        if st.form_submit_button("Enviar por E-mail", type="primary", width="stretch"):
+            if not email_contato or not descricao_contato:
+                st.error("❌ Por favor, preencha seu e-mail e a descrição da mensagem.")
+            else:
+                # Aqui você plugaria seu SMTP real (Ex: smtplib ou API SendGrid)
+                st.success("🎉 Sua mensagem foi enviada para o e-mail de suporte (suporte@lucyia.com) com sucesso!")
                 
-                for idx, row in grade_editada.iterrows(): 
-                    p_id = periodos[idx]["id"]
-                    for d in dias: 
-                        if row[d]: 
-                            cursor.execute("""
-                                INSERT INTO disponibilidade_usuarios (usuario_id, dia_semana, periodo) 
-                                VALUES (%s, %s, %s);
-                            """, (meu_id_limpo, str(d), str(p_id))) 
-                
-                # ... CÓDIGO DA SUA QUERY DE INSERT CONTINUA IGUAL ...
-                conn.commit()
-                cursor.close()
-                conn.close() 
-                
-                # 🔍 CORREÇÃO: Alerta flutuante que persiste mesmo com o st.rerun() imediato
-                st.toast("🎉 Sua grade horária foi salva com sucesso no banco de dados!")
-                
-                # Importa e segura o ciclo por 1 segundo para o usuário ler o aviso na tela
-                import time
-                time.sleep(1)
-                
-                st.rerun() 
-            except Exception as e:
-                st.error(f"Erro crítico ao salvar no banco: {e}")
-
-    # --- 2. ÁREA EXTERNA AO FORMULÁRIO (RESOLVE O STREAMLITAPIEXCEPTION) ---
-    # Os botões comuns abaixo agora nascem fora do container do form, operando livremente
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    col_l, col_v = st.columns(2)
-    
-    with col_l:
-        if st.button("🗑️ Limpar Grade Horária", type="secondary", width="stretch"):
-            try:
-                conn = conectar_supabase(); cursor = conn.cursor()
-                cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
-                conn.commit(); cursor.close(); conn.close()
-                st.toast("Toda a sua grade horária foi limpa!")
-                st.rerun()
-            except Exception as e: 
-                st.error(f"Erro: {e}")
-            
-    with col_v: 
-        if st.button("Voltar ao Chat", width="stretch"): 
-            st.session_state.opcao_menu = "💬 Conversar com Lucy" 
-            st.rerun()
-
+    if st.button("← Voltar para o Chat Principal", type="secondary"):
+        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+        st.rerun()
 
 
 # ==============================================================================
