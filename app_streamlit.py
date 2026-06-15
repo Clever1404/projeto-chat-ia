@@ -805,7 +805,7 @@ def renderizar_historico_ia(usuario_id):
                 with st.chat_message("assistant"): st.write(ia_r)
 
 def template_chat_ia_completo(): 
-    col_titulos, col_botoes_topo = st.columns()
+    col_titulos, col_botoes_topo = st.columns([2, 1])
     
     with col_titulos:
         st.markdown("<h2 style='margin-top:0; margin-bottom:2px; font-size: 24px;'>🤖 Olá, Seja bem-vindo ao Lucy Chat IA</h2>", unsafe_allow_html=True) 
