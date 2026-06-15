@@ -573,12 +573,9 @@ def template_chat_ia_completo():
                     SELECT idade, genero, procura_por, procura_relacionamento 
                     FROM usuarios WHERE id = %s;
                 """, (meu_id_f,))
-                #pilar_dados = cursor.fetchone()
+                pilar_dados = cursor.fetchone()
 
-                # Substitua o bloco de código antigo de leitura de pilares por isso:
-                pilar_dados = buscar_pilares_usuario_cached(meu_id_f)
-
-
+              
                 dados_faltantes_contexto = ""
                 if pilar_dados:
                     idade_b, gen_b, proc_gen_b, proc_rel_b = pilar_dados
@@ -672,30 +669,30 @@ def template_chat_ia_completo():
                     #cursor_p = conn_p.cursor()
                     
                     # 1. Garante que a relação exista ou cria ela no banco para não quebrar a FK do Agendamento
-                    cursor_p.execute("""
+                    cursor.execute("""
                         SELECT id FROM matches 
                         WHERE (usuario_1_id = %s AND usuario_2_id = %s) 
                            OR (usuario_1_id = %s AND usuario_2_id = %s);
                     """, (meu_id_f, id_parceiro_match, id_parceiro_match, meu_id_f))
-                    resultado_match = cursor_p.fetchone()
+                    resultado_match = cursor.fetchone()
                     
                     if resultado_match:
-                        match_id_final = resultado_match
+                        match_id_final = resultado_match[0]
                     else:
-                        cursor_p.execute("""
+                        cursor.execute("""
                             INSERT INTO matches (usuario_1_id, usuario_2_id) 
                             VALUES (%s, %s) RETURNING id;
                         """, (meu_id_f, id_parceiro_match))
-                        match_id_final = cursor_p.fetchone()
-                        conn_p.commit()
+                        match_id_final = cursor.fetchone()[0]
+                        conn.commit()
 
                     # 2. Busca o status e nome real do parceiro
                     cursor_p.execute("SELECT status FROM usuarios WHERE id = %s;", (id_parceiro_match,))
-                    status_banco = cursor_p.fetchone()
-                    
+                    status_banco = cursor.fetchone()
+
                     try:
-                        cursor_p.execute("SELECT nome FROM usuarios WHERE id = %s;", (id_parceiro_match,))
-                        nome_banco = cursor_p.fetchone()
+                        cursor.execute("SELECT nome FROM usuarios WHERE id = %s;", (id_parceiro_match,))
+                        nome_banco = cursor.fetchone()
                         # Extrai a string se o fetchone retornar uma tupla (ex: ('Carlos',))
                         if nome_banco and isinstance(nome_banco, tuple):
                             nome_exibicao = nome_banco[0]
@@ -726,9 +723,15 @@ def template_chat_ia_completo():
 
                 # Recarrega a página atualizando todo o fluxo de uma vez
                 st.rerun() 
-
             except Exception as e: 
+                # Garante o fechamento seguro mesmo em caso de falha catastrófica
+                try:
+                    cursor.close()
+                    conn.close()
+                except Exception:
+                    pass
                 st.error(f"Erro na IA principal: {e}")
+            
 
 
 
