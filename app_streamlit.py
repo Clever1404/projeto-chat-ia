@@ -994,8 +994,8 @@ def template_chat_ia_completo():
                 # Recarrega a página atualizando todo o fluxo de uma vez
                 st.rerun() 
 
-    except Exception as e: 
-        st.error(f"Erro na IA principal: {e}")
+            except Exception as e: 
+                st.error(f"Erro na IA principal: {e}")
 
 
             
