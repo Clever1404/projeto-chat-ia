@@ -892,7 +892,7 @@ def template_chat_ia_completo():
                 )
 
                 # Processa o retorno da IA na memória local
-                resultado_unificado = modulo_json.loads(resposta_streaming.choices.message.content)
+                resultado_unificado = modulo_json.loads(resposta_streaming.choices[0].message.content)
                 resposta_lucy = resultado_unificado.get("resposta_chat", "Estou processando seus interesses...")
                 dados_extraidos = resultado_unificado.get("extracao", {})
                 
