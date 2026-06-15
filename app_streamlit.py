@@ -499,22 +499,36 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
 @st.fragment
 def renderizar_historico_ia(usuario_id):
     """
-    Função 1: Histórico de Mensagens isolado.
-    Garante que as mensagens fiquem fixas na tela e atualizem de forma independente.
+    Busca o histórico do banco e adiciona imediatamente as mensagens 
+    da memória volátil para evitar que o chat suma durante o Rerun.
     """
     with st.container(height=440, border=False):
+        # 1. Busca as mensagens já consolidadas no banco de dados
         historico = buscar_memoria(usuario_id, limite=15) 
-        if not historico:
+        
+        # Inicializa a lista de exibição com os dados do banco
+        mensagens_para_exibir = []
+        if historico:
+            for user_p, ia_r in historico:
+                if user_p: mensagens_para_exibir.append(("user", user_p))
+                if ia_r: mensagens_para_exibir.append(("assistant", ia_r))
+        
+        # 2. Se houver mensagens na memória que ainda não subiram pro banco, anexa elas
+        if "historico_volatil" in st.session_state:
+            for role, text in st.session_state.historico_volatil:
+                # Evita duplicar mensagens que já foram consolidadas no banco
+                if (role, text) not in mensagens_para_exibir:
+                    mensagens_para_exibir.append((role, text))
+        
+        if not mensagens_para_exibir:
             st.info("Inicie a conversa com a Lucy enviando uma mensagem abaixo!")
             return
             
-        for user_p, ia_r in historico: 
-            if user_p: 
-                with st.chat_message("user"): 
-                    st.write(user_p) 
-            if ia_r: 
-                with st.chat_message("assistant"): 
-                    st.write(ia_r)
+        # 3. Renderiza a lista combinada e blindada na tela
+        for role, conteudo in mensagens_para_exibir:
+            with st.chat_message(role):
+                st.write(conteudo)
+
 
 def template_chat_ia_completo(): 
     """
@@ -549,9 +563,11 @@ def template_chat_ia_completo():
     if st.session_state.opcao_menu == "💬 Conversar com Lucy":
         if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
             
-            # Corrige o sumiço mantendo o estado local ativo imediatamente na tela
+            # Inicializa e grava na memória local imediatamente
             if "historico_volatil" not in st.session_state:
                 st.session_state.historico_volatil = []
+                
+            # Salva o texto do usuário
             st.session_state.historico_volatil.append(("user", prompt))
             st.chat_message("user").write(prompt) 
             
@@ -608,12 +624,11 @@ def template_chat_ia_completo():
                     response_format={"type": "json_object"}
                 )
 
-                # Processa o retorno unificado diretamente na memória ram
                 resultado_unificado = modulo_json.loads(resposta_streaming.choices[0].message.content)
                 resposta_lucy = resultado_unificado.get("resposta_chat", "Estou processando seus interesses...")
                 dados_extraidos = resultado_unificado.get("extracao", {})
                 
-                # Exibe a resposta da Lucy na tela sem travar
+                # Salva a resposta da Lucy na memória local imediatamente
                 st.session_state.historico_volatil.append(("assistant", resposta_lucy))
                 st.chat_message("assistant").write(resposta_lucy)
 
@@ -709,7 +724,7 @@ def template_chat_ia_completo():
                     conn.close()
                 except Exception:
                     pass
-                st.error(f"Erro na IA principal: {e}")
+                st.error(f"Erro na IA principal: {e}")  
             
 
 
