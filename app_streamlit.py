@@ -897,7 +897,7 @@ def modal_match_lucy(dados_m):
         if st.button(f"🟢 {dados_m['nome']} está online. Gostaria de conversar agora!", type="primary", width="stretch"):
             if saldo_moedas >= 2:
                 if st.button("🪙 Entrar na Sala Privada (Gasta 2 moedas)"):
-                    supabase.table("usuarios").update({"creditos": saldo_moedas - 2}).eq("id", id_usuario).execute())
+                    supabase.table("usuarios").update({"creditos": saldo_moedas - 2}).eq("id", id_usuario).execute()
                     st.success("Moedas debitadas! Sala privada liberada. Pode conversar!")
                     st.session_state.match_id_atual = dados_m["match_id"]
                     st.session_state.opcao_menu = "🤝 Sala Privada"
