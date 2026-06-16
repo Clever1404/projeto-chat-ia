@@ -1290,7 +1290,7 @@ def renderizar_listas_sidebar_e_acoes():
                 st.session_state.opcao_menu = "🛠️ Painel Admin"; st.rerun()
         
         if st.button("🪙PLATAFORMA PLANOS", type="secondary", use_container_width=True): 
-            st.session_state.opcao_menu = "📅planosponibilidade"; st.rerun()         
+            st.session_state.opcao_menu = "planos"; st.rerun()         
 
         if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True):
             try:
