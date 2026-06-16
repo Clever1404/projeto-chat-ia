@@ -381,7 +381,7 @@ def template_planos():
     st.caption(f"Status: **{str(status_usuario).upper()}** | Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
     
     # --- TEXTO DESCRITIVO DOS PLANOS CENTRALIZADO ---
-    st.markdown(
+    st.html(
         """
         <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
             <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
@@ -401,8 +401,8 @@ def template_planos():
                 <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
             </div>
         </div>
-        """,
-        unsafe_allow_html=True,
+        """
+        
     )
     
     if st.button("← Voltar para o 🔒 Login", type="secondary"):
