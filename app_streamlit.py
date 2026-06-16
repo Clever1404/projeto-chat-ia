@@ -60,15 +60,15 @@ if 'supabase' not in locals() or not supabase:
     st.stop()  # Para o código aqui com segurança
     
 
-# 1. CORRETO: Usa parênteses para a função .get() e vírgula se quiser um valor padrão
-TOKEN_MERCADO_PAGO = st.secrets.get("TOKEN_MERCADO_PAGO", None)
-
-# 2. Inicializa o SDK usando a variável correta
-if TOKEN_MERCADO_PAGO:
-    sdk = mercadopago.SDK(TOKEN_MERCADO_PAGO)
-else:
-    st.error("Erro: TOKEN_MERCADO_PAGO não foi configurado nos Secrets.")
-
+# =========================================================================
+# INICIALIZAÇÃO DO SDK DO MERCADO PAGO
+# =========================================================================
+# Busca o token direto dos secrets do Streamlit de forma segura
+try:
+    sdk = mercadopago.SDK(st.secrets["TOKEN_MERCADO_PAGO"])
+except Exception as e:
+    st.error(f"Erro ao carregar credenciais do Mercado Pago: {e}")
+    sdk = None
 
 # 2. Função de conexão com o Supabase corrigida com SSL seguro
 def conectar_supabase():
@@ -315,127 +315,88 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
                     except Exception as e:
                         st.error(f"Erro ao cadastrar: {e}")
 
+        # =========================================================================
+        # SEÇÃO DE COMPRAS (MERCADO PAGO)
+        # =========================================================================
+        st.sidebar.header("🛒 Loja do App")
 
+        opcoes_compra = st.sidebar.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
 
-# =========================================================================
-# INICIALIZAÇÃO DO SDK DO MERCADO PAGO
-# =========================================================================
-# Busca o token direto dos secrets do Streamlit de forma segura
-try:
-    sdk = mercadopago.SDK(st.secrets["TOKEN_MERCADO_PAGO"])
-except Exception as e:
-    st.error(f"Erro ao carregar credenciais do Mercado Pago: {e}")
-    sdk = None
-
-# --- ADICIONE ESTAS DUAS LINHAS LOGO ANTES DO SEU IF DE CRÉDITOS ---
-status_usuario = "Offline"
-saldo_moedas = 0
-
-# (Abaixo fica o seu código atual que busca do Supabase)
-id_usuario_atual = st.session_state.get("usuario_id", None)
-
-if id_usuario_atual:
-    try:
-        user_query = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).execute()
-        # Correção exata: acessando o índice [0] antes do .get()
-        if user_query.data and len(user_query.data) > 0:
-            status_usuario = user_query.data[0].get("status", "🟢 Online")
-            saldo_moedas = user_query.data[0].get("creditos", 0)
-    except Exception as e:
-        st.error(f"Aviso de sincronização: {e}")
-
-# --- SEU CÓDIGO DA LINHA 330 EM DIANTE ---
-st.title("Plataforma de Planos IA")                                    
-st.caption(f"Status: **{str(status_usuario).upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
-
-
-# --- VARIÁVEIS DE CONTROLE DE PAGAMENTO EM ANDAMENTO ---
-if "id_pagamento_pendente" not in st.session_state:
-    st.session_state.id_pagamento_pendente = None
-if "tipo_pagamento_pendente" not in st.session_state:
-    st.session_state.tipo_pagamento_pendente = None
-
-# =========================================================================
-# SEÇÃO DE COMPRAS (MERCADO PAGO)
-# =========================================================================
-st.sidebar.header("🛒 Loja do App")
-
-opcoes_compra = st.sidebar.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
-
-if st.sidebar.button("Gerar Pix de Pagamento"):
-    if not sdk:
-        st.sidebar.error("SDK do Mercado Pago não foi inicializado.")
-    else:
-        # Configura o valor e descrição baseado na escolha do menu lateral
-        if "VIP" in opcoes_compra:
-            valor, desc, tipo = 19.90, "Plano VIP 30 dias", "vip"
-        else:
-            valor, desc, tipo = 5.00, "Pacote de 10 Moedas", "moedas"
-
-        payment_data = {
-            "transaction_amount": valor,
-            "description": desc,
-            "payment_method_id": "pix",
-            "payer": {"email": "cliente@email.com"},
-            "external_reference": f"{id_usuario_atual}:{tipo}"
-        }
-
-        try:
-            # Criando o Pix na API do Mercado Pago
-            payment_response = sdk.payment().create(payment_data)
-            payment = payment_response["response"]
-
-            if "point_of_interaction" in payment:
-                # Salva o ID do pagamento gerado para checar depois
-                st.session_state.id_pagamento_pendente = payment["id"]
-                st.session_state.tipo_pagamento_pendente = tipo
-                
-                # Dados para exibição do Pix
-                st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
-                st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
-                st.sidebar.success("Pix gerado com sucesso!")
+        if st.sidebar.button("Gerar Pix de Pagamento"):
+            if not sdk:
+                st.sidebar.error("SDK do Mercado Pago não foi inicializado.")
             else:
-                st.sidebar.error("Erro ao gerar pagamento. Verifique as credenciais.")
-        except Exception as e:
-            st.sidebar.error(f"Erro na API do Mercado Pago: {e}")
-
-# Exibe o Pix gerado se ele existir na sessão atual
-if st.session_state.id_pagamento_pendente:
-    st.sidebar.markdown("---")
-    st.sidebar.image(f"data:image/jpeg;base64,{st.session_state.qr_code_img}", width=200)
-    st.sidebar.text_input("Copia e Cola:", value=st.session_state.qr_code_texto)
-    
-    # BOTÃO CHAVE: O usuário clica após pagar para o código validar na hora
-    if st.sidebar.button("🔄 Já paguei, liberar meu acesso"):
-        if not sdk:
-            st.sidebar.error("SDK do Mercado Pago não disponível.")
-        else:
-            # Consulta o status do pagamento direto na API do Mercado Pago
-            id_pag = st.session_state.id_pagamento_pendente
-            tipo_pag = st.session_state.tipo_pagamento_pendente
-            
-            try:
-                check_payment = sdk.payment().get(id_pag)["response"]
-                status_pagamento = check_payment.get("status")
-
-                if status_pagamento == "approved":
-                    if tipo_pag == "vip":
-                        # Atualiza para VIP no Supabase
-                        supabase.table("usuarios").update({"status": "vip"}).eq("id", id_usuario_atual).execute()
-                        st.success("🎉 Parabéns! Seu plano VIP foi ativado.")
-                    elif tipo_pag == "moedas":
-                        # Soma as novas moedas no Supabase
-                        novo_saldo = saldo_moedas + 10
-                        supabase.table("usuarios").update({"creditos": novo_saldo}).eq("id", id_usuario_atual).execute()
-                        st.success("🪙 10 Moedas adicionadas com sucesso ao seu saldo!")
-                    
-                    # Limpa as variáveis de pagamento pendente da tela
-                    st.session_state.id_pagamento_pendente = None
-                    st.rerun()
+                # Configura o valor e descrição baseado na escolha do menu lateral
+                if "VIP" in opcoes_compra:
+                    valor, desc, tipo = 19.90, "Plano VIP 30 dias", "vip"
                 else:
-                    st.sidebar.warning("⚠️ Pagamento ainda não consta como aprovado. Aguarde alguns instantes e tente novamente.")
-            except Exception as e:
-                st.sidebar.error(f"Erro ao verificar pagamento: {e}")
+                    valor, desc, tipo = 5.00, "Pacote de 10 Moedas", "moedas"
+
+                payment_data = {
+                    "transaction_amount": valor,
+                    "description": desc,
+                    "payment_method_id": "pix",
+                    "payer": {"email": "cliente@email.com"},
+                    "external_reference": f"{id_usuario_atual}:{tipo}"
+                }
+
+                try:
+                    # Criando o Pix na API do Mercado Pago
+                    payment_response = sdk.payment().create(payment_data)
+                    payment = payment_response["response"]
+
+                    if "point_of_interaction" in payment:
+                        # Salva o ID do pagamento gerado para checar depois
+                        st.session_state.id_pagamento_pendente = payment["id"]
+                        st.session_state.tipo_pagamento_pendente = tipo
+                        
+                        # Dados para exibição do Pix
+                        st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+                        st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+                        st.sidebar.success("Pix gerado com sucesso!")
+                    else:
+                        st.sidebar.error("Erro ao gerar pagamento. Verifique as credenciais.")
+                except Exception as e:
+                    st.sidebar.error(f"Erro na API do Mercado Pago: {e}")
+
+        # Exibe o Pix gerado se ele existir na sessão atual
+        if st.session_state.id_pagamento_pendente:
+            st.sidebar.markdown("---")
+            st.sidebar.image(f"data:image/jpeg;base64,{st.session_state.qr_code_img}", width=200)
+            st.sidebar.text_input("Copia e Cola:", value=st.session_state.qr_code_texto)
+            
+            # BOTÃO CHAVE: O usuário clica após pagar para o código validar na hora
+            if st.sidebar.button("🔄 Já paguei, liberar meu acesso"):
+                if not sdk:
+                    st.sidebar.error("SDK do Mercado Pago não disponível.")
+                else:
+                    # Consulta o status do pagamento direto na API do Mercado Pago
+                    id_pag = st.session_state.id_pagamento_pendente
+                    tipo_pag = st.session_state.tipo_pagamento_pendente
+                    
+                    try:
+                        check_payment = sdk.payment().get(id_pag)["response"]
+                        status_pagamento = check_payment.get("status")
+
+                        if status_pagamento == "approved":
+                            if tipo_pag == "vip":
+                                # Atualiza para VIP no Supabase
+                                supabase.table("usuarios").update({"status": "vip"}).eq("id", id_usuario_atual).execute()
+                                st.success("🎉 Parabéns! Seu plano VIP foi ativado.")
+                            elif tipo_pag == "moedas":
+                                # Soma as novas moedas no Supabase
+                                novo_saldo = saldo_moedas + 10
+                                supabase.table("usuarios").update({"creditos": novo_saldo}).eq("id", id_usuario_atual).execute()
+                                st.success("🪙 10 Moedas adicionadas com sucesso ao seu saldo!")
+                            
+                            # Limpa as variáveis de pagamento pendente da tela
+                            st.session_state.id_pagamento_pendente = None
+                            st.rerun()
+                        else:
+                            st.sidebar.warning("⚠️ Pagamento ainda não consta como aprovado. Aguarde alguns instantes e tente novamente.")
+                    except Exception as e:
+                        st.sidebar.error(f"Erro ao verificar pagamento: {e}")
+
 
 
 # ==============================================================================
@@ -1633,6 +1594,34 @@ def template_gerenciar_conexoes_completo():
                 
         except Exception as e: st.error(f"Erro: {e}")     
 
+def template planos():
+    # --- SEU CÓDIGO DA LINHA 330 EM DIANTE ---
+    st.title("Plataforma de Planos IA")                                    
+    st.caption(f"Status: **{str(status_usuario).upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+
+
+    # --- VARIÁVEIS DE CONTROLE DE PAGAMENTO EM ANDAMENTO ---
+    if "id_pagamento_pendente" not in st.session_state:
+        st.session_state.id_pagamento_pendente = None
+    if "tipo_pagamento_pendente" not in st.session_state:
+        st.session_state.tipo_pagamento_pendente = None
+
+    # --- ADICIONE ESTAS DUAS LINHAS LOGO ANTES DO SEU IF DE CRÉDITOS ---
+    status_usuario = "status"
+    saldo_moedas = "creditos"
+
+    # (Abaixo fica o seu código atual que busca do Supabase)
+    id_usuario_atual = st.session_state.get("usuario_id", None)
+
+    if id_usuario_atual:
+        try:
+            user_query = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).execute()
+            # Correção exata: acessando o índice [0] antes do .get()
+            if user_query.data and len(user_query.data) > 0:
+                status_usuario = user_query.data[0].get("status", "🟢 Online")
+                saldo_moedas = user_query.data[0].get("creditos", 0)
+        except Exception as e:
+            st.error(f"Aviso de sincronização: {e}")
 
 
 # ==============================================================================
