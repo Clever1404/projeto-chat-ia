@@ -14,19 +14,14 @@ import time
 from streamlit_extras.stylable_container import stylable_container
 import psycopg2
 from openai import OpenAI
-import json as modulo_json 
+import json as modulo_json
+import mercadopago 
 
 
 UPLOAD_FOLDER = "uploads"
 load_dotenv()
 UPLOAD_FOLDER = 'static/uploads/perfis'
 
-# --- SIMULAÇÃO DE DADOS (Substitua pelas consultas ao Supabase) ---
-id_usuario_atual = st.session_state.get("id_usuario_logado", "123")
-
-# Simulando dados que viriam do Supabase sobre o usuário LOGADO
-status_autor = "gratis"  # 'gratis' ou 'vip'
-saldo_moedas = 5         # quantidade de créditos que ele tem
 
 # 1. Busca a chave da OpenAI priorizando os Secrets da nuvem
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
@@ -282,8 +277,15 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
 # Inicializa o SDK do Mercado Pago
 sdk = mercadopago.SDK("SEU_ACCESS_TOKEN_DO_MERCADO_PAGO")
 
-# --- CONTROLE DE SESSÃO DO USUÁRIO ---
-id_usuario = st.session_state.get("id_usuario_logado", "123")
+TOKEN_MERCADO_PAGO = st.get("TOKEN_MERCADO_PAGO", os.getenv("TOKEN_MERCADO_PAGO"))
+
+# --- SIMULAÇÃO DE DADOS (Substitua pelas consultas ao Supabase) ---
+id_usuario_atual = st.session_state.get("username", "id")
+
+# Simulando dados que viriam do Supabase sobre o usuário LOGADO
+status_autor = "gratis"  # 'gratis' ou 'vip'
+saldo_moedas = 5         # quantidade de créditos que ele tem
+
 
 # Busca dados em tempo real do Supabase
 user_db = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario).single().execute()
@@ -897,7 +899,7 @@ def modal_match_lucy(dados_m):
         if st.button(f"🟢 {dados_m['nome']} está online. Gostaria de conversar agora!", type="primary", width="stretch"):
             if saldo_moedas >= 2:
                 if st.button("🪙 Entrar na Sala Privada (Gasta 2 moedas)"):
-                    supabase.table("usuarios").update({"creditos": saldo_moedas - 2}).eq("id", id_usuario).execute()
+                    supabase.table("usuarios").update({"creditos": saldo_moedas - 2}).eq("id", id_usuario).execute())
                     st.success("Moedas debitadas! Sala privada liberada. Pode conversar!")
                     st.session_state.match_id_atual = dados_m["match_id"]
                     st.session_state.opcao_menu = "🤝 Sala Privada"
