@@ -337,7 +337,7 @@ id_usuario_atual = st.session_state.get("usuario_id", None)
 if id_usuario_atual:
     try:
         user_query = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).execute()
-        # Correção: Adicionado o [0] de volta para acessar o primeiro registro retornado
+        # Correção exata: acessando o índice [0] antes do .get()
         if user_query.data and len(user_query.data) > 0:
             status_usuario = user_query.data[0].get("status", "🟢 Online")
             saldo_moedas = user_query.data[0].get("creditos", 0)
