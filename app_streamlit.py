@@ -405,8 +405,8 @@ def template_planos():
         
     )
     
-    if st.form_submit_button("← Voltar para o 🔒 Login", use_container_width=True):
-                st.session_state.opcao_menu = "🔒 Login"  # o nome correto do seu menu de chat
+    if st.button("← Voltar para o 🔒 Login", use_container_width=True):
+        st.session_state.opcao_menu = "🔒 Login"  # o nome correto do seu menu de chat
        
 
     if "id_pagamento_pendente" not in st.session_state:
