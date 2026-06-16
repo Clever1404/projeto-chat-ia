@@ -33,6 +33,15 @@ if not OPENAI_API_KEY or "sua_chave" in OPENAI_API_KEY:
 # 2. Inicializa o cliente da OpenAI de forma global
 client = OpenAI(api_key=OPENAI_API_KEY)
 
+# 1. Busca o token nos Segredos do Streamlit ou nas variáveis de ambiente locais
+TOKEN_MERCADO_PAGO = st.secrets.get("TOKEN_MERCADO_PAGO", os.getenv("TOKEN_MERCADO_PAGO"))
+
+# 2. Inicializa o SDK usando a variável correta
+if TOKEN_MERCADO_PAGO:
+    sdk = mercadopago.SDK(TOKEN_MERCADO_PAGO)
+else:
+    st.error("Erro: TOKEN_MERCADO_PAGO não foi configurado.")
+
 
 # 2. Função de conexão com o Supabase corrigida com SSL seguro
 def conectar_supabase():
@@ -273,11 +282,6 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
             st.session_state.opcao_menu = "divulgacao"
             st.rerun()
 
-
-# Inicializa o SDK do Mercado Pago
-sdk = mercadopago.SDK("SEU_ACCESS_TOKEN_DO_MERCADO_PAGO")
-
-TOKEN_MERCADO_PAGO = st.get("TOKEN_MERCADO_PAGO", os.getenv("TOKEN_MERCADO_PAGO"))
 
 # --- SIMULAÇÃO DE DADOS (Substitua pelas consultas ao Supabase) ---
 id_usuario_atual = st.session_state.get("username", "id")
