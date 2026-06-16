@@ -338,6 +338,13 @@ def template_cadastro():
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao cadastrar: {e}")
+                
+                
+            if st.button("← Voltar para o 🔒 Login", type="secondary"):
+                st.session_state.opcao_menu = "login"   # Ou o nome correto do seu menu de chat
+                st.rerun()
+
+
 
 def template_planos():
     status_usuario = "🟢 Online"
@@ -378,10 +385,10 @@ def template_planos():
             <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+     """, unsafe_allow_html=True)
     
     if st.button("← Voltar para o 🔒 Login", type="secondary"):
-        st.session_state.opcao_menu = "🔒 Login"    # Ou o nome correto do seu menu de chat
+        st.session_state.opcao_menu = "login"    # Ou o nome correto do seu menu de chat
         st.rerun()
 
     if "id_pagamento_pendente" not in st.session_state:
