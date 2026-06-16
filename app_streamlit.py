@@ -1594,7 +1594,7 @@ def template_gerenciar_conexoes_completo():
                 
         except Exception as e: st.error(f"Erro: {e}")     
 
-def template planos():
+def template_planos():
     # --- SEU CÓDIGO DA LINHA 330 EM DIANTE ---
     st.title("Plataforma de Planos IA")                                    
     st.caption(f"Status: **{str(status_usuario).upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
