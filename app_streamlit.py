@@ -312,7 +312,7 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
 
 # --- SIMULAÇÃO DE DADOS (Substitua pelas consultas ao Supabase) ---
 # Correção: Definindo o nome padrão como id_usuario_atual
-id_usuario_atual = st.session_state.get("username", "id")
+id_usuario_atual = st.session_state.get("Mariana", "2")
 
 # Busca dados em tempo real do Supabase
 # 319: Busca os dados como uma lista comum (sem o .single())
