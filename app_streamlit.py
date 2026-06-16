@@ -61,9 +61,8 @@ if 'supabase' not in locals() or not supabase:
     
 
 # 1. Busca o token nos Segredos do Streamlit ou nas variáveis de ambiente locais
-url: str = st.secrets.get["TOKEN_MERCADO_PAGO"]
-mercado_pago: Client = create_client(url)
-mercado_pago = None
+TOKEN_MERCADO_PAGO = st.secrets.get["TOKEN_MERCADO_PAGO"]
+
 
 # 2. Inicializa o SDK usando a variável correta
 if TOKEN_MERCADO_PAGO:
