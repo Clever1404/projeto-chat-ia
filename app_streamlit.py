@@ -266,6 +266,12 @@ elif st.session_state.opcao_menu == "🔒 Login":
             if st.session_state.mostrar_recuperar_senha:
                 modal_recuperar_senha()
 
+
+# No topo do seu script ou dentro da função, garanta um ID exclusivo por sessão
+if "form_seed" not in st.session_state:
+    import random
+    st.session_state.form_seed = random.randint(1000, 9999)
+
 # ==============================================================================
 # 1. CONFIGURAÇÕES GLOBAIS E ESTILO BASE
 # ==============================================================================
@@ -294,7 +300,8 @@ if "opcao_menu" not in st.session_state:
 def template_cadastro():
     st.markdown('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>', unsafe_allow_html=True)
     
-    with st.form("form_cadastro_usuario_unico"):
+    # Substitua a linha do formulário por esta:
+    with st.form(key=f"form_cad_unico_{st.session_state.form_seed}"):
         usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
         email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed")
         senha = st.text_input("Senha", placeholder="Escolha uma Senha", type="password", label_visibility="collapsed")
@@ -341,10 +348,12 @@ def template_planos():
     id_usuario_atual = st.session_state.get("usuario_id", None)
     if id_usuario_atual:
         try:
-            user_query = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).execute()
+            # 🔍 CORREÇÃO: Trocado "creditos" por "moedas" na consulta
+            user_query = supabase.table("usuarios").select("status", "moedas").eq("id", id_usuario_atual).execute()
             if user_query.data and len(user_query.data) > 0:
                 status_usuario = user_query.data[0].get("status", "🟢 Online")
-                saldo_moedas = user_query.data[0].get("creditos", 0)
+                # 🔍 CORREÇÃO: Puxando do dicionário usando a chave "moedas"
+                saldo_moedas = user_query.data[0].get("moedas", 0)
         except Exception as e:
             st.error(f"Aviso de sincronização: {e}")
 
@@ -352,8 +361,8 @@ def template_planos():
     st.markdown('<h2 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h2>', unsafe_allow_html=True)
     st.caption(f"Status: **{str(status_usuario).upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
     
-    if st.button("← Voltar para o Chat da Lucy", type="secondary"):
-        st.session_state.opcao_menu = "Chat" # Ou o nome correto do seu menu de chat
+    if st.button("← Voltar para o 🔒 Login", type="secondary"):
+        st.session_state.opcao_menu = "🔒 Login"    # Ou o nome correto do seu menu de chat
         st.rerun()
 
     if "id_pagamento_pendente" not in st.session_state:
@@ -434,18 +443,7 @@ def template_planos():
                 st.rerun()
             else:
                 st.sidebar.warning("⚠️ Pagamento ainda não consta como aprovado. Aguarde alguns instantes e tente novamente.")
-
-# ==============================================================================
-# 3. CONTROLE DE FLUXO (CHAMADA DAS TELAS)
-# ==============================================================================
-if st.session_state.opcao_menu == "📝 Cadastro":
-    template_cadastro()
-
-elif st.session_state.opcao_menu == "Plataforma de Planos IA":
-    template_planos()
-              
-
-       
+     
 
 
 
@@ -1924,11 +1922,16 @@ if st.session_state.abrir_reserva_fluxo:
 
 # --- ROTEAMENTO ESTRITO DE TELAS ---
 if st.session_state.usuario_id is None:
-    if st.session_state.opcao_menu == "🔒 Login": template_login()
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.session_state.opcao_menu == "📝 Cadastro": template_cadastro()
+    if st.session_state.opcao_menu == "🔒 Login": 
+        template_login()
+    elif st.session_state.opcao_menu == "📝 Cadastro": 
+        template_cadastro()
 else:
-    # 🔍 REPOSICIONAMENTO CRÍTICO: Só busca e exibe a notificação se o menu NÃO for a Sala Privada
+    # 🟢 USUÁRIO LOGADO: Gerencia as telas internas e notificações
+    if st.session_state.opcao_menu == "Plataforma de Planos IA":
+        template_planos()
+        
+    # 🔍 NOTIFICAÇÕES: Só busca e exibe se o menu NÃO for a Sala Privada
     if st.session_state.opcao_menu != "🤝 Sala Privada":
         try:
             conn_notif = conectar_supabase()
