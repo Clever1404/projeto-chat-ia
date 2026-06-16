@@ -153,129 +153,47 @@ if st.session_state.opcao_menu == "divulgacao":
 # ENCAIXE DAS SUAS FUNÇÕES EXISTENTES DE FLUXO DE CONTA
 # ==============================================================================
 elif st.session_state.opcao_menu == "🔒 Login":
-    st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
-    
-    with st.form("form_login"):
-        user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed")
-        pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed")
+    def template_login():
+        st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
         
-        if st.form_submit_button("Login", type="primary", use_container_width=True):
-            try:
-                conn = conectar_supabase()
-                cursor = conn.cursor()
-                cursor.execute("SELECT id, username, foto_perfil, is_admin, genero FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
-                res = cursor.fetchone()
-                
-                if res:
-                    # Salva os dados na sessão
-                    st.session_state.usuario_id = res[0]
-                    st.session_state.username = res[1]
-                    st.session_state.foto_perfil = res[2]
-                    st.session_state.eh_admin = res[3]
-                    st.session_state.genero = res[4]
+        with st.form("form_login"):
+            user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed")
+            pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed")
+            
+            if st.form_submit_button("Login", type="primary", use_container_width=True):
+                try:
+                    conn = conectar_supabase()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT id, username, foto_perfil, is_admin, genero FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
+                    res = cursor.fetchone()
                     
-                    # Atualiza o status do usuário no banco PostgreSQL
-                    cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (res[0],))
-                    conn.commit()
+                    if res:
+                        # Salva os dados na sessão
+                        st.session_state.usuario_id = res[0]
+                        st.session_state.username = res[1]
+                        st.session_state.foto_perfil = res[2]
+                        st.session_state.eh_admin = res[3]
+                        st.session_state.genero = res[4]
+                        
+                        # Atualiza o status do usuário no banco PostgreSQL
+                        cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (res[0],))
+                        conn.commit()
+                        
+                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                        cursor.close()
+                        conn.close()
+                        st.rerun()
+                    else:
+                        st.error("Usuário ou e-mail não encontrado.")
                     
-                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
                     cursor.close()
                     conn.close()
-                    st.rerun()
-                else:
-                    st.error("Usuário ou e-mail não encontrado.")
-                
-                cursor.close()
-                conn.close()
-            except Exception as e: 
-                st.error(f"Erro: {e}")
-    
-    # Botão de cadastro estilizado
-    with stylable_container(
-        key="green_button",
-        css_styles="""
-            button {
-                background-color: #28a745;
-                color: white;
-                border-radius: 5px;
-            }
-            button:hover {
-                background-color: #218838;
-                color: white;
-            }
-        """,
-    ):
-        if st.button("📝 Cadastre-se", use_container_width=True):
-            st.session_state.opcao_menu = "📝 Cadastro"
-            st.rerun()
-
-    # Rodapé do formulário de login (Voltar e Esqueceu a Senha)
-    col_voltar, col_esqueceu = st.columns(2)
-    with col_voltar:
-        if st.button("⬅️ Voltar para a Home", use_container_width=True):
-            st.session_state.opcao_menu = "divulgacao"
-            st.rerun()
-            
-    with col_esqueceu:
-        # Inicializa o estado para controlar a abertura do modal
-        if "mostrar_recuperar_senha" not in st.session_state:
-            st.session_state.mostrar_recuperar_senha = False
-
-        # DEFINE O DIÁLOGO (Apenas decora a função)
-        @st.dialog("🔑 Recuperar Senha")
-        def modal_recuperar_senha():
-            st.write("Digite o seu e-mail cadastrado e a sua nova senha abaixo.")
-            with st.form("form_recuperacao_senha", clear_on_submit=True):
-                email_digitado = st.text_input("E-mail Cadastrado").strip().lower()
-                nova_senha = st.text_input("Nova Senha", type="password")
-                botao_confirmar = st.form_submit_button("Redefinir Senha", use_container_width=True)
-                
-                if botao_confirmar:
-                    if not email_digitado or not nova_senha:
-                        st.error("Por favor, preencha todos os campos.")
-                        return
-                    try:
-                        conn = conectar_supabase()
-                        cursor = conn.cursor()
-                        cursor.execute('SELECT id FROM usuarios WHERE email = %s', (email_digitado,))
-                        usuario_encontrado = cursor.fetchone()
-
-                        if usuario_encontrado:
-                            senha_criptografada = generate_password_hash(nova_senha)
-                            cursor.execute('UPDATE usuarios SET password_hash = %s WHERE email = %s', (senha_criptografada, email_digitado))
-                            conn.commit()
-                            cursor.close()
-                            conn.close()
-                            
-                            st.success("Senha redefinida com sucesso!")
-                            st.toast("Sucesso! Faça o login agora.")
-                            time.sleep(2.5)
-                            st.session_state.mostrar_recuperar_senha = False
-                            st.rerun() 
-                        else:
-                            cursor.close()
-                            conn.close()
-                            st.error("E-mail não localizado no sistema.")
-                    except Exception as e:
-                        st.error(f"Erro ao acessar o banco de dados: {e}")
-
-        if st.button("🔑 Esqueceu a senha?", use_container_width=True):
-            st.session_state.mostrar_recuperar_senha = True
-
-        if st.session_state.mostrar_recuperar_senha:
-            modal_recuperar_senha()
-
-elif st.session_state.opcao_menu == "📝 Cadastro":
-    st.markdown('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>', unsafe_allow_html=True)
-    
-    with st.form("form_cad"):
-        usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
-        email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed")
-        senha = st.text_input("Senha", placeholder="Escolha uma Senha", type="password", label_visibility="collapsed")
-        genero = st.selectbox("Gênero", options=["M", "F"], index=0, label_visibility="collapsed")
+                except Exception as e: 
+                    st.error(f"Erro: {e}")
         
+        # Botão de cadastro estilizado
         with stylable_container(
-            key="green_button_cad",
+            key="green_button",
             css_styles="""
                 button {
                     background-color: #28a745;
@@ -287,31 +205,115 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
                     color: white;
                 }
             """,
-        ):         
-            if st.form_submit_button("Cadastrar", use_container_width=True):
-                try:
-                    conn = conectar_supabase()
-                    cursor = conn.cursor()
+        ):
+            if st.button("📝 Cadastre-se", use_container_width=True):
+                st.session_state.opcao_menu = "📝 Cadastro"
+                st.rerun()
+
+        # Rodapé do formulário de login (Voltar e Esqueceu a Senha)
+        col_voltar, col_esqueceu = st.columns(2)
+        with col_voltar:
+            if st.button("⬅️ Voltar para a Home", use_container_width=True):
+                st.session_state.opcao_menu = "divulgacao"
+                st.rerun()
+                
+        with col_esqueceu:
+            # Inicializa o estado para controlar a abertura do modal
+            if "mostrar_recuperar_senha" not in st.session_state:
+                st.session_state.mostrar_recuperar_senha = False
+
+            # DEFINE O DIÁLOGO (Apenas decora a função)
+            @st.dialog("🔑 Recuperar Senha")
+            def modal_recuperar_senha():
+                st.write("Digite o seu e-mail cadastrado e a sua nova senha abaixo.")
+                with st.form("form_recuperacao_senha", clear_on_submit=True):
+                    email_digitado = st.text_input("E-mail Cadastrado").strip().lower()
+                    nova_senha = st.text_input("Nova Senha", type="password")
+                    botao_confirmar = st.form_submit_button("Redefinir Senha", use_container_width=True)
                     
-                    # Criptografa a senha no cadastro também se estiver usando generate_password_hash no login
-                    senha_final = generate_password_hash(senha) if 'generate_password_hash' in locals() else senha
-                    
-                    cursor.execute(
-                        "INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", 
-                        (usuario, email, senha_final, genero)
-                    )
-                    st.session_state.usuario_id = cursor.fetchone()[0]
-                    st.session_state.username = usuario
-                    st.session_state.genero = genero
-                    
-                    conn.commit()
-                    cursor.close()
-                    conn.close()
-                    
-                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro ao cadastrar: {e}")
+                    if botao_confirmar:
+                        if not email_digitado or not nova_senha:
+                            st.error("Por favor, preencha todos os campos.")
+                            return
+                        try:
+                            conn = conectar_supabase()
+                            cursor = conn.cursor()
+                            cursor.execute('SELECT id FROM usuarios WHERE email = %s', (email_digitado,))
+                            usuario_encontrado = cursor.fetchone()
+
+                            if usuario_encontrado:
+                                senha_criptografada = generate_password_hash(nova_senha)
+                                cursor.execute('UPDATE usuarios SET password_hash = %s WHERE email = %s', (senha_criptografada, email_digitado))
+                                conn.commit()
+                                cursor.close()
+                                conn.close()
+                                
+                                st.success("Senha redefinida com sucesso!")
+                                st.toast("Sucesso! Faça o login agora.")
+                                time.sleep(2.5)
+                                st.session_state.mostrar_recuperar_senha = False
+                                st.rerun() 
+                            else:
+                                cursor.close()
+                                conn.close()
+                                st.error("E-mail não localizado no sistema.")
+                        except Exception as e:
+                            st.error(f"Erro ao acessar o banco de dados: {e}")
+
+            if st.button("🔑 Esqueceu a senha?", use_container_width=True):
+                st.session_state.mostrar_recuperar_senha = True
+
+            if st.session_state.mostrar_recuperar_senha:
+                modal_recuperar_senha()
+
+elif st.session_state.opcao_menu == "📝 Cadastro":
+    def template_cadastro():
+        st.markdown('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>', unsafe_allow_html=True)
+        
+        with st.form("form_cad"):
+            usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
+            email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed")
+            senha = st.text_input("Senha", placeholder="Escolha uma Senha", type="password", label_visibility="collapsed")
+            genero = st.selectbox("Gênero", options=["M", "F"], index=0, label_visibility="collapsed")
+            
+            with stylable_container(
+                key="green_button_cad",
+                css_styles="""
+                    button {
+                        background-color: #28a745;
+                        color: white;
+                        border-radius: 5px;
+                    }
+                    button:hover {
+                        background-color: #218838;
+                        color: white;
+                    }
+                """,
+            ):         
+                if st.form_submit_button("Cadastrar", use_container_width=True):
+                    try:
+                        conn = conectar_supabase()
+                        cursor = conn.cursor()
+                        
+                        # Criptografa a senha no cadastro também se estiver usando generate_password_hash no login
+                        senha_final = generate_password_hash(senha) if 'generate_password_hash' in locals() else senha
+                        
+                        cursor.execute(
+                            "INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", 
+                            (usuario, email, senha_final, genero)
+                        )
+                        st.session_state.usuario_id = cursor.fetchone()[0]
+                        st.session_state.username = usuario
+                        st.session_state.genero = genero
+                        
+                        conn.commit()
+                        cursor.close()
+                        conn.close()
+                        
+                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao cadastrar: {e}")
 
 
 # --- ADICIONE ESTAS DUAS LINHAS LOGO ANTES DO SEU IF DE CRÉDITOS ---
