@@ -1595,33 +1595,34 @@ def template_gerenciar_conexoes_completo():
         except Exception as e: st.error(f"Erro: {e}")     
 
 def template_planos():
-    # --- SEU CÓDIGO DA LINHA 330 EM DIANTE ---
-    st.title("Plataforma de Planos IA")                                    
-    st.caption(f"Status: **{str(status_usuario).upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+    # --- SEU CÓDIGO DA LINHA 330 EM DIANTE ---                                  
+    with aba_f:
+        st.title("Plataforma de Planos IA")
+        st.caption(f"Status: **{str(status_usuario).upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
 
 
-    # --- VARIÁVEIS DE CONTROLE DE PAGAMENTO EM ANDAMENTO ---
-    if "id_pagamento_pendente" not in st.session_state:
-        st.session_state.id_pagamento_pendente = None
-    if "tipo_pagamento_pendente" not in st.session_state:
-        st.session_state.tipo_pagamento_pendente = None
+        # --- VARIÁVEIS DE CONTROLE DE PAGAMENTO EM ANDAMENTO ---
+        if "id_pagamento_pendente" not in st.session_state:
+            st.session_state.id_pagamento_pendente = None
+        if "tipo_pagamento_pendente" not in st.session_state:
+            st.session_state.tipo_pagamento_pendente = None
 
-    # --- ADICIONE ESTAS DUAS LINHAS LOGO ANTES DO SEU IF DE CRÉDITOS ---
-    status_usuario = "status"
-    saldo_moedas = "creditos"
+        # --- ADICIONE ESTAS DUAS LINHAS LOGO ANTES DO SEU IF DE CRÉDITOS ---
+        status_usuario = "status"
+        saldo_moedas = "creditos"
 
-    # (Abaixo fica o seu código atual que busca do Supabase)
-    id_usuario_atual = st.session_state.get("usuario_id", None)
+        # (Abaixo fica o seu código atual que busca do Supabase)
+        id_usuario_atual = st.session_state.get("usuario_id", None)
 
-    if id_usuario_atual:
-        try:
-            user_query = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).execute()
-            # Correção exata: acessando o índice [0] antes do .get()
-            if user_query.data and len(user_query.data) > 0:
-                status_usuario = user_query.data[0].get("status", "🟢 Online")
-                saldo_moedas = user_query.data[0].get("creditos", 0)
-        except Exception as e:
-            st.error(f"Aviso de sincronização: {e}")
+        if id_usuario_atual:
+            try:
+                user_query = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).execute()
+                # Correção exata: acessando o índice [0] antes do .get()
+                if user_query.data and len(user_query.data) > 0:
+                    status_usuario = user_query.data[0].get("status", "🟢 Online")
+                    saldo_moedas = user_query.data[0].get("creditos", 0)
+            except Exception as e:
+                st.error(f"Aviso de sincronização: {e}")
 
 
 # ==============================================================================
