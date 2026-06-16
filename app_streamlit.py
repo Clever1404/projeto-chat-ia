@@ -34,10 +34,12 @@ if not OPENAI_API_KEY or "sua_chave" in OPENAI_API_KEY:
 # 2. Inicializa o cliente da OpenAI de forma global
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# 1. Busca as chaves de acesso com segurança
-# Busca direto dos Secrets do Streamlit (funciona local e na nuvem)
-SUPABASE_URL = st.secrets.get("SUPABASE_URL")
-SUPABASE_KEY = st.secrets.get("SUPABASE_KEY")
+# Busca os dados injetados pelo painel do Streamlit Cloud
+url: str = st.secrets["SUPABASE_URL"]
+key: str = st.secrets["SUPABASE_KEY"]
+
+# Inicializa o cliente do Supabase
+supabase: Client = create_client(url, key)
 
 # 2. Inicializa a variável antes para evitar o NameError
 supabase = None
