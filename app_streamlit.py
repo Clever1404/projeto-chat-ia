@@ -1415,10 +1415,7 @@ def renderizar_listas_sidebar_e_acoes():
 
         if st.session_state.eh_admin or st.session_state.username in ['admin', 'Clever1404']:
             if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True):
-                st.session_state.opcao_menu = "🛠️ Painel Admin"; st.rerun()
-        
-        if st.button("🪙PLATAFORMA PLANOS", type="secondary", use_container_width=True): 
-            st.session_state.opcao_menu = "planos"; st.rerun()         
+                st.session_state.opcao_menu = "🛠️ Painel Admin"; st.rerun()     
 
         if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True):
             try:
