@@ -362,23 +362,9 @@ def template_cadastro():
            
 
 def template_planos():
-    status_usuario = "🟢 Online"
-    saldo_moedas = 0
-    tipo_plano = "Grátis"
     
-    id_usuario_atual = st.session_state.get("usuario_id", None)
-    if id_usuario_atual:
-        try:
-            user_query = supabase.table("usuarios").select("status", "moedas", "tipo_plano").eq("id", id_usuario_atual).execute()
-            if user_query.data and len(user_query.data) > 0:
-                status_usuario = user_query.data[0].get("status", "🟢 Online")
-                saldo_moedas = user_query.data[0].get("moedas", 0)
-                tipo_plano = user_query.data[0].get("tipo_plano", "Grátis")
-        except Exception as e:
-            st.error(f"Aviso de sincronização: {e}")
-
     st.markdown('<h1 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
-    st.caption(f"Status: **{str(status_usuario).upper()}** | Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+    
     
     # --- TEXTO DESCRITIVO DOS PLANOS CENTRALIZADO ---
     st.html(
@@ -759,6 +745,7 @@ def template_chat_ia_completo():
         st.markdown("<h2 style='margin-top:0; margin-bottom:2px; font-size: 24px;'>🤖 Olá, Seja bem-vindo ao Lucy Chat IA</h2>", unsafe_allow_html=True) 
         st.caption("Lucy conversa com você e armazena os seus interesses para encontrar matches.") 
         
+    
     with col_botoes_topo:
         c_refresh, c_fc = st.columns(2)
         with c_refresh:
@@ -1001,7 +988,6 @@ def template_chat_ia_completo():
                     pass
                 st.error(f"Erro na IA principal: {e}")
             
-
 
 
 # ==============================================================================
@@ -1472,6 +1458,9 @@ def renderizar_listas_sidebar_e_acoes():
             </div>
         """, unsafe_allow_html=True)
 
+        st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+
+
         st.caption("📷 Enviar nova foto de perfil:")
         f_nova = st.file_uploader("Alterar Foto", type=["png","jpg","jpeg"], key="side_f_up", label_visibility="collapsed") 
         if f_nova: 
@@ -1483,7 +1472,8 @@ def renderizar_listas_sidebar_e_acoes():
             conn.commit(); cursor.close(); conn.close() 
             st.session_state.foto_perfil = f"/{c_completo}"; st.rerun() 
 
-        st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)    
+
 
         # 🔍 MOTOR DE BUSCA DA NOTIFICAÇÃO DA BARRA LATERAL (BOLINHA VERMELHA)
         possui_convite_pendente = False
