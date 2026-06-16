@@ -46,8 +46,8 @@ supabase = None
 
 if url and key:
     try:
-        # Cria o cliente se as chaves existirem
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        # ✅ CORRETO: Passa as variáveis em minúsculo que guardam os valores
+        supabase = create_client(url, key)
     except Exception as e:
         st.error(f"Erro ao conectar com o Supabase: {e}")
 else:
@@ -55,9 +55,9 @@ else:
     st.warning("⚠️ Atenção: As credenciais do Supabase não estão configuradas nas configurações (Secrets).")
 
 # Garante que o app não vai rodar as consultas ao banco se o cliente não existir
-if not supabase:
+if 'supabase' not in locals() or not supabase:
     st.info("Por favor, configure as chaves SUPABASE_URL e SUPABASE_KEY para liberar o banco de dados.")
-    st.stop()  # Para o código aqui com segurança, impedindo o NameError mais abaixo
+    st.stop()  # Para o código aqui com segurança
     
 
 # 1. Busca o token nos Segredos do Streamlit ou nas variáveis de ambiente locais
