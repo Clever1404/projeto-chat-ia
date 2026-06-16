@@ -1288,6 +1288,9 @@ def renderizar_listas_sidebar_e_acoes():
         if st.session_state.eh_admin or st.session_state.username in ['admin', 'Clever1404']:
             if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True):
                 st.session_state.opcao_menu = "🛠️ Painel Admin"; st.rerun()
+        
+        if st.button("🪙PLATAFORMA PLANOS", type="secondary", use_container_width=True): 
+            st.session_state.opcao_menu = "📅planosponibilidade"; st.rerun()         
 
         if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True):
             try:
@@ -1516,11 +1519,9 @@ def template_gerenciar_conexoes_completo():
 
 def template_planos():
     # --- SEU CÓDIGO DA LINHA 330 EM DIANTE ---                                  
-    with aba_f:
         st.title("Plataforma de Planos IA")
-        st.button("Plataforma de Planos IA", type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel")
         st.caption(f"Status: **{str(status_usuario).upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
-
+        st.button("← Voltar para o Chat da Lucy", type="secondary"):
 
         # --- VARIÁVEIS DE CONTROLE DE PAGAMENTO EM ANDAMENTO ---
         if "id_pagamento_pendente" not in st.session_state:
@@ -1544,13 +1545,13 @@ def template_planos():
                     saldo_moedas = user_query.data[0].get("creditos", 0)
             except Exception as e:
                 st.error(f"Aviso de sincronização: {e}")
-
+              
 
         # =========================================================================
         # SEÇÃO DE COMPRAS (MERCADO PAGO)
         # =========================================================================
         st.sidebar.header("🛒 Loja do App")
-
+        st.button("← Voltar para o Chat da Lucy", type="secondary"):
         opcoes_compra = st.sidebar.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
 
         if st.sidebar.button("Gerar Pix de Pagamento"):
@@ -1627,6 +1628,8 @@ def template_planos():
                             st.sidebar.warning("⚠️ Pagamento ainda não consta como aprovado. Aguarde alguns instantes e tente novamente.")
                     except Exception as e:
                         st.sidebar.error(f"Erro ao verificar pagamento: {e}")
+
+
 
 # ==============================================================================
 # 9. CORREÇÃO DO PAINEL ADMIN (REATIVAÇÃO DO PARETO E COLUNAS IDADE/GENERO/EMAIL)
