@@ -315,10 +315,16 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
 id_usuario_atual = st.session_state.get("username", "id")
 
 # Busca dados em tempo real do Supabase
-# Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
-user_db = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).single().execute()
-status_usuario = user_db.data["status"] if user_db.data else "gratis"
-saldo_moedas = user_db.data["creditos"] if user_db.data else 0
+# 319: Busca os dados como uma lista comum (sem o .single())
+user_query = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).execute()
+
+# 320 e 321: Trata os dados com segurança caso a lista venha vazia
+if user_query.data and len(user_query.data) > 0:
+    status_usuario = user_query.data[0]["status"]
+    saldo_moedas = user_query.data[0]["creditos"]
+else:
+    status_usuario = "gratis"
+    saldo_moedas = 0
 
 st.title("Plataforma de Planos IA")
 st.caption(f"Status: **{status_usuario.upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
