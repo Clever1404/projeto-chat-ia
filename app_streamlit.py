@@ -340,26 +340,45 @@ def template_cadastro():
                     st.error(f"Erro ao cadastrar: {e}")
 
 def template_planos():
-    # Inicializa variáveis padrão de fallback
     status_usuario = "🟢 Online"
     saldo_moedas = 0
+    tipo_plano = "Grátis"
     
-    # Busca dados em tempo real do Supabase se o usuário estiver logado
     id_usuario_atual = st.session_state.get("usuario_id", None)
     if id_usuario_atual:
         try:
-            # 🔍 CORREÇÃO: Trocado "creditos" por "moedas" na consulta
-            user_query = supabase.table("usuarios").select("status", "moedas").eq("id", id_usuario_atual).execute()
+            user_query = supabase.table("usuarios").select("status", "moedas", "tipo_plano").eq("id", id_usuario_atual).execute()
             if user_query.data and len(user_query.data) > 0:
                 status_usuario = user_query.data[0].get("status", "🟢 Online")
-                # 🔍 CORREÇÃO: Puxando do dicionário usando a chave "moedas"
                 saldo_moedas = user_query.data[0].get("moedas", 0)
+                tipo_plano = user_query.data[0].get("tipo_plano", "Grátis")
         except Exception as e:
             st.error(f"Aviso de sincronização: {e}")
 
-    # Interface visual do template de planos
-    st.markdown('<h2 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h2>', unsafe_allow_html=True)
-    st.caption(f"Status: **{str(status_usuario).upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+    st.markdown('<h1 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
+    st.caption(f"Status: **{str(status_usuario).upper()}** | Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+    
+    # --- TEXTO DESCRITIVO DOS PLANOS CENTRALIZADO ---
+    st.markdown("""
+    <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
+        <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
+        
+        <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
+            <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+            <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
+        </div>
+        
+        <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
+            <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+            <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
+        </div>
+        
+        <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+            <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+            <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     if st.button("← Voltar para o 🔒 Login", type="secondary"):
         st.session_state.opcao_menu = "🔒 Login"    # Ou o nome correto do seu menu de chat
@@ -961,47 +980,80 @@ def template_chat_ia_completo():
 
 
 # ==============================================================================
-# 3. DIALOGS RECALIBRADOS (CORREÇÃO DA JANELA MATCH INTELIGENTE TRIPLA)
+# 3. DIALOGS RECALIBRADOS (INTEGRAÇÃO DE PLANOS IA, CRÉDITOS E AGENDAMENTOS)
 # ==============================================================================
+
 @st.dialog("🤖 Lucy Notou Afinidade!")
 def modal_match_lucy(dados_m):
+    # 🔍 SINCRONIZAÇÃO DE PERMISSÕES DO USUÁRIO EM TEMPO REAL
+    id_usuario = st.session_state.get("usuario_id", None)
+    saldo_moedas = 0
+    tipo_plano = "Grátis"
+    
+    if id_usuario:
+        try:
+            # Garante dados frescos do banco de dados
+            user_query = supabase.table("usuarios").select("moedas", "tipo_plano").eq("id", id_usuario).execute()
+            if user_query.data and len(user_query.data) > 0:
+                saldo_moedas = user_query.data[0].get("moedas", 0)
+                tipo_plano = user_query.data[0].get("tipo_plano", "Grátis")
+        except Exception:
+            pass
+
     st.markdown(f"Lucy identificou uma excelente afinidade entre você e **{dados_m['nome']}**!")
     
-   # 🟢 COMPORTAMENTO SE O PAR ESTIVER ONLINE: Libera o chat imediato
+    # 🟢 COMPORTAMENTO SE O PAR ESTIVER ONLINE: Controle de acesso à Sala Privada
     if dados_m["online"]:
-        if st.button(f"🟢 {dados_m['nome']} está online. Gostaria de conversar agora!", type="primary", width="stretch"):
-            if saldo_moedas >= 2:
-                if st.button("🪙 Entrar na Sala Privada (Gasta 2 moedas)"):
-                    supabase.table("usuarios").update({"creditos": saldo_moedas - 2}).eq("id", id_usuario).execute()
-                    st.success("Moedas debitadas! Sala privada liberada. Pode conversar!")
-                    st.session_state.match_id_atual = dados_m["match_id"]
-                    st.session_state.opcao_menu = "🤝 Sala Privada"
-                    st.rerun()
-            else:
-                st.warning("🔒 Saldo insuficiente para abrir uma sala privada.")
-                       
-            
-    # ⚪ COMPORTAMENTO SE O PAR ESTIVER OFFLINE: Mostra bloqueado e ativa o botão de agendamento
-    else:
-        st.button(f"⚪ {dados_m['nome']} está offline. Indisponível.", disabled=True, width="stretch")
+        st.markdown(f"🟢 **{dados_m['nome']} está online agora!**")
         
-        # O botão azul agora herda os IDs e aciona de forma atômica o modal de agendamentos no próximo ciclo
-        if st.button("📅 Agende um encontro virtual", type="secondary", width="stretch"):
-            if status_usuario == "vip":
+        # Validação baseada no Plano do Usuário
+        if tipo_plano == "Assinante":
+            if st.button("🚀 Entrar na Sala Privada (Acesso Total Ilimitado)", type="primary", use_container_width=True):
+                st.session_state.match_id_atual = dados_m["match_id"]
+                st.session_state.tempo_limite_sala = -1  # Tempo indeterminado
+                st.session_state.opcao_menu = "🤝 Sala Privada"
+                st.rerun()
+                
+        elif tipo_plano == "Crédito":
+            st.info(f"🪙 Seu Saldo: **{saldo_moedas} moedas**. Custo da Sala Privada: 10 moedas = 10 minutos.")
+            if st.button("🪙 Entrar na Sala Privada (Gasta 10 moedas)", type="primary", use_container_width=True):
+                if saldo_moedas >= 10:
+                    try:
+                        # Deduz as primeiras 10 moedas correspondentes aos primeiros 10 minutos regulamentares
+                        supabase.table("usuarios").update({"moedas": saldo_moedas - 10}).eq("id", id_usuario).execute()
+                        st.success("Moedas debitadas! Sala privada liberada por 10 minutos iniciais.")
+                        
+                        st.session_state.match_id_atual = dados_m["match_id"]
+                        st.session_state.tempo_limite_sala = 10  # Temporizador dinâmico
+                        st.session_state.opcao_menu = "🤝 Sala Privada"
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Falha na transação: {e}")
+                else:
+                    st.warning("🔒 Saldo insuficiente. Você precisa de pelo menos 10 moedas.")
+                    
+        else:
+            # Bloqueio estrito para Plano Grátis
+            st.error("🔒 O acesso a salas privadas é exclusivo para clientes com plano de Crédito ou Assinantes.")
+                       
+    # ⚪ COMPORTAMENTO SE O PAR ESTIVER OFFLINE: Controle de Agendamento Eletrônico
+    else:
+        st.button(f"⚪ {dados_m['nome']} está offline. Indisponível para chat instantâneo.", disabled=True, use_container_width=True)
+        
+        if st.button("📅 Agende um encontro virtual", type="secondary", use_container_width=True):
+            if tipo_plano in ["Assinante", "Crédito"]:
                 st.session_state.abrir_reserva_fluxo = {
                     "id_par": dados_m["id_par"], 
                     "nome_par": dados_m["nome"], 
                     "m_id": dados_m["match_id"]
                 }
                 st.rerun()
-            
             else:
-                # Bloqueio para usuários grátis
-                st.warning("🔒 O agendamento de encontros virtuais é exclusivo para Assinantes VIP.")
-              
+                # Bloqueio estrito para Usuários com Plano Grátis
+                st.warning("🔒 O agendamento de encontros virtuais não está disponível no Plano Grátis. Faça um upgrade!")
 
-    # ❌ Opção comum de rejeição em qualquer cenário
-    if st.button("❌ Não tenho interesse", type="primary", width="stretch"):
+    # ❌ Cancelamento e fechamento
+    if st.button("❌ Não tenho interesse", type="secondary", use_container_width=True):
         st.rerun()
 
 
@@ -1021,7 +1073,6 @@ def modal_agendamento_encontro(dados_r):
     ]
     per_exibicao = st.selectbox("Escolha o Período:", opcoes_periodo, key="dg_res_per")
     
-    # Mapeamento limpo para os IDs do banco
     if "Manhã" in per_exibicao:
         per_s = "manha"
         horario_sugestao = datetime.strptime("09:00", "%H:%M").time()
@@ -1037,7 +1088,6 @@ def modal_agendamento_encontro(dados_r):
     if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True):
         hora_int = hor_s.hour
         
-        # Função para limpar IDs de tuplas aninhadas de forma absoluta
         def limpar_id_absoluto(id_bruto):
             while isinstance(id_bruto, (tuple, list)):
                 if len(id_bruto) > 0: id_bruto = id_bruto[0]
@@ -1045,12 +1095,11 @@ def modal_agendamento_encontro(dados_r):
             try: return int(id_bruto)
             except (TypeError, ValueError): return 0
 
-        # Limpeza cirúrgica das chaves
         m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
         meu_id_limpo = limpar_id_absoluto(st.session_state.usuario_id)
         parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
 
-        # --- 2. TRAVA DE DISPONIBILIDADE DIRETA NO POSTGRESQL (CRUZAMENTO SEGURO) ---
+        # --- 2. TRAVA DE DISPONIBILIDADE DIRETA NO POSTGRESQL ---
         meu_registro_existe = False
         parceiro_registro_existe = False
         parceiro_tem_algum_horario = False
@@ -1059,44 +1108,32 @@ def modal_agendamento_encontro(dados_r):
             conn_check = conectar_supabase()
             cursor_check = conn_check.cursor()
             
-            # Verifica se você possui o horário na grade
             cursor_check.execute("""
                 SELECT COUNT(*) FROM disponibilidade_usuarios 
                 WHERE usuario_id = %s 
                   AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
                   AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
             """, (meu_id_limpo, str(dia_s), str(per_s)))
-            meu_count = cursor_check.fetchone()[0]
-            meu_registro_existe = (meu_count > 0)
+            meu_registro_existe = (cursor_check.fetchone()[0] > 0)
             
-            # Verifica se o parceiro possui ALGUNS horários cadastrados no banco (para saber se a grade dele está vazia)
             cursor_check.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
-            total_parceiro = cursor_check.fetchone()[0]
-            parceiro_tem_algum_horario = (total_parceiro > 0)
+            parceiro_tem_algum_horario = (cursor_check.fetchone()[0] > 0)
             
-            # Verifica se o parceiro possui ESTE horário específico na grade
             cursor_check.execute("""
                 SELECT COUNT(*) FROM disponibilidade_usuarios 
                 WHERE usuario_id = %s 
                   AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
                   AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
             """, (parceiro_id_limpo, str(dia_s), str(per_s)))
-            parceiro_count = cursor_check.fetchone()[0]
-            parceiro_registro_existe = (parceiro_count > 0)
+            parceiro_registro_existe = (cursor_check.fetchone()[0] > 0)
             
             cursor_check.close()
             conn_check.close()
             
-            # Painel de depuração limpo
-            with st.expander("🔍 Depurador de Agenda (Debug)"):
-                st.write(f"**Seu ID ({st.session_state.username}):** {meu_id_limpo} | Possui este horário? `{'Sim' if meu_registro_existe else 'Não'}`")
-                st.write(f"**ID do Par ({dados_r['nome_par']}):** {parceiro_id_limpo} | Possui este horário? `{'Sim' if parceiro_registro_existe else 'Não'}`")
-                st.write(f"**O parceiro já preencheu a grade alguma vez?** `{'Sim' if parceiro_tem_algum_horario else 'Não'}`")
-            
         except Exception as e:
-            st.error(f"Erro ao consultar o banco de dados: {e}")
+            st.error(f"Erro ao consultar disponibilidade: {e}")
 
-        # --- 3. EXECUÇÃO DAS TRAVAS DE HORÁRIO ---
+        # --- 3. EXECUÇÃO DAS TRAVAS E PERSISTÊNCIA COMPLETA ---
         if per_s == 'manha' and (hora_int < 6 or hora_int >= 12):
             st.error("❌ Horário inválido! Para o período da manhã, ajuste entre **06:00 e 11:59**.")
         elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18):
@@ -1104,33 +1141,33 @@ def modal_agendamento_encontro(dados_r):
         elif per_s == 'noite' and (hora_int < 18 or hora_int > 23):
             st.error("❌ Horário inválido! Para o período da noite, ajuste entre **18:00 e 23:59**.")
             
-        # Alerta de recusa: Se você não marcou o dia na sua própria grade
         elif not meu_registro_existe:
-            st.error(f"❌ **Agendamento Recusado:** Você ({st.session_state.username}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar.")
+            st.error(f"❌ **Agendamento Recusado:** Você ({st.session_state.username}) configurou este dia/período como indisponível.")
             
-        # Alerta de recusa: Se o parceiro tem horários configurados mas não marcou este dia específico
-        elif parceiro_tem_algum_horario and not parceiro_registro_existe:
+        elif os_tem_horarios := (parceiro_tem_algum_horario and not parceiro_registro_existe):
             st.error(f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado.")
             
-        # Se passar em todas as validações, realiza o agendamento pendente
         else:
             try:
+                # Gravação atômica da agenda finalizada com sucesso no banco de dados relacional
                 conn = conectar_supabase()
                 cursor = conn.cursor()
                 cursor.execute('''
-                    INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
-                    VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
-                ''', (m_id_limpo, meu_id_limpo, parceiro_id_limpo, dia_s, per_s, hor_s))
+                    INSERT INTO agendamentos_virtuais (
+                        match_id, remetente_id, destinatario_id, dia_semana, periodo, horario_exato, status_convite
+                    ) VALUES (%s, %s, %s, %s, %s, %s, 'aceito');
+                ''', (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), str(hor_s)))
+                
                 conn.commit()
                 cursor.close()
                 conn.close()
                 
-                st.success("🎉 Convite de encontro enviado com sucesso!")
+                st.success(f"🎉 Encontro agendado com sucesso para {dia_s} às {hor_s}!")
                 st.session_state.abrir_reserva_fluxo = None
                 st.rerun()
             except Exception as e:
-                st.error(f"❌ Erro ao gravar agendamento: {e}")
-
+                st.error(f"Erro ao salvar agendamento no banco: {e}")
+                
 
 # ==============================================================================
 # 8. REESTRUTURAÇÃO DA SALA PRIVADA (LAYOUT FIXO, FOTO REAL E LIMPAR HISTÓRICO)
@@ -1276,12 +1313,73 @@ def template_sala_privada():
                     cursor.close()
                     conn.close()
                     
+                    # ==============================================================================
+                    # GERENCIAMENTO DE TEMPO EM TEMPO REAL (SALA PRIVADA)
+                    # ==============================================================================
+                    # Inicializa o marcador de tempo se ele não existir na sessão
+                    if "tempo_inicio_sala" not in st.session_state:
+                        import time
+                        st.session_state.tempo_inicio_sala = time.time()
+
+                    # Busca o plano do usuário atualizado para aplicar as regras
+                    tipo_plano_sala = "Grátis"
+                    saldo_moedas_sala = 0
+                    try:
+                        user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(my_id)).execute()
+                        if user_data.data and len(user_data.data) > 0:
+                            tipo_plano_sala = user_data.data[0].get("tipo_plano", "Grátis")
+                            saldo_moedas_sala = user_data.data[0].get("moedas", 0)
+                    except Exception:
+                        pass
+
+                    # Lógica de controle do Timer para usuários do plano de Crédito
+                    if tipo_plano_sala == "Crédito":
+                        import time
+                        tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
+                        
+                        # Limite inicial de 10 minutos (600 segundos)
+                        tempo_limite_segundos = 600 
+                        tempo_restante = tempo_limite_segundos - tempo_decorrido
+
+                        if tempo_restante > 0:
+                            minutos_r = int(tempo_restante // 60)
+                            segundos_r = int(tempo_restante % 60)
+                            # Exibe um contador visual no topo do chat privado
+                            st.warning(f"⏳ **Tempo Restante nesta sessão:** {minutos_r:02d}:{segundos_r:02d} | Saldo Atual: 🪙 {saldo_moedas_sala} moedas")
+                            
+                            # Executa um auto-refresh a cada 5 segundos para atualizar o cronômetro sem travar o input de texto
+                            st.fragment(lambda: time.sleep(5) or st.rerun())()
+                        else:
+                            # O tempo acabou! Tenta renovar debitando mais 10 moedas por +10 minutos
+                            if saldo_moedas_sala >= 10:
+                                try:
+                                    supabase.table("usuarios").update({"moedas": saldo_moedas_sala - 10}).eq("id", int(my_id)).execute()
+                                    st.session_state.tempo_inicio_sala = time.time() # Reseta o cronômetro para mais 10 minutos
+                                    st.toast("🪙 Mais 10 minutos adicionados! 10 moedas foram debitadas do seu saldo.", icon="🪙")
+                                    st.rerun()
+                                except Exception:
+                                    st.error("Erro ao renovar tempo. Encerrando sala...")
+                                    st.session_state.opcao_menu = "Plataforma de Planos IA"
+                                    st.rerun()
+                            else:
+                                # Se não houver saldo suficiente, expulsa da sala imediatamente
+                                st.error("🔒 Seus 10 minutos acabaram e você não tem moedas suficientes para renovar.")
+                                time.sleep(3)
+                                st.session_state.opcao_menu = "Plataforma de Planos IA"
+                                st.rerun()
+                                
+                    elif tipo_plano_sala == "Assinante":
+                        st.success(f"⭐ **Plano Assinante Ativo:** Você possui acesso ilimitado por tempo indeterminado nesta sala.")
+
+                    # ==============================================================================
+                    # RENDERIZAÇÃO E HISTÓRICO DE MENSAGENS (SEU CÓDIGO ORIGINAL)
+                    # ==============================================================================
                     for r_id, txt, dt in rows:
                         # Tratamento seguro contra valores None/Nulos na data
                         if dt is not None:
                             hora_f = dt.strftime("%H:%M")
                         else:
-                            hora_f = "--:--"  # Fallback caso a data antiga esteja nula [1]
+                            hora_f = "--:--"  # Fallback caso a data antiga esteja nula
                         
                         if int(r_id) == int(my_id):
                             with st.chat_message("user"):
@@ -1293,13 +1391,12 @@ def template_sala_privada():
                                 st.caption(f"{nome_exibicao} — {hora_f}")
                 except Exception as e:
                     st.error(f"Erro ao ler banco: {e}")
-            
+
             if st.session_state.opcao_menu == "🤝 Sala Privada":
                 if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
                     if txt_in.strip():
                         try:
                             conn = conectar_supabase()
-                            # Garante que o banco salve as alterações imediatamente
                             conn.autocommit = True 
                             cursor = conn.cursor()
                             
@@ -1308,23 +1405,19 @@ def template_sala_privada():
                                 (int(m_id), int(my_id), txt_in.strip())
                             )
                             
-                            # Dupla confirmação de gravação
                             conn.commit() 
                             cursor.close()
                             conn.close()
                             
-                            # Atualiza o fragmento para mostrar a nova mensagem
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao enviar: {e}")
 
+            # --- EXECUÇÃO DO MOTOR DE CHAT DE FORMA LIMPA ---
+            live_sala_id = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id)
+            meu_id_sala = st.session_state.usuario_id[0] if isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
-            
-        live_sala_id = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id)
-        meu_id_sala = st.session_state.usuario_id[0] if isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
-        
-        # Passa a string limpa do nome obtida no banco para dentro do fragmento
-        live_chat_privado_engine(live_sala_id, meu_id_sala, parceiro_nome)
+            live_chat_privado_engine(live_sala_id, meu_id_sala, parceiro_nome)
 
 
 
