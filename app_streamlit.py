@@ -60,15 +60,14 @@ if 'supabase' not in locals() or not supabase:
     st.stop()  # Para o código aqui com segurança
     
 
-# 1. Busca o token nos Segredos do Streamlit ou nas variáveis de ambiente locais
-TOKEN_MERCADO_PAGO = st.secrets.get["TOKEN_MERCADO_PAGO"]
-
+# 1. CORRETO: Usa parênteses para a função .get() e vírgula se quiser um valor padrão
+TOKEN_MERCADO_PAGO = st.secrets.get("TOKEN_MERCADO_PAGO", None)
 
 # 2. Inicializa o SDK usando a variável correta
 if TOKEN_MERCADO_PAGO:
     sdk = mercadopago.SDK(TOKEN_MERCADO_PAGO)
 else:
-    st.error("Erro: TOKEN_MERCADO_PAGO não foi configurado.")
+    st.error("Erro: TOKEN_MERCADO_PAGO não foi configurado nos Secrets.")
 
 
 # 2. Função de conexão com o Supabase corrigida com SSL seguro
