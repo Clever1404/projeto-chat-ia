@@ -405,7 +405,7 @@ def template_planos():
         
     )
     
-    if st.button("← Voltar para o 🔒 Login", type="secondary"):
+    if st.button("← Voltar para o 🔒 Login", type="secondary", use_container_width=True):
         st.session_state.opcao_menu = "🔒 Login"  # o nome correto do seu menu de chat
        
 
