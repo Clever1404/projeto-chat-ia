@@ -1808,7 +1808,7 @@ def template_painel_admin():
         ativos_now = len(df_usuarios_mod[df_usuarios_mod["Status Presença"].str.contains("Online", na=False)])
         st.metric("Usuários Online Agora", ativos_now)
     with c_k3:
-        # NOVO: Contador de salas humanas ativas online requisitado
+        # Contador de salas humanas ativas online requisitado
         st.metric("Salas Virtuais Ativas (Hoje)", total_salas_ativas, help="Total de salas de encontros confirmados abertas para transmissão hoje")
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -1875,7 +1875,7 @@ def template_painel_admin():
 
         st.markdown("<hr style='border-color: #21262d; margin: 25px 0;'>", unsafe_allow_html=True)
         
-        # --- 3. RETORNO DOS OUTROS DOIS GRÁFICOS COMPLEMENTARES DE DISTRIBUIÇÃO (CORRIGIDO) ---
+        # --- 3. RETORNO DOS OUTROS DOIS GRÁFICOS COMPLEMENTARES DE DISTRIBUIÇÃO ---
         st.markdown("### 🗺️ Análise Demográfica e Procura por Orientação")
         st.caption("Mapeamento visual da base de usuários cadastrados na plataforma.")
         st.markdown("<br>", unsafe_allow_html=True)
@@ -1887,7 +1887,6 @@ def template_painel_admin():
             df_usuarios_mod["Gênero_Nome"] = df_usuarios_mod["Gênero"].map({"M": "Homem", "F": "Mulher", "O": "Outros"}).fillna("Não Informado")
             contagem_genero = df_usuarios_mod["Gênero_Nome"].value_counts()
             
-            # 🔍 CORREÇÃO: Trocado 'use_container_width=True' por 'use_container_width=True'
             st.bar_chart(contagem_genero, color="#1f6feb", height=180, use_container_width=True)
             
         with col_piz2:
@@ -1895,7 +1894,6 @@ def template_painel_admin():
             df_usuarios_mod["Procura_Nome"] = df_usuarios_mod["Procura Por"].map({"M": "Procura Homem", "F": "Procura Mulher", "O": "Procura Ambos"}).fillna("Não Configurado")
             contagem_procura = df_usuarios_mod["Procura_Nome"].value_counts()
             
-            # 🔍 CORREÇÃO: Trocado 'use_container_width=True' por 'use_container_width=True'
             st.bar_chart(contagem_procura, color="#238636", height=180, use_container_width=True)
 
     # ==============================================================================
@@ -1915,10 +1913,9 @@ def template_painel_admin():
         else:
             df_filtrado = df_usuarios_mod
 
-        # 🔍 CORREÇÃO: Trocado 'use_container_width=True' por 'use_container_width=True' na tabela de moderação
+        # Exibição do DataFrame de moderação com largura completa
         st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
         st.markdown("<br>", unsafe_allow_html=True)
-
 
         # --- CONTAINER DE EXCLUSÃO INDIVIDUAL (MODERAÇÃO CASCO GROSSO) ---
         st.subheader("🗑️ Gerenciador de Exclusão de Perfis")
@@ -1941,7 +1938,7 @@ def template_painel_admin():
                     
                 with col_botao_u:
                     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-                    # NOVO: Função Excluir Usuário acoplada com deleção em cascata total no Postgres
+                    # Função Excluir Usuário acoplada com deleção em cascata total no Postgres
                     if st.button("❌ Excluir Usuário", key=f"adm_drop_user_{u_id}", type="primary", use_container_width=True):
                         try:
                             conn_del = conectar_supabase()
@@ -1965,12 +1962,6 @@ def template_painel_admin():
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao deletar usuário: {e}")
-
-    # Botão de retorno na base do painel
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("← Voltar ao Chat Principal", type="secondary", use_container_width=True, key="btn_admin_back_to_lucy"):
-        st.session_state.opcao_menu = "💬 Conversar com Lucy"
-        st.rerun()
 
 
 
