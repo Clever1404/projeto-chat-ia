@@ -16,6 +16,7 @@ import psycopg2
 from openai import OpenAI
 import json as modulo_json
 import mercadopago 
+from supabase import create_client, Client
 
 
 UPLOAD_FOLDER = "uploads"
@@ -32,6 +33,18 @@ if not OPENAI_API_KEY or "sua_chave" in OPENAI_API_KEY:
 
 # 2. Inicializa o cliente da OpenAI de forma global
 client = OpenAI(api_key=OPENAI_API_KEY)
+
+
+# Configura a conexão com o Supabase com segurança
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL"))
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", os.getenv("SUPABASE_KEY"))
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    st.error("Erro: Credenciais do Supabase não configuradas.")
+    st.stop()
+
+# Cria o cliente do Supabase que seu código estava tentando encontrar
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # 1. Busca o token nos Segredos do Streamlit ou nas variáveis de ambiente locais
 TOKEN_MERCADO_PAGO = st.secrets.get("TOKEN_MERCADO_PAGO", os.getenv("TOKEN_MERCADO_PAGO"))
@@ -284,15 +297,12 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
 
 
 # --- SIMULAÇÃO DE DADOS (Substitua pelas consultas ao Supabase) ---
+# Correção: Definindo o nome padrão como id_usuario_atual
 id_usuario_atual = st.session_state.get("username", "id")
 
-# Simulando dados que viriam do Supabase sobre o usuário LOGADO
-status_autor = "gratis"  # 'gratis' ou 'vip'
-saldo_moedas = 5         # quantidade de créditos que ele tem
-
-
 # Busca dados em tempo real do Supabase
-user_db = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario).single().execute()
+# Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
+user_db = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).single().execute()
 status_usuario = user_db.data["status"] if user_db.data else "gratis"
 saldo_moedas = user_db.data["creditos"] if user_db.data else 0
 
@@ -324,7 +334,8 @@ if st.sidebar.button("Gerar Pix de Pagamento"):
         "description": desc,
         "payment_method_id": "pix",
         "payer": {"email": "cliente@email.com"},
-        "external_reference": f"{id_usuario}:{tipo}"
+        # Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
+        "external_reference": f"{id_usuario_atual}:{tipo}"
     }
 
     # Criando o Pix na API do Mercado Pago
@@ -361,12 +372,14 @@ if st.session_state.id_pagamento_pendente:
         if status_pagamento == "approved":
             if tipo_pag == "vip":
                 # Atualiza para VIP no Supabase
-                supabase.table("usuarios").update({"status": "vip"}).eq("id", id_usuario).execute()
+                # Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
+                supabase.table("usuarios").update({"status": "vip"}).eq("id", id_usuario_atual).execute()
                 st.success("🎉 Parabéns! Seu plano VIP foi ativado.")
             elif tipo_pag == "moedas":
                 # Soma as novas moedas no Supabase
                 novo_saldo = saldo_moedas + 10
-                supabase.table("usuarios").update({"creditos": novo_saldo}).eq("id", id_usuario).execute()
+                # Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
+                supabase.table("usuarios").update({"creditos": novo_saldo}).eq("id", id_usuario_atual).execute()
                 st.success("🪙 10 Moedas adicionadas com sucesso ao seu saldo!")
             
             # Limpa as variáveis de pagamento pendente da tela
@@ -374,7 +387,6 @@ if st.session_state.id_pagamento_pendente:
             st.rerun()
         else:
             st.sidebar.warning("⚠️ Pagamento ainda não consta como aprovado. Aguarde alguns instantes e tente novamente.")
-
 
 
 
