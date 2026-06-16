@@ -316,6 +316,17 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
                         st.error(f"Erro ao cadastrar: {e}")
 
 
+
+# =========================================================================
+# INICIALIZAÇÃO DO SDK DO MERCADO PAGO
+# =========================================================================
+# Busca o token direto dos secrets do Streamlit de forma segura
+try:
+    sdk = mercadopago.SDK(st.secrets["TOKEN_MERCADO_PAGO"])
+except Exception as e:
+    st.error(f"Erro ao carregar credenciais do Mercado Pago: {e}")
+    sdk = None
+
 # --- ADICIONE ESTAS DUAS LINHAS LOGO ANTES DO SEU IF DE CRÉDITOS ---
 status_usuario = "Offline"
 saldo_moedas = 0
@@ -326,6 +337,7 @@ id_usuario_atual = st.session_state.get("usuario_id", None)
 if id_usuario_atual:
     try:
         user_query = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).execute()
+        # Correção: Adicionado o [0] de volta para acessar o primeiro registro retornado
         if user_query.data and len(user_query.data) > 0:
             status_usuario = user_query.data[0].get("status", "🟢 Online")
             saldo_moedas = user_query.data[0].get("creditos", 0)
@@ -351,36 +363,41 @@ st.sidebar.header("🛒 Loja do App")
 opcoes_compra = st.sidebar.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
 
 if st.sidebar.button("Gerar Pix de Pagamento"):
-    # Configura o valor e descrição baseado na escolha do menu lateral
-    if "VIP" in opcoes_compra:
-        valor, desc, tipo = 19.90, "Plano VIP 30 dias", "vip"
+    if not sdk:
+        st.sidebar.error("SDK do Mercado Pago não foi inicializado.")
     else:
-        valor, desc, tipo = 5.00, "Pacote de 10 Moedas", "moedas"
+        # Configura o valor e descrição baseado na escolha do menu lateral
+        if "VIP" in opcoes_compra:
+            valor, desc, tipo = 19.90, "Plano VIP 30 dias", "vip"
+        else:
+            valor, desc, tipo = 5.00, "Pacote de 10 Moedas", "moedas"
 
-    payment_data = {
-        "transaction_amount": valor,
-        "description": desc,
-        "payment_method_id": "pix",
-        "payer": {"email": "cliente@email.com"},
-        # Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
-        "external_reference": f"{id_usuario_atual}:{tipo}"
-    }
+        payment_data = {
+            "transaction_amount": valor,
+            "description": desc,
+            "payment_method_id": "pix",
+            "payer": {"email": "cliente@email.com"},
+            "external_reference": f"{id_usuario_atual}:{tipo}"
+        }
 
-    # Criando o Pix na API do Mercado Pago
-    payment_response = sdk.payment().create(payment_data)
-    payment = payment_response["response"]
+        try:
+            # Criando o Pix na API do Mercado Pago
+            payment_response = sdk.payment().create(payment_data)
+            payment = payment_response["response"]
 
-    if "point_of_interaction" in payment:
-        # Salva o ID do pagamento gerado para checar depois
-        st.session_state.id_pagamento_pendente = payment["id"]
-        st.session_state.tipo_pagamento_pendente = tipo
-        
-        # Dados para exibição do Pix
-        st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
-        st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
-        st.sidebar.success("Pix gerado com sucesso!")
-    else:
-        st.sidebar.error("Erro ao gerar pagamento. Verifique as credenciais.")
+            if "point_of_interaction" in payment:
+                # Salva o ID do pagamento gerado para checar depois
+                st.session_state.id_pagamento_pendente = payment["id"]
+                st.session_state.tipo_pagamento_pendente = tipo
+                
+                # Dados para exibição do Pix
+                st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+                st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+                st.sidebar.success("Pix gerado com sucesso!")
+            else:
+                st.sidebar.error("Erro ao gerar pagamento. Verifique as credenciais.")
+        except Exception as e:
+            st.sidebar.error(f"Erro na API do Mercado Pago: {e}")
 
 # Exibe o Pix gerado se ele existir na sessão atual
 if st.session_state.id_pagamento_pendente:
@@ -390,32 +407,35 @@ if st.session_state.id_pagamento_pendente:
     
     # BOTÃO CHAVE: O usuário clica após pagar para o código validar na hora
     if st.sidebar.button("🔄 Já paguei, liberar meu acesso"):
-        # Consulta o status do pagamento direto na API do Mercado Pago
-        id_pag = st.session_state.id_pagamento_pendente
-        tipo_pag = st.session_state.tipo_pagamento_pendente
-        
-        check_payment = sdk.payment().get(id_pag)["response"]
-        status_pagamento = check_payment.get("status")
-
-        if status_pagamento == "approved":
-            if tipo_pag == "vip":
-                # Atualiza para VIP no Supabase
-                # Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
-                supabase.table("usuarios").update({"status": "vip"}).eq("id", id_usuario_atual).execute()
-                st.success("🎉 Parabéns! Seu plano VIP foi ativado.")
-            elif tipo_pag == "moedas":
-                # Soma as novas moedas no Supabase
-                novo_saldo = saldo_moedas + 10
-                # Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
-                supabase.table("usuarios").update({"creditos": novo_saldo}).eq("id", id_usuario_atual).execute()
-                st.success("🪙 10 Moedas adicionadas com sucesso ao seu saldo!")
-            
-            # Limpa as variáveis de pagamento pendente da tela
-            st.session_state.id_pagamento_pendente = None
-            st.rerun()
+        if not sdk:
+            st.sidebar.error("SDK do Mercado Pago não disponível.")
         else:
-            st.sidebar.warning("⚠️ Pagamento ainda não consta como aprovado. Aguarde alguns instantes e tente novamente.")
+            # Consulta o status do pagamento direto na API do Mercado Pago
+            id_pag = st.session_state.id_pagamento_pendente
+            tipo_pag = st.session_state.tipo_pagamento_pendente
+            
+            try:
+                check_payment = sdk.payment().get(id_pag)["response"]
+                status_pagamento = check_payment.get("status")
 
+                if status_pagamento == "approved":
+                    if tipo_pag == "vip":
+                        # Atualiza para VIP no Supabase
+                        supabase.table("usuarios").update({"status": "vip"}).eq("id", id_usuario_atual).execute()
+                        st.success("🎉 Parabéns! Seu plano VIP foi ativado.")
+                    elif tipo_pag == "moedas":
+                        # Soma as novas moedas no Supabase
+                        novo_saldo = saldo_moedas + 10
+                        supabase.table("usuarios").update({"creditos": novo_saldo}).eq("id", id_usuario_atual).execute()
+                        st.success("🪙 10 Moedas adicionadas com sucesso ao seu saldo!")
+                    
+                    # Limpa as variáveis de pagamento pendente da tela
+                    st.session_state.id_pagamento_pendente = None
+                    st.rerun()
+                else:
+                    st.sidebar.warning("⚠️ Pagamento ainda não consta como aprovado. Aguarde alguns instantes e tente novamente.")
+            except Exception as e:
+                st.sidebar.error(f"Erro ao verificar pagamento: {e}")
 
 
 # ==============================================================================
