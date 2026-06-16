@@ -314,21 +314,26 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
                     st.error(f"Erro ao cadastrar: {e}")
 
 
-# --- SIMULAÇÃO DE DADOS (Substitua pelas consultas ao Supabase) ---
+# --- ADICIONE ESTAS DUAS LINHAS LOGO ANTES DO SEU IF DE CRÉDITOS ---
+status_usuario = "Offline"
+saldo_moedas = 0
+
+# (Abaixo fica o seu código atual que busca do Supabase)
 id_usuario_atual = st.session_state.get("usuario_id", None)
 
 if id_usuario_atual:
-    # Código da sua linha 319 com tratamento seguro de erro
     try:
         user_query = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).execute()
-        if user_query.data:
-            status_usuario = user_query.data[0]["status"]
-            saldo_moedas = user_query.data[0]["creditos"]
+        if user_query.data and len(user_query.data) > 0:
+            status_usuario = user_query.data[0].get("status", "🟢 Online")
+            saldo_moedas = user_query.data[0].get("creditos", 0)
     except Exception as e:
         st.error(f"Aviso de sincronização: {e}")
 
-st.title("Plataforma de Planos IA")
-st.caption(f"Status: **{status_usuario.upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+# --- SEU CÓDIGO DA LINHA 330 EM DIANTE ---
+st.title("Plataforma de Planos IA")                                    
+st.caption(f"Status: **{str(status_usuario).upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+
 
 # --- VARIÁVEIS DE CONTROLE DE PAGAMENTO EM ANDAMENTO ---
 if "id_pagamento_pendente" not in st.session_state:
