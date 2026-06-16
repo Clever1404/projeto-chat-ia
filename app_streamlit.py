@@ -44,7 +44,7 @@ supabase: Client = create_client(url, key)
 # 2. Inicializa a variável antes para evitar o NameError
 supabase = None
 
-if url and key::
+if url and key:
     try:
         # Cria o cliente se as chaves existirem
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
