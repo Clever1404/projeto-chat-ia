@@ -1521,7 +1521,7 @@ def template_planos():
     # --- SEU CÓDIGO DA LINHA 330 EM DIANTE ---                                  
         st.title("Plataforma de Planos IA")
         st.caption(f"Status: **{str(status_usuario).upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
-        st.button("← Voltar para o Chat da Lucy", type="secondary"):
+        st.button("← Voltar para o Chat da Lucy", type="secondary")
 
         # --- VARIÁVEIS DE CONTROLE DE PAGAMENTO EM ANDAMENTO ---
         if "id_pagamento_pendente" not in st.session_state:
@@ -1551,7 +1551,7 @@ def template_planos():
         # SEÇÃO DE COMPRAS (MERCADO PAGO)
         # =========================================================================
         st.sidebar.header("🛒 Loja do App")
-        st.button("← Voltar para o Chat da Lucy", type="secondary"):
+        st.button("← Voltar para o Chat da Lucy", type="secondary")
         opcoes_compra = st.sidebar.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
 
         if st.sidebar.button("Gerar Pix de Pagamento"):
