@@ -361,7 +361,7 @@ elif st.session_state.opcao_menu == "📝 Cadastro":
 
         # Exibe o Pix gerado se ele existir na sessão atual
         if st.session_state.id_pagamento_pendente:
-            st.sidebar.markdown("---")
+            st.sidebar.markdown("<h2>Pagamento pendente</h2>", unsafe_allow_html=True)
             st.sidebar.image(f"data:image/jpeg;base64,{st.session_state.qr_code_img}", width=200)
             st.sidebar.text_input("Copia e Cola:", value=st.session_state.qr_code_texto)
             
