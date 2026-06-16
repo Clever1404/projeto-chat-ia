@@ -381,26 +381,29 @@ def template_planos():
     st.caption(f"Status: **{str(status_usuario).upper()}** | Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
     
     # --- TEXTO DESCRITIVO DOS PLANOS CENTRALIZADO ---
-    st.markdown("""
-    <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
-        <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
-        
-        <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
-            <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
-            <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
+    st.markdown(
+        """
+        <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
+            <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
+            
+            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
+                <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+                <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
+            </div>
+            
+            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
+                <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+                <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
+            </div>
+            
+            <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+                <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+                <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+            </div>
         </div>
-        
-        <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
-            <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
-            <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
-        </div>
-        
-        <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
-            <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
-            <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
-        </div>
-    </div>
-     """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True,
+    )
     
     if st.button("← Voltar para o 🔒 Login", type="secondary"):
         st.session_state.opcao_menu = "🔒 Login"  # o nome correto do seu menu de chat
