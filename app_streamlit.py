@@ -266,54 +266,184 @@ elif st.session_state.opcao_menu == "🔒 Login":
             if st.session_state.mostrar_recuperar_senha:
                 modal_recuperar_senha()
 
-elif st.session_state.opcao_menu == "📝 Cadastro":
-    def template_cadastro():
-        st.markdown('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>', unsafe_allow_html=True)
+# ==============================================================================
+# 1. CONFIGURAÇÕES GLOBAIS E ESTILO BASE
+# ==============================================================================
+if 'config_executada' not in st.session_state:
+    st.set_page_config(page_title="Lucy Chat IA - Plataforma", layout="wide")
+    st.session_state.config_executada = True
+
+st.markdown("""
+    <style>
+    [data-testid="stHeader"] { display: none !important; }
+    div[data-testid="stToolbar"] { display: none !important; }
+    .stApp { background-color: #0d1117; color: #c9d1d9; }
+    h1, h2, h3 { font-family: Arial, sans-serif; color: #f0f6fc !important; }
+    div[data-testid="stSidebar"] { background-color: #161b22 !important; border-right: 1px solid #30363d; }
+    .block-container { padding-top: 0.5rem !important; padding-bottom: 1rem !important; }
+    </style>
+""", unsafe_allow_html=True)
+
+# Inicializa a variável de menu se não existir
+if "opcao_menu" not in st.session_state:
+    st.session_state.opcao_menu = "📝 Cadastro"
+
+# ==============================================================================
+# 2. DEFINIÇÃO DOS TEMPLATES (FUNÇÕES)
+# ==============================================================================
+def template_cadastro():
+    st.markdown('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>', unsafe_allow_html=True)
+    
+    with st.form("form_cadastro_usuario_unico"):
+        usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
+        email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed")
+        senha = st.text_input("Senha", placeholder="Escolha uma Senha", type="password", label_visibility="collapsed")
+        genero = st.selectbox("Gênero", options=["M", "F"], index=0, label_visibility="collapsed")
         
-        with st.form("form_cad"):
-            usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
-            email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed")
-            senha = st.text_input("Senha", placeholder="Escolha uma Senha", type="password", label_visibility="collapsed")
-            genero = st.selectbox("Gênero", options=["M", "F"], index=0, label_visibility="collapsed")
+        with stylable_container(
+            key="green_button_cad",
+            css_styles="""
+                button { background-color: #28a745; color: white; border-radius: 5px; }
+                button:hover { background-color: #218838; color: white; }
+            """,
+        ):         
+            if st.form_submit_button("Cadastre-se", use_container_width=True):
+                try:
+                    conn = conectar_supabase()
+                    cursor = conn.cursor()
+                    
+                    senha_final = generate_password_hash(senha) if 'generate_password_hash' in locals() else senha
+                    
+                    cursor.execute(
+                        "INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", 
+                        (usuario, email, senha_final, genero)
+                    )
+                    st.session_state.usuario_id = cursor.fetchone()[0]
+                    st.session_state.username = usuario
+                    st.session_state.genero = genero
+                    
+                    conn.commit()
+                    cursor.close()
+                    conn.close()
+                    
+                    # Altera o estado do menu e força a atualização da tela
+                    st.session_state.opcao_menu = "Plataforma de Planos IA"
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao cadastrar: {e}")
+
+def template_planos():
+    # Inicializa variáveis padrão de fallback
+    status_usuario = "🟢 Online"
+    saldo_moedas = 0
+    
+    # Busca dados em tempo real do Supabase se o usuário estiver logado
+    id_usuario_atual = st.session_state.get("usuario_id", None)
+    if id_usuario_atual:
+        try:
+            user_query = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).execute()
+            if user_query.data and len(user_query.data) > 0:
+                status_usuario = user_query.data[0].get("status", "🟢 Online")
+                saldo_moedas = user_query.data[0].get("creditos", 0)
+        except Exception as e:
+            st.error(f"Aviso de sincronização: {e}")
+
+    # Interface visual do template de planos
+    st.markdown('<h2 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h2>', unsafe_allow_html=True)
+    st.caption(f"Status: **{str(status_usuario).upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+    
+    if st.button("← Voltar para o Chat da Lucy", type="secondary"):
+        st.session_state.opcao_menu = "Chat" # Ou o nome correto do seu menu de chat
+        st.rerun()
+
+    if "id_pagamento_pendente" not in st.session_state:
+        st.session_state.id_pagamento_pendente = None
+    if "tipo_pagamento_pendente" not in st.session_state:
+        st.session_state.tipo_pagamento_pendente = None
+
+    # --- Seu código complementar de exibição de planos continua aqui ---
+    # =========================================================================
+    # SEÇÃO DE COMPRAS (MERCADO PAGO)
+    # =========================================================================
+    st.sidebar.header("🛒 Loja do App")
+
+    opcoes_compra = st.sidebar.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
+
+    if st.sidebar.button("Gerar Pix de Pagamento"):
+        # Configura o valor e descrição baseado na escolha do menu lateral
+        if "VIP" in opcoes_compra:
+            valor, desc, tipo = 19.90, "Plano VIP 30 dias", "vip"
+        else:
+            valor, desc, tipo = 5.00, "Pacote de 10 Moedas", "moedas"
+
+        payment_data = {
+            "transaction_amount": valor,
+            "description": desc,
+            "payment_method_id": "pix",
+            "payer": {"email": "cliente@email.com"},
+            # Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
+            "external_reference": f"{id_usuario_atual}:{tipo}"
+        }
+
+        # Criando o Pix na API do Mercado Pago
+        payment_response = sdk.payment().create(payment_data)
+        payment = payment_response["response"]
+
+        if "point_of_interaction" in payment:
+            # Salva o ID do pagamento gerado para checar depois
+            st.session_state.id_pagamento_pendente = payment["id"]
+            st.session_state.tipo_pagamento_pendente = tipo
             
-            with stylable_container(
-                key="green_button_cad",
-                css_styles="""
-                    button {
-                        background-color: #28a745;
-                        color: white;
-                        border-radius: 5px;
-                    }
-                    button:hover {
-                        background-color: #218838;
-                        color: white;
-                    }
-                """,
-            ):         
-                if st.form_submit_button("Cadastrar", use_container_width=True):
-                    try:
-                        conn = conectar_supabase()
-                        cursor = conn.cursor()
-                        
-                        # Criptografa a senha no cadastro também se estiver usando generate_password_hash no login
-                        senha_final = generate_password_hash(senha) if 'generate_password_hash' in locals() else senha
-                        
-                        cursor.execute(
-                            "INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", 
-                            (usuario, email, senha_final, genero)
-                        )
-                        st.session_state.usuario_id = cursor.fetchone()[0]
-                        st.session_state.username = usuario
-                        st.session_state.genero = genero
-                        
-                        conn.commit()
-                        cursor.close()
-                        conn.close()
-                        
-                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao cadastrar: {e}")
+            # Dados para exibição do Pix
+            st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+            st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+            st.sidebar.success("Pix gerado com sucesso!")
+        else:
+            st.sidebar.error("Erro ao gerar pagamento. Verifique as credenciais.")
+
+    # Exibe o Pix gerado se ele existir na sessão atual
+    if st.session_state.id_pagamento_pendente:
+        st.sidebar.markdown("---")
+        st.sidebar.image(f"data:image/jpeg;base64,{st.session_state.qr_code_img}", width=200)
+        st.sidebar.text_input("Copia e Cola:", value=st.session_state.qr_code_texto)
+        
+        # BOTÃO CHAVE: O usuário clica após pagar para o código validar na hora
+        if st.sidebar.button("🔄 Já paguei, liberar meu acesso"):
+            # Consulta o status do pagamento direto na API do Mercado Pago
+            id_pag = st.session_state.id_pagamento_pendente
+            tipo_pag = st.session_state.tipo_pagamento_pendente
+            
+            check_payment = sdk.payment().get(id_pag)["response"]
+            status_pagamento = check_payment.get("status")
+
+            if status_pagamento == "approved":
+                if tipo_pag == "vip":
+                    # Atualiza para VIP no Supabase
+                    # Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
+                    supabase.table("usuarios").update({"status": "vip"}).eq("id", id_usuario_atual).execute()
+                    st.success("🎉 Parabéns! Seu plano VIP foi ativado.")
+                elif tipo_pag == "moedas":
+                    # Soma as novas moedas no Supabase
+                    novo_saldo = saldo_moedas + 10
+                    # Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
+                    supabase.table("usuarios").update({"creditos": novo_saldo}).eq("id", id_usuario_atual).execute()
+                    st.success("🪙 10 Moedas adicionadas com sucesso ao seu saldo!")
+                
+                # Limpa as variáveis de pagamento pendente da tela
+                st.session_state.id_pagamento_pendente = None
+                st.rerun()
+            else:
+                st.sidebar.warning("⚠️ Pagamento ainda não consta como aprovado. Aguarde alguns instantes e tente novamente.")
+
+# ==============================================================================
+# 3. CONTROLE DE FLUXO (CHAMADA DAS TELAS)
+# ==============================================================================
+if st.session_state.opcao_menu == "📝 Cadastro":
+    template_cadastro()
+
+elif st.session_state.opcao_menu == "Plataforma de Planos IA":
+    template_planos()
+              
 
        
 
@@ -1516,119 +1646,6 @@ def template_gerenciar_conexoes_completo():
                 st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
                 
         except Exception as e: st.error(f"Erro: {e}")     
-
-def template_planos():
-    # --- SEU CÓDIGO DA LINHA 330 EM DIANTE ---                                  
-        st.title("Plataforma de Planos IA")
-        st.caption(f"Status: **{str(status_usuario).upper()}** | Saldo: 🪙 **{saldo_moedas} moedas**")
-        st.button("← Voltar para o Chat da Lucy", type="secondary")
-
-        # --- VARIÁVEIS DE CONTROLE DE PAGAMENTO EM ANDAMENTO ---
-        if "id_pagamento_pendente" not in st.session_state:
-            st.session_state.id_pagamento_pendente = None
-        if "tipo_pagamento_pendente" not in st.session_state:
-            st.session_state.tipo_pagamento_pendente = None
-
-        # --- ADICIONE ESTAS DUAS LINHAS LOGO ANTES DO SEU IF DE CRÉDITOS ---
-        status_usuario = "status"
-        saldo_moedas = "creditos"
-
-        # (Abaixo fica o seu código atual que busca do Supabase)
-        id_usuario_atual = st.session_state.get("usuario_id", None)
-
-        if id_usuario_atual:
-            try:
-                user_query = supabase.table("usuarios").select("status", "creditos").eq("id", id_usuario_atual).execute()
-                # Correção exata: acessando o índice [0] antes do .get()
-                if user_query.data and len(user_query.data) > 0:
-                    status_usuario = user_query.data[0].get("status", "🟢 Online")
-                    saldo_moedas = user_query.data[0].get("creditos", 0)
-            except Exception as e:
-                st.error(f"Aviso de sincronização: {e}")
-              
-
-        # =========================================================================
-        # SEÇÃO DE COMPRAS (MERCADO PAGO)
-        # =========================================================================
-        st.sidebar.header("🛒 Loja do App")
-        st.button("← Voltar para o Chat da Lucy", type="secondary")
-        opcoes_compra = st.sidebar.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
-
-        if st.sidebar.button("Gerar Pix de Pagamento"):
-            if not sdk:
-                st.sidebar.error("SDK do Mercado Pago não foi inicializado.")
-            else:
-                # Configura o valor e descrição baseado na escolha do menu lateral
-                if "VIP" in opcoes_compra:
-                    valor, desc, tipo = 19.90, "Plano VIP 30 dias", "vip"
-                else:
-                    valor, desc, tipo = 5.00, "Pacote de 10 Moedas", "moedas"
-
-                payment_data = {
-                    "transaction_amount": valor,
-                    "description": desc,
-                    "payment_method_id": "pix",
-                    "payer": {"email": "cliente@email.com"},
-                    "external_reference": f"{id_usuario_atual}:{tipo}"
-                }
-
-                try:
-                    # Criando o Pix na API do Mercado Pago
-                    payment_response = sdk.payment().create(payment_data)
-                    payment = payment_response["response"]
-
-                    if "point_of_interaction" in payment:
-                        # Salva o ID do pagamento gerado para checar depois
-                        st.session_state.id_pagamento_pendente = payment["id"]
-                        st.session_state.tipo_pagamento_pendente = tipo
-                        
-                        # Dados para exibição do Pix
-                        st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
-                        st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
-                        st.sidebar.success("Pix gerado com sucesso!")
-                    else:
-                        st.sidebar.error("Erro ao gerar pagamento. Verifique as credenciais.")
-                except Exception as e:
-                    st.sidebar.error(f"Erro na API do Mercado Pago: {e}")
-
-        # Exibe o Pix gerado se ele existir na sessão atual
-        if st.session_state.id_pagamento_pendente:
-            st.sidebar.markdown("<h2>Pagamento pendente</h2>", unsafe_allow_html=True)
-            st.sidebar.image(f"data:image/jpeg;base64,{st.session_state.qr_code_img}", width=200)
-            st.sidebar.text_input("Copia e Cola:", value=st.session_state.qr_code_texto)
-            
-            # BOTÃO CHAVE: O usuário clica após pagar para o código validar na hora
-            if st.sidebar.button("🔄 Já paguei, liberar meu acesso"):
-                if not sdk:
-                    st.sidebar.error("SDK do Mercado Pago não disponível.")
-                else:
-                    # Consulta o status do pagamento direto na API do Mercado Pago
-                    id_pag = st.session_state.id_pagamento_pendente
-                    tipo_pag = st.session_state.tipo_pagamento_pendente
-                    
-                    try:
-                        check_payment = sdk.payment().get(id_pag)["response"]
-                        status_pagamento = check_payment.get("status")
-
-                        if status_pagamento == "approved":
-                            if tipo_pag == "vip":
-                                # Atualiza para VIP no Supabase
-                                supabase.table("usuarios").update({"status": "vip"}).eq("id", id_usuario_atual).execute()
-                                st.success("🎉 Parabéns! Seu plano VIP foi ativado.")
-                            elif tipo_pag == "moedas":
-                                # Soma as novas moedas no Supabase
-                                novo_saldo = saldo_moedas + 10
-                                supabase.table("usuarios").update({"creditos": novo_saldo}).eq("id", id_usuario_atual).execute()
-                                st.success("🪙 10 Moedas adicionadas com sucesso ao seu saldo!")
-                            
-                            # Limpa as variáveis de pagamento pendente da tela
-                            st.session_state.id_pagamento_pendente = None
-                            st.rerun()
-                        else:
-                            st.sidebar.warning("⚠️ Pagamento ainda não consta como aprovado. Aguarde alguns instantes e tente novamente.")
-                    except Exception as e:
-                        st.sidebar.error(f"Erro ao verificar pagamento: {e}")
-
 
 
 # ==============================================================================
