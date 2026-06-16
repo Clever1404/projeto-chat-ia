@@ -11,5 +11,6 @@ google-genai
 psycopg2-binary
 supabase
 mercadopago
+supabase
 
 
