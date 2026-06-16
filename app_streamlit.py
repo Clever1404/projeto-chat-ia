@@ -34,17 +34,28 @@ if not OPENAI_API_KEY or "sua_chave" in OPENAI_API_KEY:
 # 2. Inicializa o cliente da OpenAI de forma global
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-
-# Configura a conexão com o Supabase com segurança
+# 1. Busca as chaves de acesso com segurança
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", os.getenv("SUPABASE_URL"))
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", os.getenv("SUPABASE_KEY"))
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    st.error("Erro: Credenciais do Supabase não configuradas.")
-    st.stop()
+# 2. Inicializa a variável antes para evitar o NameError
+supabase = None
 
-# Cria o cliente do Supabase que seu código estava tentando encontrar
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        # Cria o cliente se as chaves existirem
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        st.error(f"Erro ao conectar com o Supabase: {e}")
+else:
+    # Mostra um aviso claro na tela em vez de quebrar o app
+    st.warning("⚠️ Atenção: As credenciais do Supabase não estão configuradas nas configurações (Secrets).")
+
+# Garante que o app não vai rodar as consultas ao banco se o cliente não existir
+if not supabase:
+    st.info("Por favor, configure as chaves SUPABASE_URL e SUPABASE_KEY para liberar o banco de dados.")
+    st.stop()  # Para o código aqui com segurança, impedindo o NameError mais abaixo
+    
 
 # 1. Busca o token nos Segredos do Streamlit ou nas variáveis de ambiente locais
 TOKEN_MERCADO_PAGO = st.secrets.get("TOKEN_MERCADO_PAGO", os.getenv("TOKEN_MERCADO_PAGO"))
