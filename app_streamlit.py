@@ -18,6 +18,7 @@ import json as modulo_json
 import mercadopago 
 from supabase import create_client, Client
 import random
+from datetime import datetime, timedelta
 
 
 UPLOAD_FOLDER = "uploads"
@@ -1519,17 +1520,20 @@ def renderizar_listas_sidebar_e_acoes():
             </div>
         """, unsafe_allow_html=True)
 
-        # Busca o plano do usuário atualizado para aplicar as regras
+       # 1. Define os valores padrões caso a busca no banco falhe
         tipo_plano = "Grátis"
         saldo_moedas = 0
+
         try:
             user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(my_id)).execute()
             if user_data.data and len(user_data.data) > 0:
-                tipo_plano_sala = user_data.data[0].get("tipo_plano", "Grátis")
-                saldo_moedas_sala = user_data.data[0].get("moedas", 0)
+                # CORREÇÃO: Remova o "_sala" do final dos nomes das variáveis
+                tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
+                saldo_moedas = user_data.data[0].get("moedas", 0)
         except Exception:
             pass
-        
+
+        # Agora o texto vai exibir os dados atualizados que vieram do Supabase
         st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
 
 
