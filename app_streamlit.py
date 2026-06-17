@@ -1527,15 +1527,19 @@ def renderizar_listas_sidebar_e_acoes():
         saldo_moedas = 0
 
         try:
+            # Faz a busca no Supabase
             user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(my_id)).execute()
+            
+            # CORREÇÃO CRÍTICA: Verifica se a lista .data existe e contém elementos
             if user_data.data and len(user_data.data) > 0:
-                # CORREÇÃO: Remova o "_sala" do final dos nomes das variáveis
+                # Acessamos o índice [0] para pegar o primeiro dicionário retornado da lista
                 tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
                 saldo_moedas = user_data.data[0].get("moedas", 0)
-        except Exception:
-            pass
+        except Exception as e:
+            # Mostra o erro na tela temporariamente caso algo dê errado na consulta
+            st.error(f"Erro ao carregar dados do banco: {e}")
 
-        # Agora o texto vai exibir os dados atualizados que vieram do Supabase
+        # Agora o texto vai refletir exatamente o valor do banco de dados
         st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
 
 
@@ -1996,88 +2000,55 @@ def template_painel_admin():
         # Configuração inicial do Streamlit (opcional, remova se já tiver no topo do seu código)
         st.set_page_config(layout="wide")
 
-        # --------------------------------------------------------------------------
-        # MÓDULO 1: CONSULTA DE DADOS REAIS NO SUPABASE
-        # --------------------------------------------------------------------------
-        try:
-            # Busca os dados reais da sua tabela 'usuarios'
-            usuarios_query = (
-                supabase.table("usuarios")
-                .select("id", "tipo_plano", "moedas", "ultima_recarga")
-                .execute()
-            )
+       def template_painel_admin():
+    # --------------------------------------------------------------------------
+    # VALORES PADRÃO (FALLBACKS) - Impede qualquer NameError no restante do script
+    # --------------------------------------------------------------------------
+    df_users = pd.DataFrame(columns=["id", "tipo_plano", "moedas", "ultima_recarga"])
+    df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
+    total_assinantes = 0
+    total_credito = 0
+    total_gratis = 0
+    salas_ativas = [] # <-- Definida no topo garante que a linha 2166 nunca quebre
 
-            if usuarios_query.data:
-                df_users = pd.DataFrame(usuarios_query.data)
+    # --------------------------------------------------------------------------
+    # MÓDULO 1: CONSULTA DE DADOS REAIS NO SUPABASE
+    # --------------------------------------------------------------------------
+    try:
+        usuarios_query = (
+            supabase.table("usuarios")
+            .select("id", "tipo_plano", "moedas", "ultima_recarga")
+            .execute()
+        )
 
-                # Trata e padroniza a coluna de data para o formato Ano-Mês-Dia
-                df_users["ultima_recarga"] = pd.to_datetime(
-                    df_users["ultima_recarga"]
-                ).dt.strftime("%Y-%m-%d")
-            else:
-                # Cria colunas vazias de segurança caso não retorne nada
-                df_users = pd.DataFrame(
-                    columns=["id", "tipo_plano", "moedas", "ultima_recarga"]
-                )
+        if usuarios_query.data:
+            df_users = pd.DataFrame(usuarios_query.data)
+            df_users["ultima_recarga"] = pd.to_datetime(
+                df_users["ultima_recarga"]
+            ).dt.strftime("%Y-%m-%d")
 
-        except Exception as e:
-            st.error(f"Erro ao carregar dados do Supabase: {e}")
-            st.stop()
+    except Exception as e:
+        st.error(f"Erro ao carregar dados do Supabase: {e}")
+        # Não damos st.stop() para permitir que o resto da página carregue zerada sem crashar
 
 
-        # --------------------------------------------------------------------------
-        # MÓDULO 2: PROCESSAMENTO E AGREGAÇÃO DOS DADOS REAIS
-        # --------------------------------------------------------------------------
-        try:
-            if not df_users.empty:
-                # --- CÁLCULO PARA O GRÁFICO DE PIZZA (Distribuição de Usuários) ---
-                # Assinantes: quem não usa o plano gratuito
-                total_assinantes = int(
-                    df_users[df_users["tipo_plano"] != "gratis"].shape
-                )
+    # --------------------------------------------------------------------------
+    # MÓDULO 2: PROCESSAMENTO E AGREGAÇÃO DOS DADOS REAIS
+    # --------------------------------------------------------------------------
+    try:
+        if not df_users.empty:
+            # Distribuição de Usuários
+            total_assinantes = int(df_users[df_users["tipo_plano"] != "gratis"].shape[0])
+            total_credito = int(df_users[(df_users["tipo_plano"] == "gratis") & (df_users["moedas"] > 0)].shape[0])
+            total_gratis = int(df_users[(df_users["tipo_plano"] == "gratis") & (df_users["moedas"] == 0)].shape[0])
 
-                # Com Créditos: usuários do plano grátis que têm moedas > 0
-                total_credito = int(
-                    df_users[
-                        (df_users["tipo_plano"] == "gratis") & (df_users["moedas"] > 0)
-                    ].shape
-                )
+            # Agrupamento para o Gráfico de Pareto
+            df_agrupado = df_users.groupby("ultima_recarga")["moedas"].sum().reset_index()
+            df_agrupado.columns = ["data", "quantidade_creditos"]
+            df_creditos = df_agrupado.sort_values(by="data", ascending=False).head(7)
 
-                # Sem Assinatura: usuários do plano grátis com 0 moedas
-                total_gratis = int(
-                    df_users[
-                        (df_users["tipo_plano"] == "gratis")
-                        & (df_users["moedas"] == 0)
-                    ].shape
-                )
-
-                # --- CÁLCULO PARA O GRÁFICO DE PARETO (Volume Real de Moedas por Data) ---
-                # Agrupa a tabela real somando as moedas de quem recarregou na mesma data
-                df_creditos = (
-                    df_users.groupby("ultima_recarga")["moedas"]
-                    .sum()
-                    .reset_index()
-                )
-                df_creditos.columns = ["data", "quantidade_creditos"]
-
-                # Filtra apenas os últimos 7 dias com movimentação para o gráfico não poluir
-                df_creditos = df_creditos.sort_values(by="data", ascending=False).head(
-                    7
-                )
-
-            else:
-                # Fallbacks de segurança se a tabela estiver completamente vazia
-                total_assinantes, total_credito, total_gratis = 0, 0, 0
-                df_creditos = pd.DataFrame(
-                    columns=["data", "quantidade_creditos"]
-                )
-
-        except Exception as e:
-            st.error(f"Erro ao processar métricas reais: {e}")
-            total_assinantes, total_credito, total_gratis = 0, 0, 0
-            df_creditos = pd.DataFrame(
-                columns=["data", "quantidade_creditos"]
-            )
+    except Exception as e:
+        st.error(f"Erro ao processar métricas reais: {e}")
 
 
         # --------------------------------------------------------------------------
