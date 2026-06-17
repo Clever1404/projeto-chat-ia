@@ -1997,32 +1997,32 @@ def template_painel_admin():
         st.set_page_config(layout="wide")
 
         # --------------------------------------------------------------------------
-# MÓDULO 1: CONSULTA DE DADOS REAIS NO SUPABASE
-# --------------------------------------------------------------------------
-try:
-    # Busca os dados reais da sua tabela 'usuarios'
-    usuarios_query = (
-        supabase.table("usuarios")
-        .select("id", "tipo_plano", "moedas", "ultima_recarga")
-        .execute()
-    )
+        # MÓDULO 1: CONSULTA DE DADOS REAIS NO SUPABASE
+        # --------------------------------------------------------------------------
+        try:
+            # Busca os dados reais da sua tabela 'usuarios'
+            usuarios_query = (
+                supabase.table("usuarios")
+                .select("id", "tipo_plano", "moedas", "ultima_recarga")
+                .execute()
+            )
 
-    if usuarios_query.data:
-        df_users = pd.DataFrame(usuarios_query.data)
+            if usuarios_query.data:
+                df_users = pd.DataFrame(usuarios_query.data)
 
-        # Trata e padroniza a coluna de data para o formato Ano-Mês-Dia
-        df_users["ultima_recarga"] = pd.to_datetime(
-            df_users["ultima_recarga"]
-        ).dt.strftime("%Y-%m-%d")
-    else:
-        # Cria colunas vazias de segurança caso não retorne nada
-        df_users = pd.DataFrame(
-            columns=["id", "tipo_plano", "moedas", "ultima_recarga"]
-        )
+                # Trata e padroniza a coluna de data para o formato Ano-Mês-Dia
+                df_users["ultima_recarga"] = pd.to_datetime(
+                    df_users["ultima_recarga"]
+                ).dt.strftime("%Y-%m-%d")
+            else:
+                # Cria colunas vazias de segurança caso não retorne nada
+                df_users = pd.DataFrame(
+                    columns=["id", "tipo_plano", "moedas", "ultima_recarga"]
+                )
 
-except Exception as e:
-    st.error(f"Erro ao carregar dados do Supabase: {e}")
-    st.stop()
+        except Exception as e:
+            st.error(f"Erro ao carregar dados do Supabase: {e}")
+            st.stop()
 
 
         # --------------------------------------------------------------------------
