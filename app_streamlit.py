@@ -2164,17 +2164,17 @@ def template_painel_admin():
         st.subheader("🎥 Monitoramento de Salas Privadas em Tempo Real")
         # Procura essa estrutura por volta da linha 2165 do seu arquivo:
         if salas_ativas:
-            st.write("### 🟢 Salas Privadas Ativas"):
-                for sala in salas_ativas:
-                    with st.container():
-                        st.markdown(f"""
-                        <div style="background-color: #161b22; padding: 15px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 10px;">
-                            <span style="color: #28a745; font-weight: bold;">● EM USO</span> | 
-                            <strong>{sala['sala']}</strong> | 
-                            Usuário Ativo: <code>{sala['usuario']}</code> | 
-                            Tempo de Duração: <span style="color: #ffc107;">{sala['tempo_uso']}</span>
-                        </div>
-                        """, unsafe_allow_html=True)
+            st.write("### 🟢 Salas Privadas Ativas")
+            for sala in salas_ativas:
+                with st.container():
+                    st.markdown(f"""
+                    <div style="background-color: #161b22; padding: 15px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 10px;">
+                        <span style="color: #28a745; font-weight: bold;">● EM USO</span> | 
+                        <strong>{sala['sala']}</strong> | 
+                        Usuário Ativo: <code>{sala['usuario']}</code> | 
+                        Tempo de Duração: <span style="color: #ffc107;">{sala['tempo_uso']}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
             st.dataframe(salas_ativas) 
 
         else:
