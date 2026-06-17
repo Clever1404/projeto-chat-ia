@@ -2286,10 +2286,10 @@ def template_painel_admin():
                     use_container_width=True, 
                     hide_index=True, 
                 ) 
-                else: 
-                    st.info( 
-                        "ℹ️ Nenhuma atividade ou registro de sala privada encontrado no banco de dados." 
-                    ) 
+    else: 
+        st.info( 
+            "ℹ️ Nenhuma atividade ou registro de sala privada encontrado no banco de dados." 
+        ) 
 
 
     
