@@ -2212,7 +2212,7 @@ def template_painel_admin():
                     title="Percentual Acumulado (%)",
                     overlaying="y",
                     side="right",
-                    range=,
+                    range=[0, 105],
                 ),
                 template="plotly_dark",
                 paper_bgcolor="#161b22",
