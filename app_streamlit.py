@@ -91,20 +91,17 @@ def template_home():
     if "opcao_menu" not in st.session_state:
         st.session_state.opcao_menu = "🏠 Home"  # Copie e cole exatamente esta string
         st.set_page_config(page_title="Lucy Chat IA - Plataforma", layout="wide")
-        st.session_state.config_executada = True
-        st.session_state.usuario_id = None
-   
     
-    st.markdown("""
-        <style>
-        [data-testid="stHeader"] { display: none !important; }
-        div[data-testid="stToolbar"] { display: none !important; }
-        .stApp { background-color: #0d1117; color: #c9d1d9; }
-        h1, h2, h3 { font-family: Arial, sans-serif; color: #f0f6fc !important; }
-        div[data-testid="stSidebar"] { background-color: #161b22 !important; border-right: 1px solid #30363d; }
-        .block-container { padding-top: 0.5rem !important; padding-bottom: 1rem !important; }
-        </style>
-    """, unsafe_allow_html=True)
+        st.markdown("""
+            <style>
+            [data-testid="stHeader"] { display: none !important; }
+            div[data-testid="stToolbar"] { display: none !important; }
+            .stApp { background-color: #0d1117; color: #c9d1d9; }
+            h1, h2, h3 { font-family: Arial, sans-serif; color: #f0f6fc !important; }
+            div[data-testid="stSidebar"] { background-color: #161b22 !important; border-right: 1px solid #30363d; }
+            .block-container { padding-top: 0.5rem !important; padding-bottom: 1rem !important; }
+            </style>
+        """, unsafe_allow_html=True)
 
     
     # Título centralizado
