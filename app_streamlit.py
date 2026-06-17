@@ -86,213 +86,214 @@ def conectar_supabase():
 # ==============================================================================
 # 4. CONTROLE DE ESTADO E EXIBIÇÃO DAS TELAS (RODA NO FINAL)
 # ==============================================================================
-if "opcao_menu" not in st.session_state:
-    st.session_state.opcao_menu = "divulgacao"
+def template_divulgacao():
+    if "opcao_menu" not in st.session_state:
+        st.session_state.opcao_menu = "divulgacao"
 
-if st.session_state.opcao_menu == "divulgacao":
-    # Título centralizado
-    st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
+    if st.session_state.opcao_menu == "divulgacao":
+        # Título centralizado
+        st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
 
-# Subtítulo centralizado
-    st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros, com conversas criptografadas e com suporte a vídeo em tempo real.</h4>", unsafe_allow_html=True)
+    # Subtítulo centralizado
+        st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros, com conversas criptografadas e com suporte a vídeo em tempo real.</h4>", unsafe_allow_html=True)
 
-# Tópicos centralizados
-    st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
+    # Tópicos centralizados
+        st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
 
-    st.markdown("""
-        <div style='text-align: center;'>
+        st.markdown("""
+            <div style='text-align: center;'>
 
-          🔒 **Ambiente 100% Seguro:** Suas mensagens e chamadas são privadas.\n
-          🎥 **Videochamada Integrada:** Conecte-se por vídeo com um clique.\n
-          📬 **Suporte Dedicado:** Canal direto via Fale Conosco.\n
+            🔒 **Ambiente 100% Seguro:** Suas mensagens e chamadas são privadas.\n
+            🎥 **Videochamada Integrada:** Conecte-se por vídeo com um clique.\n
+            📬 **Suporte Dedicado:** Canal direto via Fale Conosco.\n
 
-        </div>
-    """, unsafe_allow_html=True)
+            </div>
+        """, unsafe_allow_html=True)
 
-    st.markdown(
-        """
-        <div style="background-color: #004085; padding: 20px; border-radius: 5px; text-align: center; border-left: 5px solid #0066cc;">
-            <h1 style="margin: 0; color: #ffffff; font-size: 24px;">
-                💡 CADASTRE-SE AGORA EM NOSSO SITE ENCONTRE SEU MATCH E MARQUE UM ENCONTRO VIRTUAL!!
-            </h1>
-        </div>
-        """, 
-        unsafe_allow_html=True
-    )
+        st.markdown(
+            """
+            <div style="background-color: #004085; padding: 20px; border-radius: 5px; text-align: center; border-left: 5px solid #0066cc;">
+                <h1 style="margin: 0; color: #ffffff; font-size: 24px;">
+                    💡 CADASTRE-SE AGORA EM NOSSO SITE ENCONTRE SEU MATCH E MARQUE UM ENCONTRO VIRTUAL!!
+                </h1>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
 
-     # Cria duas colunas para os botões de Login e Cadastro ficarem lado a lado
-    col1, col2 = st.columns(2)
-    
-    with col1:
-          if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
-            st.session_state.opcao_menu = "🔒 Login"
-            st.rerun()
-
-    with col2:
-        with stylable_container(
-            key="green_button",
-            css_styles="""
-                button {
-                    background-color: #28a745;
-                    color: white;
-                    border-radius: 5px;
-                }
-                button:hover {
-                    background-color: #218838;
-                    color: white;
-                }
-            """,
-        ):
-            if st.button("📝 Cadastre-se", use_container_width=True):
-                st.session_state.opcao_menu = "📝 Cadastro"
+        # Cria duas colunas para os botões de Login e Cadastro ficarem lado a lado
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
+                st.session_state.opcao_menu = "🔒 Login"
                 st.rerun()
+
+        with col2:
+            with stylable_container(
+                key="green_button",
+                css_styles="""
+                    button {
+                        background-color: #28a745;
+                        color: white;
+                        border-radius: 5px;
+                    }
+                    button:hover {
+                        background-color: #218838;
+                        color: white;
+                    }
+                """,
+            ):
+                if st.button("📝 Cadastre-se", use_container_width=True):
+                    st.session_state.opcao_menu = "📝 Cadastro"
+                    st.rerun()
 
                          
 
-# ==============================================================================
-# ENCAIXE DAS SUAS FUNÇÕES EXISTENTES DE FLUXO DE CONTA
-# ==============================================================================
-elif st.session_state.opcao_menu == "🔒 Login":
-    def template_login():
-        st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
-        
-        with st.form("form_login"):
-            user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed")
-            pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed")
+    # ==============================================================================
+    # ENCAIXE DAS SUAS FUNÇÕES EXISTENTES DE FLUXO DE CONTA
+    # ==============================================================================
+    elif st.session_state.opcao_menu == "🔒 Login":
+        def template_login():
+            st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
             
-            if st.form_submit_button("Login", type="primary", use_container_width=True):
-                try:
-                    conn = conectar_supabase()
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT id, username, foto_perfil, is_admin, genero FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
-                    res = cursor.fetchone()
-                    
-                    if res:
-                        # Salva os dados na sessão
-                        st.session_state.usuario_id = res[0]
-                        st.session_state.username = res[1]
-                        st.session_state.foto_perfil = res[2]
-                        st.session_state.eh_admin = res[3]
-                        st.session_state.genero = res[4]
+            with st.form("form_login"):
+                user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed")
+                pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed")
+                
+                if st.form_submit_button("Login", type="primary", use_container_width=True):
+                    try:
+                        conn = conectar_supabase()
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT id, username, foto_perfil, is_admin, genero FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
+                        res = cursor.fetchone()
                         
-                        # Atualiza o status do usuário no banco PostgreSQL
-                        cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (res[0],))
-                        conn.commit()
+                        if res:
+                            # Salva os dados na sessão
+                            st.session_state.usuario_id = res[0]
+                            st.session_state.username = res[1]
+                            st.session_state.foto_perfil = res[2]
+                            st.session_state.eh_admin = res[3]
+                            st.session_state.genero = res[4]
+                            
+                            # Atualiza o status do usuário no banco PostgreSQL
+                            cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (res[0],))
+                            conn.commit()
+                            
+                            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                            cursor.close()
+                            conn.close()
+                            st.rerun()
+                        else:
+                            st.error("Usuário ou e-mail não encontrado.")
                         
-                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
                         cursor.close()
                         conn.close()
-                        st.rerun()
-                    else:
-                        st.error("Usuário ou e-mail não encontrado.")
+                    except Exception as e: 
+                        st.error(f"Erro: {e}")
+            
+            # Botão de cadastro estilizado
+            with stylable_container(
+                key="green_button",
+                css_styles="""
+                    button {
+                        background-color: #28a745;
+                        color: white;
+                        border-radius: 5px;
+                    }
+                    button:hover {
+                        background-color: #218838;
+                        color: white;
+                    }
+                """,
+            ):
+                if st.button("📝 Cadastre-se", use_container_width=True):
+                    st.session_state.opcao_menu = "📝 Cadastro"
+                    st.rerun()
+
+            # Rodapé do formulário de login (Voltar e Esqueceu a Senha)
+            col_voltar, col_esqueceu = st.columns(2)
+            with col_voltar:
+                if st.button("⬅️ Voltar para a Home", use_container_width=True):
+                    st.session_state.opcao_menu = "divulgacao"
+                    st.rerun()
                     
-                    cursor.close()
-                    conn.close()
-                except Exception as e: 
-                    st.error(f"Erro: {e}")
-        
-        # Botão de cadastro estilizado
-        with stylable_container(
-            key="green_button",
-            css_styles="""
-                button {
-                    background-color: #28a745;
-                    color: white;
-                    border-radius: 5px;
-                }
-                button:hover {
-                    background-color: #218838;
-                    color: white;
-                }
-            """,
-        ):
-            if st.button("📝 Cadastre-se", use_container_width=True):
-                st.session_state.opcao_menu = "📝 Cadastro"
-                st.rerun()
+            with col_esqueceu:
+                # Inicializa o estado para controlar a abertura do modal
+                if "mostrar_recuperar_senha" not in st.session_state:
+                    st.session_state.mostrar_recuperar_senha = False
 
-        # Rodapé do formulário de login (Voltar e Esqueceu a Senha)
-        col_voltar, col_esqueceu = st.columns(2)
-        with col_voltar:
-            if st.button("⬅️ Voltar para a Home", use_container_width=True):
-                st.session_state.opcao_menu = "divulgacao"
-                st.rerun()
-                
-        with col_esqueceu:
-            # Inicializa o estado para controlar a abertura do modal
-            if "mostrar_recuperar_senha" not in st.session_state:
-                st.session_state.mostrar_recuperar_senha = False
+                # DEFINE O DIÁLOGO (Apenas decora a função)
+                @st.dialog("🔑 Recuperar Senha")
+                def modal_recuperar_senha():
+                    st.write("Digite o seu e-mail cadastrado e a sua nova senha abaixo.")
+                    with st.form("form_recuperacao_senha", clear_on_submit=True):
+                        email_digitado = st.text_input("E-mail Cadastrado").strip().lower()
+                        nova_senha = st.text_input("Nova Senha", type="password")
+                        botao_confirmar = st.form_submit_button("Redefinir Senha", use_container_width=True)
+                        
+                        if botao_confirmar:
+                            if not email_digitado or not nova_senha:
+                                st.error("Por favor, preencha todos os campos.")
+                                return
+                            try:
+                                conn = conectar_supabase()
+                                cursor = conn.cursor()
+                                cursor.execute('SELECT id FROM usuarios WHERE email = %s', (email_digitado,))
+                                usuario_encontrado = cursor.fetchone()
 
-            # DEFINE O DIÁLOGO (Apenas decora a função)
-            @st.dialog("🔑 Recuperar Senha")
-            def modal_recuperar_senha():
-                st.write("Digite o seu e-mail cadastrado e a sua nova senha abaixo.")
-                with st.form("form_recuperacao_senha", clear_on_submit=True):
-                    email_digitado = st.text_input("E-mail Cadastrado").strip().lower()
-                    nova_senha = st.text_input("Nova Senha", type="password")
-                    botao_confirmar = st.form_submit_button("Redefinir Senha", use_container_width=True)
-                    
-                    if botao_confirmar:
-                        if not email_digitado or not nova_senha:
-                            st.error("Por favor, preencha todos os campos.")
-                            return
-                        try:
-                            conn = conectar_supabase()
-                            cursor = conn.cursor()
-                            cursor.execute('SELECT id FROM usuarios WHERE email = %s', (email_digitado,))
-                            usuario_encontrado = cursor.fetchone()
+                                if usuario_encontrado:
+                                    senha_criptografada = generate_password_hash(nova_senha)
+                                    cursor.execute('UPDATE usuarios SET password_hash = %s WHERE email = %s', (senha_criptografada, email_digitado))
+                                    conn.commit()
+                                    cursor.close()
+                                    conn.close()
+                                    
+                                    st.success("Senha redefinida com sucesso!")
+                                    st.toast("Sucesso! Faça o login agora.")
+                                    time.sleep(2.5)
+                                    st.session_state.mostrar_recuperar_senha = False
+                                    st.rerun() 
+                                else:
+                                    cursor.close()
+                                    conn.close()
+                                    st.error("E-mail não localizado no sistema.")
+                            except Exception as e:
+                                st.error(f"Erro ao acessar o banco de dados: {e}")
 
-                            if usuario_encontrado:
-                                senha_criptografada = generate_password_hash(nova_senha)
-                                cursor.execute('UPDATE usuarios SET password_hash = %s WHERE email = %s', (senha_criptografada, email_digitado))
-                                conn.commit()
-                                cursor.close()
-                                conn.close()
-                                
-                                st.success("Senha redefinida com sucesso!")
-                                st.toast("Sucesso! Faça o login agora.")
-                                time.sleep(2.5)
-                                st.session_state.mostrar_recuperar_senha = False
-                                st.rerun() 
-                            else:
-                                cursor.close()
-                                conn.close()
-                                st.error("E-mail não localizado no sistema.")
-                        except Exception as e:
-                            st.error(f"Erro ao acessar o banco de dados: {e}")
+                if st.button("🔑 Esqueceu a senha?", use_container_width=True):
+                    st.session_state.mostrar_recuperar_senha = True
 
-            if st.button("🔑 Esqueceu a senha?", use_container_width=True):
-                st.session_state.mostrar_recuperar_senha = True
-
-            if st.session_state.mostrar_recuperar_senha:
-                modal_recuperar_senha()
+                if st.session_state.mostrar_recuperar_senha:
+                    modal_recuperar_senha()
 
 
-# No topo do seu script ou dentro da função, garanta um ID exclusivo por sessão
-if "form_seed" not in st.session_state:
-    import random
-    st.session_state.form_seed = random.randint(1000, 9999)
+    # No topo do seu script ou dentro da função, garanta um ID exclusivo por sessão
+    if "form_seed" not in st.session_state:
+        import random
+        st.session_state.form_seed = random.randint(1000, 9999)
 
-# ==============================================================================
-# 1. CONFIGURAÇÕES GLOBAIS E ESTILO BASE
-# ==============================================================================
-if 'config_executada' not in st.session_state:
-    st.set_page_config(page_title="Lucy Chat IA - Plataforma", layout="wide")
-    st.session_state.config_executada = True
+    # ==============================================================================
+    # 1. CONFIGURAÇÕES GLOBAIS E ESTILO BASE
+    # ==============================================================================
+    if 'config_executada' not in st.session_state:
+        st.set_page_config(page_title="Lucy Chat IA - Plataforma", layout="wide")
+        st.session_state.config_executada = True
 
-st.markdown("""
-    <style>
-    [data-testid="stHeader"] { display: none !important; }
-    div[data-testid="stToolbar"] { display: none !important; }
-    .stApp { background-color: #0d1117; color: #c9d1d9; }
-    h1, h2, h3 { font-family: Arial, sans-serif; color: #f0f6fc !important; }
-    div[data-testid="stSidebar"] { background-color: #161b22 !important; border-right: 1px solid #30363d; }
-    .block-container { padding-top: 0.5rem !important; padding-bottom: 1rem !important; }
-    </style>
-""", unsafe_allow_html=True)
+    st.markdown("""
+        <style>
+        [data-testid="stHeader"] { display: none !important; }
+        div[data-testid="stToolbar"] { display: none !important; }
+        .stApp { background-color: #0d1117; color: #c9d1d9; }
+        h1, h2, h3 { font-family: Arial, sans-serif; color: #f0f6fc !important; }
+        div[data-testid="stSidebar"] { background-color: #161b22 !important; border-right: 1px solid #30363d; }
+        .block-container { padding-top: 0.5rem !important; padding-bottom: 1rem !important; }
+        </style>
+    """, unsafe_allow_html=True)
 
-# Inicializa a variável de menu se não existir
-if "opcao_menu" not in st.session_state:
-    st.session_state.opcao_menu = "📝 Cadastro"
+    # Inicializa a variável de menu se não existir
+    if "opcao_menu" not in st.session_state:
+        st.session_state.opcao_menu = "📝 Cadastro"
 
 # ==============================================================================
 # 2. DEFINIÇÃO DOS TEMPLATES (FUNÇÕES)
@@ -2158,7 +2159,7 @@ def template_admin_dashboard():
     # O segredo para renderizar o HTML corretamente está nesta linha abaixo:
     st.markdown(html_planos, unsafe_allow_html=True)
 
-    
+
 
 # NOVO: Página simples de Fale Conosco
 def template_fale_conosco():
@@ -2197,12 +2198,26 @@ if st.session_state.abrir_reserva_fluxo:
     modal_agendamento_encontro(dados_r)
 
 # --- ROTEAMENTO ESTRITO DE TELAS ---
-if st.session_state.usuario_id is None:
-    if st.session_state.opcao_menu == "🔒 Login": 
-        template_login()
-    elif st.session_state.opcao_menu == "📝 Cadastro": 
-        template_cadastro()
+
+# 1. VALIDAÇÃO DE TELAS PÚBLICAS (Usuário deslogado ou tela inicial)
+if st.session_state.opcao_menu == "📢 Divulgação":
+    template_divulgacao()
+
+elif st.session_state.opcao_menu == "🔒 Login":
+    st.session_state.usuario_id = None  # Limpa o ID se for para o login
+    template_login()
+
+elif st.session_state.opcao_menu == "📝 Cadastro":
+    st.session_state.usuario_id = None  # Limpa o ID se for para o cadastro
+    template_cadastro()
+
+# 2. VALIDAÇÃO DE TELAS PRIVADAS (Apenas usuários logados)
 else:
+    # Segurança: Se tentar acessar tela interna sem ID, joga de volta para a Divulgação
+    if st.session_state.usuario_id is None:
+        st.session_state.opcao_menu = "📢 Divulgação"
+        st.rerun()
+
     # 🟢 USUÁRIO LOGADO: Gerencia as telas internas e notificações
     if st.session_state.opcao_menu == "Plataforma de Planos IA":
         template_planos()
@@ -2227,7 +2242,7 @@ else:
         except Exception:
             pass
 
-    # --- RENDERIZAÇÃO REAL DOS MENUS ---
+    # --- RENDERIZAÇÃO REAL DOS MENUS INTERNOS ---
     if st.session_state.opcao_menu == "🤝 Sala Privada":
         template_sala_privada()
     elif st.session_state.opcao_menu == "💬 Conversar com Lucy":
@@ -2240,10 +2255,8 @@ else:
         template_gerenciar_conexoes_completo()
     elif st.session_state.opcao_menu == "🛠️ Painel Admin":
         template_painel_admin()
-# Adicione esta linha dentro do bloco else (Usuário Logado) no seu Orquestrador:
     elif st.session_state.opcao_menu == "✉️ Fale Conosco":
         template_fale_conosco()
-
 
 
 # ==============================================================================
