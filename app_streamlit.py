@@ -2000,55 +2000,55 @@ def template_painel_admin():
         # Configuração inicial do Streamlit (opcional, remova se já tiver no topo do seu código)
         st.set_page_config(layout="wide")
 
-       def template_painel_admin():
-    # --------------------------------------------------------------------------
-    # VALORES PADRÃO (FALLBACKS) - Impede qualquer NameError no restante do script
-    # --------------------------------------------------------------------------
-    df_users = pd.DataFrame(columns=["id", "tipo_plano", "moedas", "ultima_recarga"])
-    df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
-    total_assinantes = 0
-    total_credito = 0
-    total_gratis = 0
-    salas_ativas = [] # <-- Definida no topo garante que a linha 2166 nunca quebre
 
-    # --------------------------------------------------------------------------
-    # MÓDULO 1: CONSULTA DE DADOS REAIS NO SUPABASE
-    # --------------------------------------------------------------------------
-    try:
-        usuarios_query = (
-            supabase.table("usuarios")
-            .select("id", "tipo_plano", "moedas", "ultima_recarga")
-            .execute()
-        )
+        # --------------------------------------------------------------------------
+        # VALORES PADRÃO (FALLBACKS) - Impede qualquer NameError no restante do script
+        # --------------------------------------------------------------------------
+        df_users = pd.DataFrame(columns=["id", "tipo_plano", "moedas", "ultima_recarga"])
+        df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
+        total_assinantes = 0
+        total_credito = 0
+        total_gratis = 0
+        salas_ativas = [] # <-- Definida no topo garante que a linha 2166 nunca quebre
 
-        if usuarios_query.data:
-            df_users = pd.DataFrame(usuarios_query.data)
-            df_users["ultima_recarga"] = pd.to_datetime(
-                df_users["ultima_recarga"]
-            ).dt.strftime("%Y-%m-%d")
+        # --------------------------------------------------------------------------
+        # MÓDULO 1: CONSULTA DE DADOS REAIS NO SUPABASE
+        # --------------------------------------------------------------------------
+        try:
+            usuarios_query = (
+                supabase.table("usuarios")
+                .select("id", "tipo_plano", "moedas", "ultima_recarga")
+                .execute()
+            )
 
-    except Exception as e:
-        st.error(f"Erro ao carregar dados do Supabase: {e}")
-        # Não damos st.stop() para permitir que o resto da página carregue zerada sem crashar
+            if usuarios_query.data:
+                df_users = pd.DataFrame(usuarios_query.data)
+                df_users["ultima_recarga"] = pd.to_datetime(
+                    df_users["ultima_recarga"]
+                ).dt.strftime("%Y-%m-%d")
+
+        except Exception as e:
+            st.error(f"Erro ao carregar dados do Supabase: {e}")
+            # Não damos st.stop() para permitir que o resto da página carregue zerada sem crashar
 
 
-    # --------------------------------------------------------------------------
-    # MÓDULO 2: PROCESSAMENTO E AGREGAÇÃO DOS DADOS REAIS
-    # --------------------------------------------------------------------------
-    try:
-        if not df_users.empty:
-            # Distribuição de Usuários
-            total_assinantes = int(df_users[df_users["tipo_plano"] != "gratis"].shape[0])
-            total_credito = int(df_users[(df_users["tipo_plano"] == "gratis") & (df_users["moedas"] > 0)].shape[0])
-            total_gratis = int(df_users[(df_users["tipo_plano"] == "gratis") & (df_users["moedas"] == 0)].shape[0])
+        # --------------------------------------------------------------------------
+        # MÓDULO 2: PROCESSAMENTO E AGREGAÇÃO DOS DADOS REAIS
+        # --------------------------------------------------------------------------
+        try:
+            if not df_users.empty:
+                # Distribuição de Usuários
+                total_assinantes = int(df_users[df_users["tipo_plano"] != "gratis"].shape[0])
+                total_credito = int(df_users[(df_users["tipo_plano"] == "gratis") & (df_users["moedas"] > 0)].shape[0])
+                total_gratis = int(df_users[(df_users["tipo_plano"] == "gratis") & (df_users["moedas"] == 0)].shape[0])
 
-            # Agrupamento para o Gráfico de Pareto
-            df_agrupado = df_users.groupby("ultima_recarga")["moedas"].sum().reset_index()
-            df_agrupado.columns = ["data", "quantidade_creditos"]
-            df_creditos = df_agrupado.sort_values(by="data", ascending=False).head(7)
+                # Agrupamento para o Gráfico de Pareto
+                df_agrupado = df_users.groupby("ultima_recarga")["moedas"].sum().reset_index()
+                df_agrupado.columns = ["data", "quantidade_creditos"]
+                df_creditos = df_agrupado.sort_values(by="data", ascending=False).head(7)
 
-    except Exception as e:
-        st.error(f"Erro ao processar métricas reais: {e}")
+        except Exception as e:
+            st.error(f"Erro ao processar métricas reais: {e}")
 
 
         # --------------------------------------------------------------------------
