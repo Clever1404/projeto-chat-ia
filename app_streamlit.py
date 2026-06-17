@@ -2302,6 +2302,8 @@ else:
         template_gerenciar_conexoes_completo()
     elif st.session_state.opcao_menu == "🛠️ Painel Admin":
         template_painel_admin()
+        else:
+            template_admin_dashboard()
     elif st.session_state.opcao_menu == "✉️ Fale Conosco":
         template_fale_conosco()
 
