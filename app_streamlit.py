@@ -1997,82 +1997,87 @@ def template_painel_admin():
         st.set_page_config(layout="wide")
 
         # --------------------------------------------------------------------------
-        # MÓDULO 1: CONSULTA DE DADOS NO SUPABASE
-        # --------------------------------------------------------------------------
-        try:
-            # Busca totalizadores de usuários
-            usuarios_query = (
-                supabase.table("usuarios").select("tipo_plano", "moedas").execute()
-            )
-            df_users = (
-                pd.DataFrame(usuarios_query.data)
-                if usuarios_query.data
-                else pd.DataFrame(columns=["tipo_plano", "moedas"])
-            )
+# MÓDULO 1: CONSULTA DE DADOS REAIS NO SUPABASE
+# --------------------------------------------------------------------------
+try:
+    # Busca os dados reais da sua tabela 'usuarios'
+    usuarios_query = (
+        supabase.table("usuarios")
+        .select("id", "tipo_plano", "moedas", "ultima_recarga")
+        .execute()
+    )
 
-            # Busca log de consumo de créditos da semana corrente
-            datas_semana = [
-                (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
-                for i in range(7)
-            ][::-1]
+    if usuarios_query.data:
+        df_users = pd.DataFrame(usuarios_query.data)
 
-            valores_credito = [120, 90, 210, 150, 300, 250, 400]
+        # Trata e padroniza a coluna de data para o formato Ano-Mês-Dia
+        df_users["ultima_recarga"] = pd.to_datetime(
+            df_users["ultima_recarga"]
+        ).dt.strftime("%Y-%m-%d")
+    else:
+        # Cria colunas vazias de segurança caso não retorne nada
+        df_users = pd.DataFrame(
+            columns=["id", "tipo_plano", "moedas", "ultima_recarga"]
+        )
 
-            dados_credito = {
-                "data": datas_semana,
-                "quantidade_creditos": valores_credito,
-            }
-            df_creditos = pd.DataFrame(dados_credito)
-
-            # Busca salas em uso ativo
-            salas_ativas = [
-                {
-                    "sala": "Sala Privada Alpha",
-                    "usuario": "CarlosM",
-                    "tempo_uso": "00:45:12",
-                },
-                {
-                    "sala": "Sala Privada Gamma",
-                    "usuario": "Beatriz99",
-                    "tempo_uso": "00:12:04",
-                },
-            ]
-        except Exception as e:
-            st.error(f"Erro ao carregar dados do dashboard: {e}")
-            st.stop()  # Interrompe a execução caso a consulta principal falhe
+except Exception as e:
+    st.error(f"Erro ao carregar dados do Supabase: {e}")
+    st.stop()
 
 
         # --------------------------------------------------------------------------
-        # MÓDULO 2: PROCESSAMENTO DE DADOS (CÁLCULO DOS TOTAIS)
+        # MÓDULO 2: PROCESSAMENTO E AGREGAÇÃO DOS DADOS REAIS
         # --------------------------------------------------------------------------
         try:
             if not df_users.empty:
-                # Assinantes: quem não está no plano gratuito
+                # --- CÁLCULO PARA O GRÁFICO DE PIZZA (Distribuição de Usuários) ---
+                # Assinantes: quem não usa o plano gratuito
                 total_assinantes = int(
-                    df_users[df_users["tipo_plano"] != "gratis"].shape[0]
+                    df_users[df_users["tipo_plano"] != "gratis"].shape
                 )
 
-                # Com Créditos: plano grátis que comprou/possui moedas extras
+                # Com Créditos: usuários do plano grátis que têm moedas > 0
                 total_credito = int(
                     df_users[
                         (df_users["tipo_plano"] == "gratis") & (df_users["moedas"] > 0)
-                    ].shape[0]
+                    ].shape
                 )
 
-                # Sem Assinatura: plano grátis com zero moedas
+                # Sem Assinatura: usuários do plano grátis com 0 moedas
                 total_gratis = int(
                     df_users[
                         (df_users["tipo_plano"] == "gratis")
                         & (df_users["moedas"] == 0)
-                    ].shape[0]
+                    ].shape
                 )
+
+                # --- CÁLCULO PARA O GRÁFICO DE PARETO (Volume Real de Moedas por Data) ---
+                # Agrupa a tabela real somando as moedas de quem recarregou na mesma data
+                df_creditos = (
+                    df_users.groupby("ultima_recarga")["moedas"]
+                    .sum()
+                    .reset_index()
+                )
+                df_creditos.columns = ["data", "quantidade_creditos"]
+
+                # Filtra apenas os últimos 7 dias com movimentação para o gráfico não poluir
+                df_creditos = df_creditos.sort_values(by="data", ascending=False).head(
+                    7
+                )
+
             else:
-                # Fallback de segurança se o banco estiver vazio
+                # Fallbacks de segurança se a tabela estiver completamente vazia
                 total_assinantes, total_credito, total_gratis = 0, 0, 0
+                df_creditos = pd.DataFrame(
+                    columns=["data", "quantidade_creditos"]
+                )
 
         except Exception as e:
-            st.error(f"Erro ao processar métricas de usuários: {e}")
+            st.error(f"Erro ao processar métricas reais: {e}")
             total_assinantes, total_credito, total_gratis = 0, 0, 0
+            df_creditos = pd.DataFrame(
+                columns=["data", "quantidade_creditos"]
+            )
 
 
         # --------------------------------------------------------------------------
@@ -2178,7 +2183,7 @@ def template_painel_admin():
         # --------------------------------------------------------------------------
         st.subheader("📋 Visualização de Termos e Regras dos Planos")
         
-        html_planos = """
+        st.html("""
         <div style="background-color: #161b22; padding: 20px; border-radius: 8px; border: 1px solid #30363d;">
             <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
                 <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
@@ -2196,8 +2201,8 @@ def template_painel_admin():
             </div>
         </div>
         """
-        
-        st.markdown(html_planos, unsafe_allow_html=True)
+        )
+       
 
 
     # ==============================================================================
