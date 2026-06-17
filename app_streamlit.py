@@ -1488,8 +1488,8 @@ def renderizar_listas_sidebar_e_acoes():
         """, unsafe_allow_html=True)
 
         # Busca o plano do usuário atualizado para aplicar as regras
-        tipo_plano_sala = "Grátis"
-        saldo_moedas_sala = 0
+        tipo_plano = "Grátis"
+        saldo_moedas = 0
         try:
             user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(my_id)).execute()
             if user_data.data and len(user_data.data) > 0:
