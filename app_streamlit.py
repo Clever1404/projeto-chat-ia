@@ -2158,17 +2158,16 @@ def template_painel_admin():
                 ].shape[0]
             )
 
-            # Gráfico de Pareto (Agrupado por Dia da Semana)
+            # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
+            # Agrupa e soma as moedas pela data pura
             df_agrupado = (
-                df_users.groupby(df_users["ultima_recarga"].dt.date)[
-                    "moedas"
-                ]
+                df_users.groupby("ultima_recarga")["moedas"]
                 .sum()
                 .reset_index()
             )
             df_agrupado.columns = ["data", "quantidade_creditos"]
-            df_agrupado["data"] = pd.to_datetime(df_agrupado["data"])
 
+            # Filtra os últimos 7 dias com base na data atual
             hoje = pd.Timestamp(datetime.now().date())
             ha_uma_semana = hoje - pd.Timedelta(days=7)
             df_creditos = df_agrupado[
@@ -2177,18 +2176,22 @@ def template_painel_admin():
             ].copy()
 
             if not df_creditos.empty:
+                # Transforma a data no nome do dia da semana (ex: 'Monday' -> 'Segunda')
                 df_creditos["dia_nome_en"] = df_creditos[
                     "data"
                 ].dt.day_name()
                 df_creditos["data"] = df_creditos["dia_nome_en"].map(
                     dias_semana_pt
                 )
+
+                # Ordena os dias cronologicamente de acordo com a semana real
                 df_creditos = df_creditos.sort_values(
                     by="quantidade_creditos", ascending=False
                 )
 
     except Exception as e:
         st.error(f"Erro ao processar métricas reais: {e}")
+
 
     # --------------------------------------------------------------------------
     # 5. RENDERIZAÇÃO DOS GRÁFICOS (MÓDULO 3)
