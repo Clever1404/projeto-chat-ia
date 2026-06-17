@@ -2031,13 +2031,22 @@ def template_admin_dashboard():
         df_users = pd.DataFrame(usuarios_query.data) if usuarios_query.data else pd.DataFrame(columns=["tipo_plano", "moedas"])
         
         # Busca log de consumo de créditos da semana corrente
-        # Mock de dados simulados para estruturação dos gráficos caso a tabela de logs ainda não exista
+        # Mock de dados simulados utilizando list() para evitar erros de renderização
         datas_semana = [(datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)][::-1]
-        dados_credito = {"data": datas_semana, "quantidade_creditos":}
+        
+        valores_credito = list()
+        valores_credito.append(120)
+        valores_credito.append(90)
+        valores_credito.append(210)
+        valores_credito.append(150)
+        valores_credito.append(300)
+        valores_credito.append(250)
+        valores_credito.append(400)
+        
+        dados_credito = {"data": datas_semana, "quantidade_creditos": valores_credito}
         df_creditos = pd.DataFrame(dados_credito)
         
         # Busca salas em uso ativo
-        # Exemplo baseado em tabelas de sessões ativas
         salas_ativas = [
             {"sala": "Sala Privada Alpha", "usuario": "CarlosM", "tempo_uso": "00:45:12"},
             {"sala": "Sala Privada Gamma", "usuario": "Beatriz99", "tempo_uso": "00:12:04"}
@@ -2089,10 +2098,15 @@ def template_admin_dashboard():
             x=df_creditos["data"], y=df_creditos["cum_percentage"],
             name="% Acumulada", yaxis="y2", line=dict(color="#28a745", width=3)
         ))
+        
+        limites_grafico = list()
+        limites_grafico.append(0)
+        limites_grafico.append(105)
+        
         fig_pareto.update_layout(
             title="Consumo de Créditos (Pareto & Tendência Semanal)",
             yaxis=dict(title="Quantidade de Créditos"),
-            yaxis2=dict(title="Percentual Acumulado (%)", overlaying="y", side="right", range=[0, 105]),
+            yaxis2=dict(title="Percentual Acumulado (%)", overlaying="y", side="right", range=limites_grafico),
             theme="plotly_dark", background_color="#161b22"
         )
         st.plotly_chart(fig_pareto, use_container_width=True)
@@ -2103,10 +2117,16 @@ def template_admin_dashboard():
             "Categoria": ["Assinantes", "Com Créditos", "Sem Assinatura"],
             "Total": [total_assinantes, total_credito, total_gratis]
         })
+        
+        cores_pizza = list()
+        cores_pizza.append("#28a745")
+        cores_pizza.append("#007bff")
+        cores_pizza.append("#6e7681")
+        
         fig_pizza = px.pie(
             df_pizza, values="Total", names="Categoria", 
             title="Distribuição de Tipos de Usuários",
-            color_discrete_sequence=["#28a745", "#007bff", "#6e7681"]
+            color_discrete_sequence=cores_pizza
         )
         st.plotly_chart(fig_pizza, use_container_width=True)
 
