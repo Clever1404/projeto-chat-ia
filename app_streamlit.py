@@ -298,9 +298,10 @@ if "opcao_menu" not in st.session_state:
 # 2. DEFINIÇÃO DOS TEMPLATES (FUNÇÕES)
 # ==============================================================================
 def template_cadastro():
-    st.markdown('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>', unsafe_allow_html=True)
+    # Atualizado para usar st.html nativo
+    st.html('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>')
     
-    # Substitua a linha do formulário por esta:
+    # Bloco do Formulário de Cadastro
     with st.form(key=f"form_cad_unico_{st.session_state.form_seed}"):
         usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
         email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed")
@@ -315,49 +316,77 @@ def template_cadastro():
             """,
         ):         
             if st.form_submit_button("Cadastre-se", use_container_width=True):
+                # 1. Validação de campos vazios
+                if not usuario.strip() or not email.strip() or not senha.strip():
+                    st.warning("⚠️ Por favor, preencha todos os campos.")
+                    st.stop()
+                
+                if len(senha) < 6:
+                    st.warning("⚠️ A senha deve ter pelo menos 6 caracteres.")
+                    st.stop()
+
+                # 2. Conexão e Verificação de Duplicidade
                 try:
                     conn = conectar_supabase()
                     cursor = conn.cursor()
                     
+                    # Verifica se o username ou o e-mail já existem
+                    cursor.execute(
+                        "SELECT username, email FROM usuarios WHERE username = %s OR email = %s;", 
+                        (usuario.strip(), email.strip())
+                    )
+                    usuario_existente = cursor.fetchone()
+                    
+                    if usuario_existente:
+                        # Identifica qual dos dois campos gerou a duplicidade
+                        if usuario_existente[0] == usuario.strip():
+                            st.error("❌ Este nome de usuário já está em uso.")
+                        else:
+                            st.error("❌ Este e-mail já está cadastrado.")
+                        
+                        cursor.close()
+                        conn.close()
+                        st.stop() # Interrompe a execução aqui
+
+                    # 3. Executa o cadastro se passar em todas as validações
                     senha_final = generate_password_hash(senha) if 'generate_password_hash' in locals() else senha
                     
                     cursor.execute(
                         "INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", 
-                        (usuario, email, senha_final, genero)
+                        (usuario.strip(), email.strip(), senha_final, genero)
                     )
                     st.session_state.usuario_id = cursor.fetchone()[0]
-                    st.session_state.username = usuario
+                    st.session_state.username = usuario.strip()
                     st.session_state.genero = genero
                     
                     conn.commit()
                     cursor.close()
                     conn.close()
                     
-                    # Altera o estado do menu e força a atualização da tela
                     st.session_state.opcao_menu = "Plataforma de Planos IA"
                     st.rerun()
+                    
                 except Exception as e:
-                    st.error(f"Erro ao cadastrar: {e}")
-            # Botão de cadastro estilizado
-        
-        
-        with stylable_container(
-            key="red_button",
-            css_styles="""
-                button {
-                    background-color: primary;
-                    color: white;
-                    border-radius: 5px;
-                }
-                button:hover {
-                    background-color: primary;
-                    color: white;
-                }
-            """,
-        ):
-            if st.form_submit_button("← Voltar para o 🔒 Login", use_container_width=True):
-                st.session_state.opcao_menu = "🔒 Login"
-                st.rerun()
+                    st.error(f"Erro ao processar cadastro: {e}")
+
+    # O Botão "Voltar" agora está FORA do formulário e usa st.button normal
+    with stylable_container(
+        key="red_button",
+        css_styles="""
+            button {
+                background-color: #dc3545; /* Alterado de 'primary' para uma cor real (vermelho) */
+                color: white;
+                border-radius: 5px;
+            }
+            button:hover {
+                background-color: #bd2130;
+                color: white;
+            }
+        """,
+    ):
+        if st.button("← Voltar para o 🔒 Login", use_container_width=True):
+            st.session_state.opcao_menu = "🔒 Login"
+            st.rerun()
     
            
 
@@ -1458,6 +1487,17 @@ def renderizar_listas_sidebar_e_acoes():
             </div>
         """, unsafe_allow_html=True)
 
+        # Busca o plano do usuário atualizado para aplicar as regras
+        tipo_plano_sala = "Grátis"
+        saldo_moedas_sala = 0
+        try:
+            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(my_id)).execute()
+            if user_data.data and len(user_data.data) > 0:
+                tipo_plano_sala = user_data.data[0].get("tipo_plano", "Grátis")
+                saldo_moedas_sala = user_data.data[0].get("moedas", 0)
+        except Exception:
+            pass
+        
         st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
 
 
