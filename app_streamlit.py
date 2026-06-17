@@ -2264,8 +2264,7 @@ def template_painel_admin():
             )
 
 
-    # Para rodar a função
-    template_painel_admin()
+    
 
         # --------------------------------------------------------------------------
         # MÓDULO 5: VISUALIZAÇÃO DOS CARDÁPIOS DE PLANOS
