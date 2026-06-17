@@ -175,7 +175,6 @@ def template_home():
 # ==============================================================================
     #elif st.session_state.opcao_menu == "🔒 Login":
 def template_login():
-    st.write(f"DEBUG - Menu atual antes de desenhar o Login: '{st.session_state.opcao_menu}'")
     st.session_state.opcao_menu == "login"
     st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
             
@@ -2050,6 +2049,14 @@ def template_painel_admin():
                             st.rerun()
                         except Exception as e:
                             st.error(f"Erro ao deletar usuário: {e}")
+
+    # Botão de retorno na base do painel
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("← Voltar ao Chat Principal", type="secondary", use_container_width=True, key="btn_admin_back_to_lucy"):
+        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+        st.rerun()
+
+
 
 def template_admin_dashboard():
     st.title("👑 Painel de Controle do Administrador")
