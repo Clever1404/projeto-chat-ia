@@ -230,9 +230,9 @@ def template_login():
     # Rodapé do formulário de login (Voltar e Esqueceu a Senha)
     col_voltar, col_esqueceu = st.columns(2)
     with col_voltar:
-    if st.button("⬅️ Voltar para a Home", use_container_width=True):
-        st.session_state.opcao_menu = "🏠 Home"  # Deve ser igual ao topo
-        st.rerun()
+        if st.button("⬅️ Voltar para a Home", use_container_width=True):
+            st.session_state.opcao_menu = "🏠 Home"  # Deve ser igual ao topo
+            st.rerun()
                     
     with col_esqueceu:
         # Inicializa o estado para controlar a abertura do modal
