@@ -1060,20 +1060,29 @@ def template_chat_ia_completo():
 
 @st.dialog("🤖 Lucy Notou Afinidade!")
 def modal_match_lucy(dados_m):
-    # 🔍 SINCRONIZAÇÃO DE PERMISSÕES DO USUÁRIO EM TEMPO REAL
-    id_usuario = st.session_state.get("usuario_id", None)
-    saldo_moedas = 0
+    # 1. Define os valores padrões caso a busca no banco falhe
     tipo_plano = "Grátis"
-    
-    if id_usuario:
-        try:
-            # Garante dados frescos do banco de dados
-            user_query = supabase.table("usuarios").select("moedas", "tipo_plano").eq("id", id_usuario).execute()
-            if user_query.data and len(user_query.data) > 0:
-                saldo_moedas = user_query.data[0].get("moedas", 0)
-                tipo_plano = user_query.data[0].get("tipo_plano", "Grátis")
-        except Exception:
-            pass
+    saldo_moedas = 0
+
+    try:
+        # Captura com segurança o ID do usuário logado
+        id_usuario_logado = st.session_state.get("usuario_id")
+            
+        # CORREÇÃO: Alterado de 'NULL' para 'None' (sintaxe correta do Python)
+        if id_usuario_logado is not None:
+            # Faz a busca no Supabase convertendo o ID para inteiro
+            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
+                
+            # Verifica se a lista contém dados e extrai do primeiro elemento [0]
+            if user_data.data and len(user_data.data) > 0:
+                tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
+                saldo_moedas = user_data.data[0].get("moedas", 0)
+        else:
+            st.warning("⚠️ Usuário não identificado na sessão.")
+
+    except Exception as e:
+        st.error(f"Erro ao carregar dados do banco: {e}")
+
 
     st.markdown(f"Lucy identificou uma excelente afinidade entre você e **{dados_m['nome']}**!")
     
@@ -1089,7 +1098,7 @@ def modal_match_lucy(dados_m):
                 st.session_state.opcao_menu = "🤝 Sala Privada"
                 st.rerun()
                 
-        elif tipo_plano == "Crédito":
+        elif tipo_plano == "Plano Crédito de Moedas":
             st.info(f"🪙 Seu Saldo: **{saldo_moedas} moedas**. Custo da Sala Privada: 10 moedas = 10 minutos.")
             if st.button("🪙 Entrar na Sala Privada (Gasta 10 moedas)", type="primary", use_container_width=True):
                 if saldo_moedas >= 10:
@@ -1397,18 +1406,31 @@ def template_sala_privada():
                         st.session_state.tempo_inicio_sala = time.time()
 
                     # Busca o plano do usuário atualizado para aplicar as regras
-                    tipo_plano_sala = "Grátis"
-                    saldo_moedas_sala = 0
+                    # 1. Define os valores padrões caso a busca no banco falhe
+                    tipo_plano = "Grátis"
+                    saldo_moedas = 0
+
                     try:
-                        user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(my_id)).execute()
-                        if user_data.data and len(user_data.data) > 0:
-                            tipo_plano_sala = user_data.data[0].get("tipo_plano", "Grátis")
-                            saldo_moedas_sala = user_data.data[0].get("moedas", 0)
-                    except Exception:
-                        pass
+                        # Captura com segurança o ID do usuário logado
+                        id_usuario_logado = st.session_state.get("usuario_id")
+                            
+                        # CORREÇÃO: Alterado de 'NULL' para 'None' (sintaxe correta do Python)
+                        if id_usuario_logado is not None:
+                            # Faz a busca no Supabase convertendo o ID para inteiro
+                            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
+                                
+                            # Verifica se a lista contém dados e extrai do primeiro elemento [0]
+                            if user_data.data and len(user_data.data) > 0:
+                                tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
+                                saldo_moedas = user_data.data[0].get("moedas", 0)
+                        else:
+                            st.warning("⚠️ Usuário não identificado na sessão.")
+
+                    except Exception as e:
+                        st.error(f"Erro ao carregar dados do banco: {e}")
 
                     # Lógica de controle do Timer para usuários do plano de Crédito
-                    if tipo_plano_sala == "Crédito":
+                    if tipo_plano_sala == "Plano Crédito de Moedas":
                         import time
                         tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
                         
@@ -2116,26 +2138,24 @@ def template_painel_admin():
     # 3. PROCESSAMENTO E AGREGAÇÃO DOS DADOS DE USUÁRIOS
     # --------------------------------------------------------------------------
     try:
+        try:
         if not df_users.empty:
-            # Gráfico de Pizza
-            filtro_gratis = (
-                (df_users["tipo_plano"] == "gratis")
-                | (df_users["tipo_plano"] == "none")
-                | (df_users["tipo_plano"] == "")
-            ) & (df_users["moedas"].fillna(0) == 0)
-            total_gratis = int(df_users[filtro_gratis].shape)
-
-            # Com Créditos
-            filtro_credito = (
-                (df_users["tipo_plano"] == "gratis")
-                | (df_users["tipo_plano"] == "none")
-                | (df_users["tipo_plano"] == "")
-            ) & (df_users["moedas"].fillna(0) > 0)
-            total_credito = int(df_users[filtro_credito].shape)
-
-            # Assinantes
+            # --- CÁLCULO DO GRÁFICO DE PIZZA ---
             total_assinantes = int(
-                df_users[~(filtro_gratis | filtro_credito)].shape
+                df_users[df_users["tipo_plano"] != "Grátis"].shape[0]
+            )
+            total_credito = int(
+                df_users[
+                    (df_users["tipo_plano"] == "Grátis")
+                    & (df_users["moedas"] > 0)
+                ].shape[0]
+            )
+            # Substituído "Sem Assinatura" por "Grátis" conforme solicitado
+            total_gratis = int(
+                df_users[
+                    (df_users["tipo_plano"] == "Grátis")
+                    & (df_users["moedas"] == 0)
+                ].shape[0]
             )
 
             # Gráfico de Pareto (Agrupado por Dia da Semana)
