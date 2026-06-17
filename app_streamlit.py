@@ -19,6 +19,8 @@ import mercadopago
 from supabase import create_client, Client
 import random
 from datetime import datetime, timedelta
+import plotly.graph_objects as go
+import plotly.express as px
 
 
 UPLOAD_FOLDER = "uploads"
@@ -1991,111 +1993,161 @@ def template_painel_admin():
         st.markdown("### 👑 Painel de Controle do Administrador")
         st.markdown("<br>", unsafe_allow_html=True)
 
+        # Configuração inicial do Streamlit (opcional, remova se já tiver no topo do seu código)
+        st.set_page_config(layout="wide")
+
         # --------------------------------------------------------------------------
         # MÓDULO 1: CONSULTA DE DADOS NO SUPABASE
         # --------------------------------------------------------------------------
         try:
             # Busca totalizadores de usuários
-            usuarios_query = supabase.table("usuarios").select("tipo_plano", "moedas").execute()
-            df_users = pd.DataFrame(usuarios_query.data) if usuarios_query.data else pd.DataFrame(columns=["tipo_plano", "moedas"])
-            
+            usuarios_query = (
+                supabase.table("usuarios").select("tipo_plano", "moedas").execute()
+            )
+            df_users = (
+                pd.DataFrame(usuarios_query.data)
+                if usuarios_query.data
+                else pd.DataFrame(columns=["tipo_plano", "moedas"])
+            )
+
             # Busca log de consumo de créditos da semana corrente
-            # Mock de dados simulados utilizando list() para evitar erros de renderização
-            datas_semana = [(datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)][::-1]
-            
-            valores_credito = list()
-            valores_credito.append(120)
-            valores_credito.append(90)
-            valores_credito.append(210)
-            valores_credito.append(150)
-            valores_credito.append(300)
-            valores_credito.append(250)
-            valores_credito.append(400)
-            
-            dados_credito = {"data": datas_semana, "quantidade_creditos": valores_credito}
+            datas_semana = [
+                (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+                for i in range(7)
+            ][::-1]
+
+            valores_credito = [120, 90, 210, 150, 300, 250, 400]
+
+            dados_credito = {
+                "data": datas_semana,
+                "quantidade_creditos": valores_credito,
+            }
             df_creditos = pd.DataFrame(dados_credito)
-            
+
             # Busca salas em uso ativo
             salas_ativas = [
-                {"sala": "Sala Privada Alpha", "usuario": "CarlosM", "tempo_uso": "00:45:12"},
-                {"sala": "Sala Privada Gamma", "usuario": "Beatriz99", "tempo_uso": "00:12:04"}
+                {
+                    "sala": "Sala Privada Alpha",
+                    "usuario": "CarlosM",
+                    "tempo_uso": "00:45:12",
+                },
+                {
+                    "sala": "Sala Privada Gamma",
+                    "usuario": "Beatriz99",
+                    "tempo_uso": "00:12:04",
+                },
             ]
         except Exception as e:
             st.error(f"Erro ao carregar dados do dashboard: {e}")
-            return
+            st.stop()  # Interrompe a execução caso a consulta principal falhe
+
 
         # --------------------------------------------------------------------------
-        # MÓDULO 2: INDICADORES E CONTAGEM DE USUÁRIOS
+        # MÓDULO 2: PROCESSAMENTO DE DADOS (CÁLCULO DOS TOTAIS)
         # --------------------------------------------------------------------------
-        col1, col2, col3 = st.columns(3)
-        
-        if not df_users.empty:
-            total_assinantes = len(df_users[df_users["tipo_plano"] == "Assinante"])
-            total_credito = len(df_users[df_users["tipo_plano"] == "Crédito"])
-            total_gratis = len(df_users[(df_users["tipo_plano"] == "Grátis") | (df_users["tipo_plano"].isna())])
-        else:
+        try:
+            if not df_users.empty:
+                # Assinantes: quem não está no plano gratuito
+                total_assinantes = int(
+                    df_users[df_users["tipo_plano"] != "gratis"].shape[0]
+                )
+
+                # Com Créditos: plano grátis que comprou/possui moedas extras
+                total_credito = int(
+                    df_users[
+                        (df_users["tipo_plano"] == "gratis") & (df_users["moedas"] > 0)
+                    ].shape[0]
+                )
+
+                # Sem Assinatura: plano grátis com zero moedas
+                total_gratis = int(
+                    df_users[
+                        (df_users["tipo_plano"] == "gratis")
+                        & (df_users["moedas"] == 0)
+                    ].shape[0]
+                )
+            else:
+                # Fallback de segurança se o banco estiver vazio
+                total_assinantes, total_credito, total_gratis = 0, 0, 0
+
+        except Exception as e:
+            st.error(f"Erro ao processar métricas de usuários: {e}")
             total_assinantes, total_credito, total_gratis = 0, 0, 0
-            
-        with col1:
-            st.metric("Usuários Assinantes", f"⭐ {total_assinantes}")
-        with col2:
-            st.metric("Usuários com Crédito", f"🪙 {total_credito}")
-        with col3:
-            st.metric("Usuários Sem Assinatura (Grátis)", f"⚪ {total_gratis}")
-            
-        st.markdown("---")
+
 
         # --------------------------------------------------------------------------
         # MÓDULO 3: GRÁFICOS (PARETO, ACUMULADO E DISTRIBUIÇÃO)
         # --------------------------------------------------------------------------
         st.subheader("📊 Análise de Créditos e Assinaturas")
         g1, g2 = st.columns(2)
-        
+
         with g1:
             # Cálculo de Pareto e Linha Acumulada
-            df_creditos = df_creditos.sort_values(by="quantidade_creditos", ascending=False)
+            df_creditos = df_creditos.sort_values(
+                by="quantidade_creditos", ascending=False
+            )
             df_creditos["cum_sum"] = df_creditos["quantidade_creditos"].cumsum()
-            df_creditos["cum_percentage"] = (df_creditos["cum_sum"] / df_creditos["quantidade_creditos"].sum()) * 100
-            
+            df_creditos["cum_percentage"] = (
+                df_creditos["cum_sum"] / df_creditos["quantidade_creditos"].sum()
+            ) * 100
+
             # Montagem do Gráfico Combinado (Pareto + Linha Semanal)
             fig_pareto = go.Figure()
-            fig_pareto.add_trace(go.Bar(
-                x=df_creditos["data"], y=df_creditos["quantidade_creditos"],
-                name="Créditos por Dia", marker_color="#007bff"
-            ))
-            fig_pareto.add_trace(go.Scatter(
-                x=df_creditos["data"], y=df_creditos["cum_percentage"],
-                name="% Acumulada", yaxis="y2", line=dict(color="#28a745", width=3)
-            ))
-            
-            limites_grafico = list()
-            limites_grafico.append(0)
-            limites_grafico.append(105)
-            
+            fig_pareto.add_trace(
+                go.Bar(
+                    x=df_creditos["data"],
+                    y=df_creditos["quantidade_creditos"],
+                    name="Créditos por Dia",
+                    marker_color="#007bff",
+                )
+            )
+            fig_pareto.add_trace(
+                go.Scatter(
+                    x=df_creditos["data"],
+                    y=df_creditos["cum_percentage"],
+                    name="% Acumulada",
+                    yaxis="y2",
+                    line=dict(color="#28a745", width=3),
+                )
+            )
+
             fig_pareto.update_layout(
                 title="Consumo de Créditos (Pareto & Tendência Semanal)",
                 yaxis=dict(title="Quantidade de Créditos"),
-                yaxis2=dict(title="Percentual Acumulado (%)", overlaying="y", side="right", range=limites_grafico),
-                theme="plotly_dark", background_color="#161b22"
+                yaxis2=dict(
+                    title="Percentual Acumulado (%)",
+                    overlaying="y",
+                    side="right",
+                    range=[0, 105],
+                ),
+                template="plotly_dark",
+                paper_bgcolor="#161b22",
+                plot_bgcolor="#161b22",
             )
             st.plotly_chart(fig_pareto, use_container_width=True)
 
         with g2:
             # Gráfico de Distribuição de Planos
-            df_pizza = pd.DataFrame({
-                "Categoria": ["Assinantes", "Com Créditos", "Sem Assinatura"],
-                "Total": [total_assinantes, total_credito, total_gratis]
-            })
-            
-            cores_pizza = list()
-            cores_pizza.append("#28a745")
-            cores_pizza.append("#007bff")
-            cores_pizza.append("#6e7681")
-            
+            df_pizza = pd.DataFrame(
+                {
+                    "Categoria": ["Assinantes", "Com Créditos", "Sem Assinatura"],
+                    "Total": [total_assinantes, total_credito, total_gratis],
+                }
+            )
+
+            cores_pizza = ["#28a745", "#007bff", "#6e7681"]
+
             fig_pizza = px.pie(
-                df_pizza, values="Total", names="Categoria", 
+                df_pizza,
+                values="Total",
+                names="Categoria",
                 title="Distribuição de Tipos de Usuários",
-                color_discrete_sequence=cores_pizza
+                color_discrete_sequence=cores_pizza,
+            )
+
+            fig_pizza.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="#161b22",
             )
             st.plotly_chart(fig_pizza, use_container_width=True)
 
