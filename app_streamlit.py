@@ -2138,7 +2138,7 @@ def template_painel_admin():
     # 3. PROCESSAMENTO E AGREGAÇÃO DOS DADOS DE USUÁRIOS
     # --------------------------------------------------------------------------
     try:
-        try:
+        
         if not df_users.empty:
             # --- CÁLCULO DO GRÁFICO DE PIZZA ---
             total_assinantes = int(
