@@ -2018,7 +2018,147 @@ def template_painel_admin():
                         except Exception as e:
                             st.error(f"Erro ao deletar usuário: {e}")
 
+def template_admin_dashboard():
+    st.title("👑 Painel de Controle do Administrador")
+    
+    # --------------------------------------------------------------------------
+    # MÓDULO 1: CONSULTA DE DADOS NO SUPABASE
+    # --------------------------------------------------------------------------
+    try:
+        # Busca totalizadores de usuários
+        usuarios_query = supabase.table("usuarios").select("tipo_plano", "moedas").execute()
+        df_users = pd.DataFrame(usuarios_query.data) if usuarios_query.data else pd.DataFrame(columns=["tipo_plano", "moedas"])
+        
+        # Busca log de consumo de créditos da semana corrente
+        # Mock de dados simulados para estruturação dos gráficos caso a tabela de logs ainda não exista
+        datas_semana = [(datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)][::-1]
+        dados_credito = {"data": datas_semana, "quantidade_creditos":}
+        df_creditos = pd.DataFrame(dados_credito)
+        
+        # Busca salas em uso ativo
+        # Exemplo baseado em tabelas de sessões ativas
+        salas_ativas = [
+            {"sala": "Sala Privada Alpha", "usuario": "CarlosM", "tempo_uso": "00:45:12"},
+            {"sala": "Sala Privada Gamma", "usuario": "Beatriz99", "tempo_uso": "00:12:04"}
+        ]
+    except Exception as e:
+        st.error(f"Erro ao carregar dados do dashboard: {e}")
+        return
 
+    # --------------------------------------------------------------------------
+    # MÓDULO 2: INDICADORES E CONTAGEM DE USUÁRIOS
+    # --------------------------------------------------------------------------
+    col1, col2, col3 = st.columns(3)
+    
+    if not df_users.empty:
+        total_assinantes = len(df_users[df_users["tipo_plano"] == "Assinante"])
+        total_credito = len(df_users[df_users["tipo_plano"] == "Crédito"])
+        total_gratis = len(df_users[(df_users["tipo_plano"] == "Grátis") | (df_users["tipo_plano"].isna())])
+    else:
+        total_assinantes, total_credito, total_gratis = 0, 0, 0
+        
+    with col1:
+        st.metric("Usuários Assinantes", f"⭐ {total_assinantes}")
+    with col2:
+        st.metric("Usuários com Crédito", f"🪙 {total_credito}")
+    with col3:
+        st.metric("Usuários Sem Assinatura (Grátis)", f"⚪ {total_gratis}")
+        
+    st.markdown("---")
+
+    # --------------------------------------------------------------------------
+    # MÓDULO 3: GRÁFICOS (PARETO, ACUMULADO E DISTRIBUIÇÃO)
+    # --------------------------------------------------------------------------
+    st.subheader("📊 Análise de Créditos e Assinaturas")
+    g1, g2 = st.columns(2)
+    
+    with g1:
+        # Cálculo de Pareto e Linha Acumulada
+        df_creditos = df_creditos.sort_values(by="quantidade_creditos", ascending=False)
+        df_creditos["cum_sum"] = df_creditos["quantidade_creditos"].cumsum()
+        df_creditos["cum_percentage"] = (df_creditos["cum_sum"] / df_creditos["quantidade_creditos"].sum()) * 100
+        
+        # Montagem do Gráfico Combinado (Pareto + Linha Semanal)
+        fig_pareto = go.Figure()
+        fig_pareto.add_trace(go.Bar(
+            x=df_creditos["data"], y=df_creditos["quantidade_creditos"],
+            name="Créditos por Dia", marker_color="#007bff"
+        ))
+        fig_pareto.add_trace(go.Scatter(
+            x=df_creditos["data"], y=df_creditos["cum_percentage"],
+            name="% Acumulada", yaxis="y2", line=dict(color="#28a745", width=3)
+        ))
+        fig_pareto.update_layout(
+            title="Consumo de Créditos (Pareto & Tendência Semanal)",
+            yaxis=dict(title="Quantidade de Créditos"),
+            yaxis2=dict(title="Percentual Acumulado (%)", overlaying="y", side="right", range=[0, 105]),
+            theme="plotly_dark", background_color="#161b22"
+        )
+        st.plotly_chart(fig_pareto, use_container_width=True)
+
+    with g2:
+        # Gráfico de Distribuição de Planos
+        df_pizza = pd.DataFrame({
+            "Categoria": ["Assinantes", "Com Créditos", "Sem Assinatura"],
+            "Total": [total_assinantes, total_credito, total_gratis]
+        })
+        fig_pizza = px.pie(
+            df_pizza, values="Total", names="Categoria", 
+            title="Distribuição de Tipos de Usuários",
+            color_discrete_sequence=["#28a745", "#007bff", "#6e7681"]
+        )
+        st.plotly_chart(fig_pizza, use_container_width=True)
+
+    st.markdown("---")
+
+    # --------------------------------------------------------------------------
+    # MÓDULO 4: MONITORAMENTO DE SALAS EM TEMPO REAL
+    # --------------------------------------------------------------------------
+    st.subheader("🎥 Monitoramento de Salas Privadas em Tempo Real")
+    if salas_ativas:
+        for sala in salas_ativas:
+            with st.container():
+                st.markdown(f"""
+                <div style="background-color: #161b22; padding: 15px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 10px;">
+                    <span style="color: #28a745; font-weight: bold;">● EM USO</span> | 
+                    <strong>{sala['sala']}</strong> | 
+                    Usuário Ativo: <code>{sala['usuario']}</code> | 
+                    Tempo de Duração: <span style="color: #ffc107;">{sala['tempo_uso']}</span>
+                </div>
+                """, unsafe_allow_html=True)
+    else:
+        st.info("Nenhuma sala privada está sendo utilizada no momento.")
+
+    st.markdown("---")
+
+    # --------------------------------------------------------------------------
+    # MÓDULO 5: VISUALIZAÇÃO DOS CARDÁPIOS DE PLANOS (CORREÇÃO DO BUG)
+    # --------------------------------------------------------------------------
+    st.subheader("📋 Visualização de Termos e Regras dos Planos")
+    
+    html_planos = """
+    <div style="background-color: #161b22; padding: 20px; border-radius: 8px; border: 1px solid #30363d;">
+        <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
+            <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+            <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
+        </div>
+        
+        <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
+            <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+            <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
+        </div>
+        
+        <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+            <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+            <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+        </div>
+    </div>
+    """
+    
+    # O segredo para renderizar o HTML corretamente está nesta linha abaixo:
+    st.markdown(html_planos, unsafe_allow_html=True)
+
+    
 
 # NOVO: Página simples de Fale Conosco
 def template_fale_conosco():
