@@ -88,10 +88,10 @@ def conectar_supabase():
 # 4. CONTROLE DE ESTADO E EXIBIÇÃO DAS TELAS (RODA NO FINAL)
 # ==============================================================================
 def template_home():
-    if "opcao_menu" not in st.session_state:
-        st.session_state.opcao_menu = "🏠 Home"  # Copie e cole exatamente esta string
+    # 1. CONFIGURAÇÃO DA PÁGINA (Sempre a primeira instrução Streamlit)
+    if "config_executada" not in st.session_state:
         st.set_page_config(page_title="Lucy Chat IA - Plataforma", layout="wide")
-    
+        st.session_state.config_executada = True
         st.markdown("""
             <style>
             [data-testid="stHeader"] { display: none !important; }
@@ -103,6 +103,15 @@ def template_home():
             </style>
         """, unsafe_allow_html=True)
 
+    # ==============================================================================
+    # 1. INICIALIZAÇÃO CORRETA (No topo do arquivo, abaixo dos imports)
+    # ==============================================================================
+    if "opcao_menu" not in st.session_state:
+        st.session_state.opcao_menu = "home"  # Usamos texto simples minúsculo para evitar erros
+
+    if "usuario_id" not in st.session_state:
+        st.session_state.usuario_id = None
+    
     
     # Título centralizado
     st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
@@ -139,7 +148,7 @@ def template_home():
         
     with col1:
         if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
-            st.session_state.opcao_menu = "🔒 Login"
+            st.session_state.opcao_menu = "login"
             st.rerun()
 
     with col2:
@@ -158,7 +167,7 @@ def template_home():
             """,
         ):
             if st.button("📝 Cadastre-se", use_container_width=True):
-                st.session_state.opcao_menu = "📝 Cadastro"
+                st.session_state.opcao_menu = "cadastro"
                 st.rerun()
 
 # ==============================================================================
@@ -167,14 +176,14 @@ def template_home():
     #elif st.session_state.opcao_menu == "🔒 Login":
 def template_login():
     st.write(f"DEBUG - Menu atual antes de desenhar o Login: '{st.session_state.opcao_menu}'")
-    st.session_state.opcao_menu == "🔒 Login"
+    st.session_state.opcao_menu == "login"
     st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
             
     with st.form("form_login"):
         user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed")
         pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed")
                 
-        if st.form_submit_button("Login", type="primary", use_container_width=True):
+        if st.form_submit_button("login", type="primary", use_container_width=True):
             try:
                 conn = conectar_supabase()
                 cursor = conn.cursor()
@@ -221,14 +230,14 @@ def template_login():
         """,
     ):
         if st.button("📝 Cadastre-se", use_container_width=True):
-            st.session_state.opcao_menu = "📝 Cadastro"
+            st.session_state.opcao_menu = "cadastro"
             st.rerun()
 
     # Rodapé do formulário de login (Voltar e Esqueceu a Senha)
     col_voltar, col_esqueceu = st.columns(2)
     with col_voltar:
         if st.button("⬅️ Voltar para a Home", use_container_width=True):
-            st.session_state.opcao_menu = "🏠 Home"  # Deve ser igual ao topo
+            st.session_state.opcao_menu = "home"  # Deve ser igual ao topo
             st.rerun()
                     
     with col_esqueceu:
@@ -374,8 +383,8 @@ def template_cadastro():
             }
         """,
     ):
-        if st.button("← Voltar para o 🔒 Login", use_container_width=True):
-            st.session_state.opcao_menu = "🔒 Login"
+        if st.button("← Voltar para o 🔒 login", use_container_width=True):
+            st.session_state.opcao_menu = "login"
             st.rerun()
     
            
@@ -411,7 +420,7 @@ def template_planos():
     )
     
     if st.button("← Voltar para o 🔒 Login", use_container_width=True):
-        st.session_state.opcao_menu = "🔒 Login"  # o nome correto do seu menu de chat
+        st.session_state.opcao_menu = "login"  # o nome correto do seu menu de chat
         st.rerun()
 
     if "id_pagamento_pendente" not in st.session_state:
@@ -536,13 +545,47 @@ if "username" not in st.session_state: st.session_state.username = None
 if "foto_perfil" not in st.session_state: st.session_state.foto_perfil = None
 if "genero" not in st.session_state: st.session_state.genero = "M"
 if "eh_admin" not in st.session_state: st.session_state.eh_admin = False
-if "opcao_menu" not in st.session_state: st.session_state.opcao_menu = "🔒 Login"
+if "opcao_menu" not in st.session_state: st.session_state.opcao_menu = "home"
 if "match_id_atual" not in st.session_state: st.session_state.match_id_atual = None
 if "alerta_match" not in st.session_state: st.session_state.alerta_match = None
 if "abrir_reserva_fluxo" not in st.session_state: st.session_state.abrir_reserva_fluxo = None
 
+# 🟢 ADICIONE ESTA LINHA ABAIXO PARA CORRIGIR O ERRO:
+if "form_seed" not in st.session_state: st.session_state.form_seed = 42
+
 dias_semana_map = {0: 'Segunda-feira', 1: 'Terça-feira', 2: 'Quarta-feira', 3: 'Quinta-feira', 4: 'Sexta-feira', 5: 'Sábado', 6: 'Domingo'}
 dia_atual_servidor = dias_semana_map[datetime.now().weekday()]
+
+
+# ==============================================================================
+# 2. INTERCEPTADOR DE TELAS PÚBLICAS (COLOQUE EXATAMENTE AQUI)
+# ==============================================================================
+# Normaliza a string para evitar conflito com maiúsculas/minúsculas ou emojis antigos
+menu_higienizado = str(st.session_state.opcao_menu).strip().lower()
+
+if menu_higienizado == "home":
+    template_home()
+    st.stop()  # Trava o script aqui. Impede o carregamento de qualquer lógica interna ou menus abaixo!
+
+elif menu_higienizado in ["login", "🔒 login"]:
+    st.session_state.usuario_id = None
+    template_login()
+    st.stop()  # Garante isolamento total da tela de login
+
+elif menu_higienizado in ["cadastro", "📝 cadastro"]:
+    st.session_state.usuario_id = None
+    template_cadastro()
+    st.stop()  # Garante isolamento total da tela de cadastro
+
+
+# ==============================================================================
+# 3. LÓGICA DE USUÁRIO LOGADO (Se o script passar daqui, o usuário está na área restrita)
+# ==============================================================================
+# Segurança: Se tentar burlar digitando URL ou estado corrompido, chuta de volta pra Home
+if st.session_state.usuario_id is None:
+    st.session_state.opcao_menu = "home"
+    st.rerun()
+
 
 
 def buscar_memoria(usuario_id, limite=15):
@@ -1569,7 +1612,7 @@ def renderizar_listas_sidebar_e_acoes():
                 cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (int(st.session_state.usuario_id),))
                 conn_logout.commit(); cursor_logout.close(); conn_logout.close()
             except Exception: pass
-            st.session_state.usuario_id = None; st.session_state.username = None; st.session_state.opcao_menu = "🔒 Login"; st.rerun()
+            st.session_state.usuario_id = None; st.session_state.username = None; st.session_state.opcao_menu = "login"; st.rerun()
 
 
 def template_disponibilidade(): 
@@ -2206,52 +2249,40 @@ if st.session_state.abrir_reserva_fluxo:
 
 
     
-    # --- ROTEAMENTO ESTRITO DE TELAS ---
+    # ==============================================================================
+# 2. ROTEAMENTO ESTRITO DE TELAS (Substitua o seu bloco antigo por este)
+# ==============================================================================
 
-    # 1. VALIDAÇÃO DE TELAS PÚBLICAS
-    if st.session_state.opcao_menu == "🏠 Home":
-        template_home()
+# Captura o valor atual para o roteamento baseado em strings seguras
+menu_atual = str(st.session_state.opcao_menu).strip().lower()
 
-    elif st.session_state.opcao_menu == "🔒 Login":
-        st.session_state.usuario_id = None
-        template_login()
+# --- 1. TELAS PÚBLICAS ---
+if menu_atual == "home":
+    template_home()
 
-    elif st.session_state.opcao_menu == "📝 Cadastro":
-        st.session_state.usuario_id = None
-        template_cadastro()
+elif menu_atual == "login" or menu_atual == "login":
+    st.session_state.usuario_id = None
+    template_login()
 
-    # 2. VALIDAÇÃO DE TELAS PRIVADAS
-    else:
-        # Se o menu não for nenhum dos 3 acima e o usuário não tiver ID, volta para a Home
-        if st.session_state.usuario_id is None:
-            st.session_state.opcao_menu = "🏠 Home"  # Força a correção aqui também
-            st.rerun()
+elif menu_atual == "cadastro" or menu_atual == "📝 cadastro":
+    st.session_state.usuario_id = None
+    template_cadastro()
 
-    # 🟢 USUÁRIO LOGADO: Gerencia as telas internas e notificações
+# --- 2. TELAS PRIVADAS (Usuário Logado) ---
+else:
+    # Trava de Segurança: Se não estiver logado e a tela não for pública, força 'home'
+    if st.session_state.usuario_id is None:
+        st.session_state.opcao_menu = "home"
+        st.rerun()
+
+    # Se estiver logado, processa as telas internas normalmente
     if st.session_state.opcao_menu == "Plataforma de Planos IA":
         template_planos()
         
-    # 🔍 NOTIFICAÇÕES: Só busca e exibe se o menu NÃO for a Sala Privada
-    if st.session_state.opcao_menu != "🤝 Sala Privada":
-        try:
-            conn_notif = conectar_supabase()
-            cursor_notif = conn_notif.cursor()
-            cursor_notif.execute('''
-                SELECT COUNT(*) FROM agendamentos_virtuais 
-                WHERE (remetente_id = %s OR destinatario_id = %s) 
-                AND TRIM(LOWER(dia_semana)) = TRIM(LOWER(%s)) 
-                AND status_convite = 'aceito';
-            ''', (int(st.session_state.usuario_id), int(st.session_state.usuario_id), dia_atual_servidor))
-            total_hoje = cursor_notif.fetchone()[0]
-            cursor_notif.close()
-            conn_notif.close()
+    # [Mantenha aqui o seu bloco existente de buscar e exibir notificações]
+    # ... (Seu código de busca no banco com cursor_notif) ...
 
-            if total_hoje > 0:
-                st.info(f"🔔 **Aviso da Lucy:** Você possui **{total_hoje} encontro(s)** agendado(s) para hoje ({dia_atual_servidor})!")
-        except Exception:
-            pass
-
-    # --- RENDERIZAÇÃO REAL DOS MENUS INTERNOS ---
+    # --- RENDERIZAÇÃO DOS MENUS INTERNOS ---
     if st.session_state.opcao_menu == "🤝 Sala Privada":
         template_sala_privada()
     elif st.session_state.opcao_menu == "💬 Conversar com Lucy":
@@ -2266,6 +2297,7 @@ if st.session_state.abrir_reserva_fluxo:
         template_painel_admin()
     elif st.session_state.opcao_menu == "✉️ Fale Conosco":
         template_fale_conosco()
+
 
 
 # ==============================================================================
