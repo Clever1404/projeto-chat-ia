@@ -2133,7 +2133,7 @@ def template_admin_dashboard():
     st.markdown("---")
 
     # --------------------------------------------------------------------------
-    # MÓDULO 5: VISUALIZAÇÃO DOS CARDÁPIOS DE PLANOS (CORREÇÃO DO BUG)
+    # MÓDULO 5: VISUALIZAÇÃO DOS CARDÁPIOS DE PLANOS
     # --------------------------------------------------------------------------
     st.subheader("📋 Visualização de Termos e Regras dos Planos")
     
@@ -2156,9 +2156,7 @@ def template_admin_dashboard():
     </div>
     """
     
-    # O segredo para renderizar o HTML corretamente está nesta linha abaixo:
     st.markdown(html_planos, unsafe_allow_html=True)
-
 
 
 # NOVO: Página simples de Fale Conosco
