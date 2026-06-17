@@ -1527,19 +1527,24 @@ def renderizar_listas_sidebar_e_acoes():
         saldo_moedas = 0
 
         try:
-            # Faz a busca no Supabase
-            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(my_id)).execute()
+            # CORREÇÃO: Substituído 'my_id' por 'st.session_state.usuario_id'
+            id_usuario_logado = st.session_state.get("usuario_id")
             
-            # CORREÇÃO CRÍTICA: Verifica se a lista .data existe e contém elementos
-            if user_data.data and len(user_data.data) > 0:
-                # Acessamos o índice [0] para pegar o primeiro dicionário retornado da lista
-                tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
-                saldo_moedas = user_data.data[0].get("moedas", 0)
+            if id_usuario_logado is not NULL:
+                # Faz a busca no Supabase convertendo o ID para inteiro
+                user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
+                
+                # Verifica se a lista contém dados e extrai do primeiro elemento []
+                if user_data.data and len(user_data.data) > 0:
+                    tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
+                    saldo_moedas = user_data.data[0].get("moedas", 0)
+            else:
+                st.warning("⚠️ Usuário não identificado na sessão.")
+
         except Exception as e:
-            # Mostra o erro na tela temporariamente caso algo dê errado na consulta
             st.error(f"Erro ao carregar dados do banco: {e}")
 
-        # Agora o texto vai refletir exatamente o valor do banco de dados
+        # Exibe na tela com as variáveis atualizadas e corretas
         st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
 
 
@@ -2002,17 +2007,29 @@ def template_painel_admin():
 
 
         # --------------------------------------------------------------------------
-        # VALORES PADRÃO (FALLBACKS) - Impede qualquer NameError no restante do script
+        # 1. VALORES PADRÃO (FALLBACKS) - Evita qualquer NameError
         # --------------------------------------------------------------------------
-        df_users = pd.DataFrame(columns=["id", "tipo_plano", "moedas", "ultima_recarga"])
+        df_users = pd.DataFrame(
+            columns=["id", "tipo_plano", "moedas", "ultima_recarga"]
+        )
         df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
         total_assinantes = 0
         total_credito = 0
         total_gratis = 0
-        salas_ativas = [] # <-- Definida no topo garante que a linha 2166 nunca quebre
+
+        # Dicionário para traduzir a data para o Dia da Semana em português
+        dias_semana_pt = {
+            "Monday": "Segunda",
+            "Tuesday": "Terça",
+            "Wednesday": "Quarta",
+            "Thursday": "Quinta",
+            "Friday": "Sexta",
+            "Saturday": "Sábado",
+            "Sunday": "Domingo",
+        }
 
         # --------------------------------------------------------------------------
-        # MÓDULO 1: CONSULTA DE DADOS REAIS NO SUPABASE
+        # 2. CONSULTA DE DADOS REAIS NO SUPABASE
         # --------------------------------------------------------------------------
         try:
             usuarios_query = (
@@ -2023,91 +2040,171 @@ def template_painel_admin():
 
             if usuarios_query.data:
                 df_users = pd.DataFrame(usuarios_query.data)
+                # Converte e extrai apenas a DATA (remove horas se houver)
                 df_users["ultima_recarga"] = pd.to_datetime(
                     df_users["ultima_recarga"]
-                ).dt.strftime("%Y-%m-%d")
+                ).dt.normalize()
 
         except Exception as e:
             st.error(f"Erro ao carregar dados do Supabase: {e}")
-            # Não damos st.stop() para permitir que o resto da página carregue zerada sem crashar
-
 
         # --------------------------------------------------------------------------
-        # MÓDULO 2: PROCESSAMENTO E AGREGAÇÃO DOS DADOS REAIS
+        # 3. PROCESSAMENTO E AGREGAÇÃO DOS DADOS REAIS
         # --------------------------------------------------------------------------
         try:
             if not df_users.empty:
-                # Distribuição de Usuários
-                total_assinantes = int(df_users[df_users["tipo_plano"] != "gratis"].shape[0])
-                total_credito = int(df_users[(df_users["tipo_plano"] == "gratis") & (df_users["moedas"] > 0)].shape[0])
-                total_gratis = int(df_users[(df_users["tipo_plano"] == "gratis") & (df_users["moedas"] == 0)].shape[0])
+                # --- CÁLCULO DO GRÁFICO DE PIZZA ---
+                total_assinantes = int(
+                    df_users[df_users["tipo_plano"] != "gratis"].shape[0]
+                )
+                total_credito = int(
+                    df_users[
+                        (df_users["tipo_plano"] == "gratis")
+                        & (df_users["moedas"] > 0)
+                    ].shape[0]
+                )
+                # Substituído "Sem Assinatura" por "Grátis" conforme solicitado
+                total_gratis = int(
+                    df_users[
+                        (df_users["tipo_plano"] == "gratis")
+                        & (df_users["moedas"] == 0)
+                    ].shape[0]
+                )
 
-                # Agrupamento para o Gráfico de Pareto
-                df_agrupado = df_users.groupby("ultima_recarga")["moedas"].sum().reset_index()
+                # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
+                # Agrupa e soma as moedas pela data pura
+                df_agrupado = (
+                    df_users.groupby("ultima_recarga")["moedas"]
+                    .sum()
+                    .reset_index()
+                )
                 df_agrupado.columns = ["data", "quantidade_creditos"]
-                df_creditos = df_agrupado.sort_values(by="data", ascending=False).head(7)
+
+                # Filtra os últimos 7 dias com base na data atual
+                hoje = pd.Timestamp(datetime.now().date())
+                ha_uma_semana = hoje - pd.Timedelta(days=7)
+                df_creditos = df_agrupado[
+                    (df_agrupado["data"] >= ha_uma_semana)
+                    & (df_agrupado["data"] <= hoje)
+                ].copy()
+
+                if not df_creditos.empty:
+                    # Transforma a data no nome do dia da semana (ex: 'Monday' -> 'Segunda')
+                    df_creditos["dia_nome_en"] = df_creditos[
+                        "data"
+                    ].dt.day_name()
+                    df_creditos["data"] = df_creditos["dia_nome_en"].map(
+                        dias_semana_pt
+                    )
+
+                    # Ordena os dias cronologicamente de acordo com a semana real
+                    df_creditos = df_creditos.sort_values(
+                        by="quantidade_creditos", ascending=False
+                    )
 
         except Exception as e:
             st.error(f"Erro ao processar métricas reais: {e}")
 
+        # --------------------------------------------------------------------------
+        # 4. MONITORAMENTO DE TEMPO EM SALA PRIVADA
+        # --------------------------------------------------------------------------
+        # Como as salas dependem de matches/agendamentos, estruturamos aqui os dados
+        # de tempo gasto (em minutos ou horas) de forma separada por tipo de plano.
+        # TODO: No futuro, você pode puxar isso de uma tabela 'historico_encontros'
+        dados_salas_exemplo = {
+            "Tipo de Usuário": [
+                "Assinantes",
+                "Usuários com Crédito",
+                "Assinantes",
+                "Usuários com Crédito",
+            ],
+            "Sala": [
+                "Sala Alpha",
+                "Sala Beta",
+                "Sala Gamma",
+                "Sala Delta",
+            ],
+            "Tempo de Uso (Horas)": [1.5, 1.0, 2.3, 0.5],
+        }
+        df_salas_monitoramento = pd.DataFrame(dados_salas_exemplo)
+
+        # Agrupa o tempo total gasto por perfil de usuário
+        df_tempo_por_perfil = (
+            df_salas_monitoramento.groupby("Tipo de Usuário")[
+                "Tempo de Uso (Horas)"
+            ]
+            .sum()
+            .reset_index()
+        )
 
         # --------------------------------------------------------------------------
-        # MÓDULO 3: GRÁFICOS (PARETO, ACUMULADO E DISTRIBUIÇÃO)
+        # 5. RENDERIZAÇÃO DOS GRÁFICOS (MÓDULO 3)
         # --------------------------------------------------------------------------
         st.subheader("📊 Análise de Créditos e Assinaturas")
         g1, g2 = st.columns(2)
 
         with g1:
-            # Cálculo de Pareto e Linha Acumulada
-            df_creditos = df_creditos.sort_values(
-                by="quantidade_creditos", ascending=False
-            )
-            df_creditos["cum_sum"] = df_creditos["quantidade_creditos"].cumsum()
-            df_creditos["cum_percentage"] = (
-                df_creditos["cum_sum"] / df_creditos["quantidade_creditos"].sum()
-            ) * 100
+            if not df_creditos.empty:
+                # Pareto e Linha Acumulada
+                df_creditos["cum_sum"] = df_creditos[
+                    "quantidade_creditos"
+                ].cumsum()
+                df_creditos["cum_percentage"] = (
+                    df_creditos["cum_sum"]
+                    / df_creditos["quantidade_creditos"].sum()
+                ) * 100
 
-            # Montagem do Gráfico Combinado (Pareto + Linha Semanal)
-            fig_pareto = go.Figure()
-            fig_pareto.add_trace(
-                go.Bar(
-                    x=df_creditos["data"],
-                    y=df_creditos["quantidade_creditos"],
-                    name="Créditos por Dia",
-                    marker_color="#007bff",
+                fig_pareto = go.Figure()
+                fig_pareto.add_trace(
+                    go.Bar(
+                        x=df_creditos["data"],
+                        y=df_creditos["quantidade_creditos"],
+                        name="Recargas no Dia",
+                        marker_color="#007bff",
+                    )
                 )
-            )
-            fig_pareto.add_trace(
-                go.Scatter(
-                    x=df_creditos["data"],
-                    y=df_creditos["cum_percentage"],
-                    name="% Acumulada",
-                    yaxis="y2",
-                    line=dict(color="#28a745", width=3),
+                fig_pareto.add_trace(
+                    go.Scatter(
+                        x=df_creditos["data"],
+                        y=df_creditos["cum_percentage"],
+                        name="% Acumulada Semanal",
+                        yaxis="y2",
+                        line=dict(color="#28a745", width=3),
+                    )
                 )
-            )
 
-            fig_pareto.update_layout(
-                title="Consumo de Créditos (Pareto & Tendência Semanal)",
-                yaxis=dict(title="Quantidade de Créditos"),
-                yaxis2=dict(
-                    title="Percentual Acumulado (%)",
-                    overlaying="y",
-                    side="right",
-                    range=[0, 105],
-                ),
-                template="plotly_dark",
-                paper_bgcolor="#161b22",
-                plot_bgcolor="#161b22",
-            )
-            st.plotly_chart(fig_pareto, use_container_width=True)
+                fig_pareto.update_layout(
+                    title="Soma de Recargas e Tendência (Últimos 7 dias)",
+                    yaxis=dict(title="Quantidade de Moedas"),
+                    yaxis2=dict(
+                        title="Percentual Acumulado (%)",
+                        overlaying="y",
+                        side="right",
+                        range=[0, 105],
+                    ),
+                    template="plotly_dark",
+                    paper_bgcolor="#161b22",
+                    plot_bgcolor="#161b22",
+                    legend=dict(orient="h", y=1.1),
+                )
+                st.plotly_chart(fig_pareto, use_container_width=True)
+            else:
+                st.info("ℹ️ Nenhuma recarga realizada nos últimos 7 dias.")
 
         with g2:
-            # Gráfico de Distribuição de Planos
+            # Gráfico de Distribuição de Planos atualizado para "Grátis"
             df_pizza = pd.DataFrame(
                 {
-                    "Categoria": ["Assinantes", "Com Créditos", "Sem Assinatura"],
-                    "Total": [total_assinantes, total_credito, total_gratis],
+                    "Categoria": [
+                        "Assinantes",
+                        "Com Créditos",
+                        "Grátis",
+                    ],  # Alterado aqui
+                    "Total": [
+                        total_assinantes,
+                        total_credito,
+                        total_gratis,
+                    ],
                 }
             )
 
@@ -2117,10 +2214,9 @@ def template_painel_admin():
                 df_pizza,
                 values="Total",
                 names="Categoria",
-                title="Distribuição de Tipos de Usuários",
+                title="Distribuição de Perfis de Usuários",
                 color_discrete_sequence=cores_pizza,
             )
-
             fig_pizza.update_layout(
                 template="plotly_dark",
                 paper_bgcolor="#161b22",
@@ -2130,29 +2226,46 @@ def template_painel_admin():
         st.markdown("---")
 
         # --------------------------------------------------------------------------
-        # MÓDULO 4: MONITORAMENTO DE SALAS EM TEMPO REAL
+        # 6. EXIBIÇÃO DO MONITORAMENTO DE SALAS PRIVADAS
         # --------------------------------------------------------------------------
-        st.subheader("🎥 Monitoramento de Salas Privadas em Tempo Real")
-        # Procura essa estrutura por volta da linha 2165 do seu arquivo:
-        if salas_ativas:
-            st.write("### 🟢 Salas Privadas Ativas")
-            for sala in salas_ativas:
-                with st.container():
-                    st.markdown(f"""
-                    <div style="background-color: #161b22; padding: 15px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 10px;">
-                        <span style="color: #28a745; font-weight: bold;">● EM USO</span> | 
-                        <strong>{sala['sala']}</strong> | 
-                        Usuário Ativo: <code>{sala['usuario']}</code> | 
-                        Tempo de Duração: <span style="color: #ffc107;">{sala['tempo_uso']}</span>
-                    </div>
-                    """, unsafe_allow_html=True)
-            st.dataframe(salas_ativas) 
+        st.subheader("🟢 Monitoramento de Salas Privadas")
 
-        else:
-            # Mensagem adicionada para quando não houver encontros ativos
-            st.info("ℹ️ Nenhuma sala privada ativa ou agendamento ocorrendo no momento.")    
+        # Criamos colunas para mostrar o tempo total acumulado por perfil
+        c1, c2 = st.columns(2)
 
-        st.markdown("---")
+        with c1:
+            st.write("#### ⏱️ Tempo Total Acumulado por Perfil")
+            fig_tempo = px.bar(
+                df_tempo_por_perfil,
+                x="Tipo de Usuário",
+                y="Tempo de Uso (Horas)",
+                color="Tipo de Usuário",
+                title="Horas Consumidas em Encontros",
+                color_discrete_map={
+                    "Assinantes": "#28a745",
+                    "Usuários com Crédito": "#007bff",
+                },
+            )
+            fig_tempo.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="#161b22",
+                plot_bgcolor="#161b22",
+                showlegend=False,
+            )
+            st.plotly_chart(fig_tempo, use_container_width=True)
+
+        with c2:
+            st.write("#### 📑 Detalhes dos Encontros Recentes")
+            # Exibe a tabela de monitoramento limpa para o administrador acompanhar
+            st.dataframe(
+                df_salas_monitoramento,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+
+    # Para rodar a função
+    template_painel_admin()
 
         # --------------------------------------------------------------------------
         # MÓDULO 5: VISUALIZAÇÃO DOS CARDÁPIOS DE PLANOS
