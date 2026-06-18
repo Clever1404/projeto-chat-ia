@@ -1299,7 +1299,7 @@ def modal_agendamento_encontro(dados_r):
 @st.fragment(run_every=5.0)
 def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int):
     tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
-    tempo_limite_segundos = 15  # Limite inicial de 10 minutos (600 segundos)
+    tempo_limite_segundos = 600  # Limite inicial de 10 minutos (600 segundos)
     tempo_restante = tempo_limite_segundos - tempo_decorrido
 
     if tempo_restante > 0:
