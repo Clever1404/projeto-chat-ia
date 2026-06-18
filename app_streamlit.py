@@ -1343,25 +1343,39 @@ def template_sala_privada():
     # Busca o plano do usuário atualizado para aplicar as regras# 1. Define os valores padrões caso a busca no banco falhe
     tipo_plano = "Grátis"
     saldo_moedas = 0
+    
+    id_usuario_logado = st.session_state.get("usuario_id")
+    
+    if id_usuario_logado is None:
+        st.warning("⚠️ Usuário não identificado na sessão.")
+        return
 
     try:
-        # Captura com segurança o ID do usuário logado
-        id_usuario_logado = st.session_state.get("usuario_id")
-                            
-        # CORREÇÃO: Alterado de 'NULL' para 'None' (sintaxe correta do Python)
-        if id_usuario_logado is not None:
-            # Faz a busca no Supabase convertendo o ID para inteiro
-            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
-                                
-            # Verifica se a lista contém dados e extrai do primeiro elemento [0]
-            if user_data.data and len(user_data.data) > 0:
-                tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
-                saldo_moedas = user_data.data[0].get("moedas", 0)
+        # Busca os dados no Supabase
+        user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
+        
+        # 🟢 CORREÇÃO CRÍTICA: Acessando corretamente o primeiro elemento [0] da lista .data
+        if user_data.data and len(user_data.data) > 0:
+            registro_banco = user_data.data[0]
+            
+            # Captura os valores brutos
+            plano_bruto = registro_banco.get("tipo_plano", "Grátis")
+            saldo_moedas = registro_banco.get("moedas", 0)
+            
+            # 🟢 BLINDAGEM: Remove espaços em branco invisíveis no início/fim e padroniza a string
+            if plano_bruto:
+                tipo_plano = str(plano_bruto).strip()
+            
+            # 🔍 PROVA REAL (DEBUG): Remova ou comente essa linha após resolver o problema
+            st.toast(f"DEBUG BANCO -> Plano encontrado: '{tipo_plano}' | Tipo: {type(tipo_plano)}")
+            
         else:
-            st.warning("⚠️ Usuário não identificado na sessão.")
-
+            st.error("⚠️ Nenhum registro de usuário foi encontrado no banco de dados.")
+            return
+            
     except Exception as e:
         st.error(f"Erro ao carregar dados do banco: {e}")
+        return
 
 
     # --- DIVISÃO DA TELA EM COLUNAS ---
