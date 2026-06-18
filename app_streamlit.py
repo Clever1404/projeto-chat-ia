@@ -1337,7 +1337,12 @@ def live_chat_privado_engine(m_id, my_id, p_nome_str):
     with st.container(height=410, border=False):
         try:
             # 🟢 Usando o cliente HTTP do Supabase (Mais rápido e consome menos conexões)
-            res_mensagens = supabase.table("mensagens_chat").select("remetente_id", "texto", "data_envio").eq("match_id", int(m_id)).order("data_envio", nulls_first=False).execute()
+            # 🟢 CORREÇÃO: Alterado 'nulls_first' para 'nullsfirst'
+            res_mensagens = supabase.table("mensagens_chat") \
+                .select("remetente_id", "texto", "data_envio") \
+                .eq("match_id", int(m_id)) \
+                .order("data_envio", nullsfirst=False) \
+                .execute()
             rows = res_mensagens.data if res_mensagens.data else []
 
             for msg_data in rows:
