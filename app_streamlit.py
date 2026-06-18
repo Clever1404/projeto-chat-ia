@@ -178,7 +178,8 @@ def template_home():
 # ==============================================================================
     #elif st.session_state.opcao_menu == "🔒 Login":
 def template_login():
-    st.session_state.opcao_menu == "login"
+    # 🟢 CORREÇÃO: Alterado de '==' para '=' para de fato definir o estado
+    st.session_state.opcao_menu = "login"
     st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
             
     with st.form("form_login"):
@@ -189,16 +190,31 @@ def template_login():
             try:
                 conn = conectar_supabase()
                 cursor = conn.cursor()
-                cursor.execute("SELECT id, username, foto_perfil, is_admin, genero FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
+                
+                # 🟢 OTIMIZAÇÃO: Adicionado 'tipo_plano' e 'moedas' na busca inicial do login
+                cursor.execute("""
+                    SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas 
+                    FROM usuarios 
+                    WHERE username = %s OR email = %s;
+                """, (user_in, user_in))
                 res = cursor.fetchone()
                         
                 if res:
-                    # Salva os dados na sessão
+                    # Salva as variáveis individuais antigas para não quebrar outras partes do seu app
                     st.session_state.usuario_id = res[0]
                     st.session_state.username = res[1]
                     st.session_state.foto_perfil = res[2]
                     st.session_state.eh_admin = res[3]
                     st.session_state.genero = res[4]
+                    
+                    # 🟢 CACHE CENTRALIZADO: Guarda o perfil completo em memória para acelerar as outras páginas
+                    st.session_state.dados_usuario = {
+                        "username": res[1],
+                        "foto_perfil": res[2],
+                        "genero": res[4],
+                        "tipo_plano": str(res[5]).strip() if res[5] else "Grátis",
+                        "moedas": res[6] if res[6] else 0
+                    }
                             
                     # Atualiza o status do usuário no banco PostgreSQL
                     cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (res[0],))
@@ -239,15 +255,14 @@ def template_login():
     col_voltar, col_esqueceu = st.columns(2)
     with col_voltar:
         if st.button("⬅️ Voltar para a Home", use_container_width=True):
-            st.session_state.opcao_menu = "home"  # Deve ser igual ao topo
+            st.session_state.opcao_menu = "home" 
             st.rerun()
                     
     with col_esqueceu:
-        # Inicializa o estado para controlar a abertura do modal
         if "mostrar_recuperar_senha" not in st.session_state:
             st.session_state.mostrar_recuperar_senha = False
 
-        # DEFINE O DIÁLOGO (Apenas decora a função)
+        # DEFINE O DIÁLOGO
         @st.dialog("🔑 Recuperar Senha")
         def modal_recuperar_senha():
             st.write("Digite o seu e-mail cadastrado e a sua nova senha abaixo.")
@@ -290,7 +305,6 @@ def template_login():
 
         if st.session_state.mostrar_recuperar_senha:
             modal_recuperar_senha()
-
 
                       
 
@@ -1280,6 +1294,82 @@ def modal_agendamento_encontro(dados_r):
 # 8. REESTRUTURAÇÃO DA SALA PRIVADA (LAYOUT FIXO, FOTO REAL E LIMPAR HISTÓRICO)
 # ==============================================================================
 
+# 🟢 1. CRIAÇÃO DO COMPONENTE DO TEMPORIZADOR ISOLADO EM FRAGMENTO
+# O parâmetro run_every faz o Streamlit atualizar APENAS esta caixinha a cada 5 segundos
+@st.fragment(run_every=5.0)
+def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int):
+    tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
+    tempo_limite_segundos = 600  # Limite inicial de 10 minutos
+    tempo_restante = tempo_limite_segundos - tempo_decorrido
+
+    if tempo_restante > 0:
+        minutos_r = int(tempo_restante // 60)
+        segundos_r = int(tempo_restante % 60)
+        st.warning(f"⏳ **Tempo Restante nesta sessão:** {minutos_r:02d}:{segundos_r:02d} | Saldo Atual: 🪙 {saldo_moedas_sala} moedas")
+    else:
+        # O tempo acabou! Tenta renovar debitando mais 10 moedas por +10 minutos
+        if saldo_moedas_sala >= 10:
+            try:
+                # Atualização segura convertendo ID para inteiro
+                supabase.table("usuarios").update({"moedas": saldo_moedas_sala - 10}).eq("id", int(id_usuario_logado)).execute()
+                st.session_state.tempo_inicio_sala = time.time()  # Reseta o cronômetro local
+                st.toast("🪙 Mais 10 minutos adicionados! 10 moedas foram debitadas.", icon="🪙")
+                st.rerun()  # Força atualização local para recalcular o tempo
+            except Exception:
+                st.error("Erro ao renovar tempo. Encerrando sala...")
+                st.session_state.opcao_menu = "Plataforma de Planos IA"
+                st.rerun()
+        else:
+            st.error("🔒 Seus 10 minutos acabaram e você não tem moedas suficientes para renovar.")
+            time.sleep(3)
+            st.session_state.opcao_menu = "Plataforma de Planos IA"
+            st.rerun()
+
+
+# 🟢 Altere o tempo para 4 segundos e mude a forma de buscar mensagens
+@st.fragment(run_every=4.0)
+def live_chat_privado_engine(m_id, my_id, p_nome_str):
+    try:
+        nome_exibicao = p_nome_str.split('@')[0].capitalize()
+    except Exception:
+        nome_exibicao = str(p_nome_str).capitalize()
+
+    with st.container(height=410, border=False):
+        try:
+            # 🟢 Usando o cliente HTTP do Supabase (Mais rápido e consome menos conexões)
+            res_mensagens = supabase.table("mensagens_chat").select("remetente_id", "texto", "data_envio").eq("match_id", int(m_id)).order("data_envio", nulls_first=False).execute()
+            rows = res_mensagens.data if res_mensagens.data else []
+
+            for msg_data in rows:
+                r_id = msg_data.get("remetente_id")
+                txt = msg_data.get("texto")
+                # Se a data vier como string do Supabase, você pode tratá-Fi de forma simples
+                dt_str = msg_data.get("data_envio", "")
+                hora_f = dt_str[11:16] if len(dt_str) > 16 else "--:--"
+                
+                if int(r_id) == int(my_id):
+                    with st.chat_message("user"): st.write(txt)
+                    st.caption(f"Você — {hora_f}")
+                else:
+                    with st.chat_message("assistant"): st.write(txt)
+                    st.caption(f"{nome_exibicao} — {hora_f}")
+        except Exception as e:
+            st.error(f"Erro ao ler banco: {e}")    
+
+    if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
+        if txt_in.strip():
+            try:
+                # 🟢 Inserção limpa via cliente Supabase
+                supabase.table("mensagens_chat").insert({
+                    "match_id": int(m_id),
+                    "remetente_id": int(my_id),
+                    "texto": txt_in.strip()
+                }).execute()
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao enviar: {e}")
+
+# 🟢 3. FUNÇÃO PRINCIPAL DA SALA PRIVADA (MOLDE E LAYOUT ESTÁTICO)
 def template_sala_privada():
     match_id = st.session_state.match_id_atual
     
@@ -1291,7 +1381,6 @@ def template_sala_privada():
         </style>
     """, unsafe_allow_html=True)
     
-    # Inicialização limpa de variáveis
     parceiro_nome = "Usuário"
     parceiro_foto = None
     parceiro_gen = "M"
@@ -1301,8 +1390,6 @@ def template_sala_privada():
     try:
         conn = conectar_supabase()
         cursor = conn.cursor()
-        
-        # Garante ID como inteiro puro
         id_match_int = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id)
         cursor.execute("SELECT usuario_1_id, usuario_2_id FROM matches WHERE id = %s;", (id_match_int,))
         res_m = cursor.fetchone()
@@ -1310,13 +1397,10 @@ def template_sala_privada():
         if res_m:
             u1, u2 = int(res_m[0]), int(res_m[1])
             meu_id_limpo = st.session_state.usuario_id[0] if isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
-            
-            # Identifica quem é o parceiro de conversa humana
             p_id = u2 if u1 == meu_id_limpo else u1
             
             cursor.execute("SELECT username, foto_perfil, genero, status FROM usuarios WHERE id = %s;", (int(p_id),))
             res_u = cursor.fetchone()
-            
             if res_u:
                 parceiro_nome = str(res_u[0])
                 parceiro_foto = res_u[1]
@@ -1325,53 +1409,36 @@ def template_sala_privada():
                 if "Online" in str(p_stat) or "🟢" in str(p_stat):
                     status_parceiro = "🟢 Online"
                     status_cor = "#48bb78"
-                    
         cursor.close()
         conn.close()
     except Exception as e: 
         print(f"Erro ao buscar status na Sala Privada: {e}")
 
-
-    # ==============================================================================
-    # GERENCIAMENTO DE TEMPO EM TEMPO REAL (SALA PRIVADA)
-    # ==============================================================================
-    # Inicializa o marcador de tempo se ele não existir na sessão
     if "tempo_inicio_sala" not in st.session_state:
-        import time
         st.session_state.tempo_inicio_sala = time.time()
 
-    # Busca o plano do usuário atualizado para aplicar as regras# 1. Define os valores padrões caso a busca no banco falhe
-    tipo_plano = "Grátis"
-    saldo_moedas = 0
-    
+    tipo_plano_sala = "Grátis"
+    saldo_moedas_sala = 0
     id_usuario_logado = st.session_state.get("usuario_id")
     
     if id_usuario_logado is None:
         st.warning("⚠️ Usuário não identificado na sessão.")
         return
 
-    try:
-        # Busca os dados no Supabase
-        user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
-        
-        if user_data.data and len(user_data.data) > 0:
-            # Captura exatamente a string "Plano Crédito de Moedas" vinda do banco
-            tipo_plano_sala = str(user_data.data[0].get("tipo_plano", "Grátis")).strip()
-            saldo_moedas_sala = user_data.data[0].get("moedas", 0)
-    except Exception as e:
-        st.error(f"Erro ao validar acesso à sala: {e}")
-        return
-              
-    
+    # 🟢 ADICIONE ESTA LEITURA DIRETA EM MEMÓRIA:
+    if "dados_usuario" in st.session_state:
+        tipo_plano_sala = str(st.session_state.dados_usuario.get("tipo_plano", "Grátis")).strip()
+        saldo_moedas_sala = st.session_state.dados_usuario.get("moedas", 0)
+    else:
+        tipo_plano_sala = "Grátis"
+        saldo_moedas_sala = 0
 
-    # --- DIVISÃO DA TELA EM COLUNAS ---
+    # Divisão da interface em colunas
     col_lateral_fixa, col_chat_principal = st.columns([1, 2.8])
     
     with col_lateral_fixa:
         avatar_html = ""
         caminho_disco = str(parceiro_foto).strip().lstrip('/')
-        
-        # Converte a foto real para Base64 se o arquivo físico existir na pasta
         if parceiro_foto and os.path.exists(caminho_disco):
             try:
                 with open(caminho_disco, "rb") as image_file:
@@ -1382,7 +1449,6 @@ def template_sala_privada():
         else:
             avatar_html = f'<div style="font-size: 40px; margin-bottom: 10px; text-align:center;">{"👩" if parceiro_gen == "F" else "👨"}</div>'
             
-        # 🔍 RETÂNGULO DO PERFIL FIXADO (Nome e string split tratados sem quebras)
         nome_exibicao_parceiro = parceiro_nome.split('@')[0].capitalize()
         st.markdown(f"""
             <div class="box-perfil-fixo">
@@ -1395,7 +1461,7 @@ def template_sala_privada():
         st.markdown("""
             <div class="info-box-segura" style="margin-bottom: 15px;">
                 <h3>🔒 Ambiente Seguro</h3>
-                <p>Esta é uma sala de transmissão privada e criptografada temporária. Suas mensagens serão armazenadas de forma segura nesta sessão de encontro.</p>
+                <p>Esta é uma sala de transmissão privada e criptografada temporária.</p>
             </div>
         """, unsafe_allow_html=True)
         
@@ -1417,134 +1483,29 @@ def template_sala_privada():
         st.markdown(f"## 💬 Chat Privado — ID #{id_match_int}")
         st.caption("Aproveite o seu encontro virtual reservado.")
         st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
-        st.title("💬 Chat Privado com Suporte a Vídeo")
 
-
-        # Lógica de controle do Timer para usuários do plano de Crédito
+        # 🚀 CHAMADA DO TIMOR DE CRÉDITOS ISOLADO (Evita o loop infinito global)
         if tipo_plano_sala == "Plano Crédito de Moedas":
             st.info(f"🪙 Modo Créditos Ativo. Saldo atual: {saldo_moedas_sala} moedas.")
-            import time
-            tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
-                        
-            # Limite inicial de 10 minutos (600 segundos)
-            tempo_limite_segundos = 600 
-            tempo_restante = tempo_limite_segundos - tempo_decorrido
+            renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int) 
+        elif tipo_plano_sala == "Assinante": 
+            st.success(f"⭐ Plano Assinante Ativo: Acesso ilimitado por tempo indeterminado.") 
 
-            if tempo_restante > 0:
-                minutos_r = int(tempo_restante // 60)
-                segundos_r = int(tempo_restante % 60)
-                # Exibe um contador visual no topo do chat privado
-                st.warning(f"⏳ **Tempo Restante nesta sessão:** {minutos_r:02d}:{segundos_r:02d} | Saldo Atual: 🪙 {saldo_moedas_sala} moedas")
-                            
-                # Executa um auto-refresh a cada 5 segundos para atualizar o cronômetro sem travar o input de texto
-                st.fragment(lambda: time.sleep(5) or st.rerun())()
-            else:
-                # O tempo acabou! Tenta renovar debitando mais 10 moedas por +10 minutos
-                if saldo_moedas_sala >= 10:
-                    try:
-                        supabase.table("usuarios").update({"moedas": saldo_moedas_sala - 10}).eq("id", int(my_id)).execute()
-                        st.session_state.tempo_inicio_sala = time.time() # Reseta o cronômetro para mais 10 minutos
-                        st.toast("🪙 Mais 10 minutos adicionados! 10 moedas foram debitadas do seu saldo.", icon="🪙")
-                        st.rerun()
-                    except Exception:
-                        st.error("Erro ao renovar tempo. Encerrando sala...")
-                        st.session_state.opcao_menu = "Plataforma de Planos IA"
-                        st.rerun()
-                else:
-                    # Se não houver saldo suficiente, expulsa da sala imediatamente
-                    st.error("🔒 Seus 10 minutos acabaram e você não tem moedas suficientes para renovar.")
-                    time.sleep(3)
-                    st.session_state.opcao_menu = "Plataforma de Planos IA"
-                    st.rerun()
-                                
-        elif tipo_plano_sala == "Assinante":
-            st.success(f"⭐ **Plano Assinante Ativo:** Você possui acesso ilimitado por tempo indeterminado nesta sala.")
-
-        # ==============================================================================
-        # RENDERIZAÇÃO E HISTÓRICO DE MENSAGENS (SEU CÓDIGO ORIGINAL)
-        # ==============================================================================
-        for r_id, txt, dt in rows:
-        # Tratamento seguro contra valores None/Nulos na data
-            if dt is not None:
-                hora_f = dt.strftime("%H:%M")
-            else:
-                hora_f = "--:--"  # Fallback caso a data antiga esteja nula
-                        
-            if int(r_id) == int(my_id):
-                with st.chat_message("user"):
-                    st.write(txt)
-                st.caption(f"Você — {hora_f}")
-            else:
-                with st.chat_message("assistant"):
-                    st.write(txt)
-                    st.caption(f"{nome_exibicao} — {hora_f}")
+        # Funcionalidade de Videochamada fixa 
+        if st.button("🎥 Iniciar Videochamada Privada"): 
+            nome_da_sala_unica = f"Atendimento_FaleConosco_SalaPrivada_{id_match_int}" 
+            url_jitsi = f"https://meet.jit.si/{nome_da_sala_unica}" 
         
+            st.info("A videochamada foi iniciada abaixo. Garanta as permissões no navegador.") 
+            st.iframe(url_jitsi, height=600) 
 
+    # 🚀 CHAMADA DO MOTOR DE CHAT REATIVO ISOLADO 
+    live_sala_id = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id) 
+    meu_id_sala = id_usuario_logado[0] if isinstance(id_usuario_logado, (tuple, list)) else int(id_usuario_logado) 
 
-               # Nova funcionalidade: Botão para iniciar a videochamada
-        if st.button("🎥 Iniciar Videochamada Privada"):
-            nome_da_sala_unica = f"Atendimento_FaleConosco_SalaPrivada_{id_match_int}"
-            
-            # URL 100% CORRIGIDA COM A BARRA E O DOMÍNIO CORRETO:
-            url_jitsi = f"https://meet.jit.si/{nome_da_sala_unica}"
-            
-            st.info("A videochamada foi iniciada abaixo. Dê permissão de câmera/microfone no seu navegador.")
-
-            # Comando nativo corrigido e sem o parâmetro inválido
-            st.iframe(url_jitsi, height=600)
-            
-
-        # 📥 MOTOR FRAGMENTADO AS SÍNCRONO REATIVO (ATUALIZA A CADA 2 SEGUNDOS)
-        @st.fragment(run_every=2)
-        def live_chat_privado_engine(m_id, my_id, p_nome_str):
-            # Tratamento seguro do nome
-            try:
-                nome_exibicao = p_nome_str.split('@')[0].capitalize()
-            except Exception:
-                nome_exibicao = str(p_nome_str).capitalize()
-
-            with st.container(height=410, border=False):
-                try:
-                    conn = conectar_supabase()
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        'SELECT remetente_id, texto, data_envio FROM mensagens_chat WHERE match_id = %s ORDER BY data_envio ASC;', 
-                        (int(m_id),)
-                    )
-                    rows = cursor.fetchall()
-                    cursor.close()
-                    conn.close()
-
-                except Exception as e:
-                    st.error(f"Erro ao ler banco: {e}")    
-
-            if st.session_state.opcao_menu == "🤝 Sala Privada":
-                if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
-                    if txt_in.strip():
-                        try:
-                            conn = conectar_supabase()
-                            conn.autocommit = True 
-                            cursor = conn.cursor()
-                            
-                            cursor.execute(
-                                'INSERT INTO mensagens_chat (match_id, remetente_id, texto, data_envio) VALUES (%s, %s, %s, NOW());', 
-                                (int(m_id), int(my_id), txt_in.strip())
-                            )
-                            
-                            conn.commit() 
-                            cursor.close()
-                            conn.close()
-                            
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao enviar: {e}")
-
-            # --- EXECUÇÃO DO MOTOR DE CHAT DE FORMA LIMPA ---
-            live_sala_id = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id)
-            meu_id_sala = st.session_state.usuario_id[0] if isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
-
-            live_chat_privado_engine(live_sala_id, meu_id_sala, parceiro_nome)
-        
+    # Chama a execução da engine de chat fragmentada 
+    live_chat_privado_engine(live_sala_id, meu_id_sala, parceiro_nome) 
+      
 
 
 def renderizar_listas_sidebar_e_acoes(): 
@@ -2474,71 +2435,97 @@ def template_fale_conosco():
 # ==============================================================================
 # 10. ORQUESTRADOR E MAQUINA DE ESTADOS CENTRAL (NOTIFICAÇÃO SEGUIDA DE TRAVA)
 # ==============================================================================
-if st.session_state.alerta_match:
+modal_ativa = False
+
+if st.session_state.get("alerta_match"):
     dados_m = st.session_state.alerta_match
     
-    # 🟢 IMPORTANTE: Limpamos o estado ANTES para evitar loops de repetição
+    # 🟢 Limpamos o estado para evitar loops
     st.session_state.alerta_match = None 
     
-    # Disparia o controlador que vai buscar o plano, moedas e abrir a modal
+    # Sinaliza que uma modal está em exibição para bloquear o roteamento de fundo
+    modal_ativa = True
+    
+    # Dispara o controlador que vai buscar o plano, moedas e abrir a modal
     processar_match_lucy(dados_m)
 
-
-if st.session_state.abrir_reserva_fluxo:
+if st.session_state.get("abrir_reserva_fluxo"):
     dados_r = st.session_state.abrir_reserva_fluxo
     st.session_state.abrir_reserva_fluxo = None
+    modal_ativa = True
     modal_agendamento_encontro(dados_r)
 
 
-    
-    # ==============================================================================
-# 2. ROTEAMENTO ESTRITO DE TELAS (Substitua o seu bloco antigo por este)
+# ==============================================================================
+# 2. ROTEAMENTO ESTRITO DE TELAS (CORRIGIDO CONTRA SOBREPOSIÇÃO)
 # ==============================================================================
 
-# Captura o valor atual para o roteamento baseado em strings seguras
-menu_atual = str(st.session_state.opcao_menu).strip().lower()
+# 🛑 BLOQUEIO DE SEGURANÇA: Se houver uma modal aberta na tela, NÃO renderiza a página de fundo.
+# Isso impede que duas interfaces disputem o foco e causem o "flicker" (pisca-pisca).
+if not modal_ativa:
 
-# --- 1. TELAS PÚBLICAS ---
-if menu_atual == "home":
-    template_home()
+    # Captura o valor atual para o roteamento baseado em strings seguras
+    menu_atual = str(st.session_state.get("opcao_menu", "home")).strip().lower()
 
-elif menu_atual == "login" or menu_atual == "login":
-    st.session_state.usuario_id = None
-    template_login()
+    # --- 1. TELAS PÚBLICAS ---
+    if menu_atual in ["home", ""]:
+        template_home()
 
-elif menu_atual == "cadastro" or menu_atual == "📝 cadastro":
-    st.session_state.usuario_id = None
-    template_cadastro()
+    elif menu_atual == "login":
+        st.session_state.usuario_id = None
+        template_login()
 
-# --- 2. TELAS PRIVADAS (Usuário Logado) ---
-else:
-    # Trava de Segurança: Se não estiver logado e a tela não for pública, força 'home'
-    if st.session_state.usuario_id is None:
-        st.session_state.opcao_menu = "home"
-        st.rerun()
+    elif menu_atual in ["cadastro", "📝 cadastro"]:
+        st.session_state.usuario_id = None
+        template_cadastro()
 
-    # Se estiver logado, processa as telas internas normalmente
-    if st.session_state.opcao_menu == "Plataforma de Planos IA":
-        template_planos()
-        
-    # [Mantenha aqui o seu bloco existente de buscar e exibir notificações]
-    # ... (Seu código de busca no banco com cursor_notif) ...
+    # --- 2. TELAS PRIVADAS (Usuário Logado) ---
+    else:
+        # Trava de Segurança: Se não estiver logado e a tela não for pública, força 'home'
+        if st.session_state.get("usuario_id") is None:
+            st.session_state.opcao_menu = "home"
+            st.rerun()
 
-    # --- RENDERIZAÇÃO DOS MENUS INTERNOS ---
-    if st.session_state.opcao_menu == "🤝 Sala Privada":
-        template_sala_privada()
-    elif st.session_state.opcao_menu == "💬 Conversar com Lucy":
-        renderizar_listas_sidebar_e_acoes()
-        template_chat_ia_completo()
-    elif st.session_state.opcao_menu == "📅 Disponibilidade":
-        template_disponibilidade()
-    elif st.session_state.opcao_menu == "🤝 Gerenciar Conexões":
-        renderizar_listas_sidebar_e_acoes()
-        template_gerenciar_conexoes_completo()
-    elif st.session_state.opcao_menu == "🛠️ Painel Admin":
-        template_painel_admin()
-    elif st.session_state.opcao_menu == "✉️ Fale Conosco":
-        template_fale_conosco()
+        # Se estiver logado, processa as telas internas normalmente
+        if st.session_state.opcao_menu == "Plataforma de Planos IA":
+            template_planos()
+
+       # 🔍 REPOSICIONAMENTO CRÍTICO: Só busca e exibe a notificação se o menu NÃO for a Sala Privada
+        if st.session_state.opcao_menu != "🤝 Sala Privada":
+            try:
+                conn_notif = conectar_supabase()
+                cursor_notif = conn_notif.cursor()
+                cursor_notif.execute('''
+                    SELECT COUNT(*) FROM agendamentos_virtuais 
+                    WHERE (remetente_id = %s OR destinatario_id = %s) 
+                    AND TRIM(LOWER(dia_semana)) = TRIM(LOWER(%s)) 
+                    AND status_convite = 'aceito';
+                ''', (int(st.session_state.usuario_id), int(st.session_state.usuario_id), dia_atual_servidor))
+                total_hoje = cursor_notif.fetchone()[0]
+                cursor_notif.close()
+                conn_notif.close()
+
+                if total_hoje > 0:
+                    st.info(f"🔔 **Aviso da Lucy:** Você possui **{total_hoje} encontro(s)** agendado(s) para hoje ({dia_atual_servidor})!")
+            except Exception:
+                pass 
+
+
+    # --- RENDERIZAÇÃO DOS MENUS INTERNOS (MUTUAMENTE EXCLUSIVOS) ---
+        if st.session_state.opcao_menu == "🤝 Sala Privada":
+            template_sala_privada()
+        elif st.session_state.opcao_menu == "💬 Conversar com Lucy":
+            renderizar_listas_sidebar_e_acoes()
+            template_chat_ia_completo()
+        elif st.session_state.opcao_menu == "📅 Disponibilidade":
+            template_disponibilidade()
+        elif st.session_state.opcao_menu == "🤝 Gerenciar Conexões":
+            renderizar_listas_sidebar_e_acoes()
+            template_gerenciar_conexoes_completo()
+        elif st.session_state.opcao_menu == "🛠️ Painel Admin":
+            template_painel_admin()
+        elif st.session_state.opcao_menu == "✉️ Fale Conosco":
+            template_fale_conosco()
 
 
 
