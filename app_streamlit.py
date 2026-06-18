@@ -1059,7 +1059,7 @@ def template_chat_ia_completo():
 # ==============================================================================
 
 @st.dialog("🤖 Lucy Notou Afinidade!")
-def exibir_modal_match_lucy(dados_m, tipo_plano, saldo_moedas):  
+def exibir_modal_match(dados_m, tipo_plano, saldo_moedas):  
 
     st.markdown(f"Lucy identificou uma excelente afinidade entre você e **{dados_m['nome']}**!")
     
@@ -2456,7 +2456,7 @@ def template_fale_conosco():
 if st.session_state.alerta_match:
     dados_m = st.session_state.alerta_match
     st.session_state.alerta_match = None
-    modal_match_lucy(dados_m)
+    exibir_modal_match(dados_m, tipo_plano, moedas)
 
 if st.session_state.abrir_reserva_fluxo:
     dados_r = st.session_state.abrir_reserva_fluxo
