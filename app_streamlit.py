@@ -1299,7 +1299,7 @@ def modal_agendamento_encontro(dados_r):
 @st.fragment(run_every=5.0)
 def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int):
     tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
-    tempo_limite_segundos = 600  # Limite inicial de 10 minutos (600 segundos)
+    tempo_limite_segundos = 15  # Limite inicial de 10 minutos (600 segundos)
     tempo_restante = tempo_limite_segundos - tempo_decorrido
 
     if tempo_restante > 0:
@@ -1362,13 +1362,13 @@ def live_chat_privado_engine(m_id, my_id, p_nome_str):
             dados_reais_no_banco = res_bruto.data if res_bruto.data else []
             
             st.markdown("---")
-            st.markdown("**📋 Últimas 5 linhas gravadas REALMENTE no seu banco de dados:**")
-            if not dados_reais_no_banco:
-                st.error("❌ A tabela 'mensagens_chat' está completamente VAZIA no banco!")
-            else:
-                for idx, linha in enumerate(dados_reais_no_banco):
-                    st.code(f"Linha {idx+1} -> match_id gravado: {linha.get('match_id')} | remetente_id gravado: {linha.get('remetente_id')} | texto: '{linha.get('texto')}'")
-            st.markdown("---")
+            #st.markdown("**📋 Últimas 5 linhas gravadas REALMENTE no seu banco de dados:**")
+            #if not dados_reais_no_banco:
+            #    st.error("❌ A tabela 'mensagens_chat' está completamente VAZIA no banco!")
+            #else:
+            #    for idx, linha in enumerate(dados_reais_no_banco):
+            #        st.code(f"Linha {idx+1} -> match_id gravado: {linha.get('match_id')} | remetente_id gravado: {linha.get('remetente_id')} | texto: '{linha.get('texto')}'")
+            #st.markdown("---")
 
             # --- FILTRAGEM PARA EXIBIR OS BALÕES ---
             id_sala_alvo = str(m_id).strip()
