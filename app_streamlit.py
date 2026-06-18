@@ -1475,8 +1475,7 @@ def template_sala_privada():
                 with st.chat_message("assistant"):
                     st.write(txt)
                     st.caption(f"{nome_exibicao} — {hora_f}")
-        except Exception as e:
-            st.error(f"Erro ao ler banco: {e}")
+        
 
 
                # Nova funcionalidade: Botão para iniciar a videochamada
@@ -1512,7 +1511,10 @@ def template_sala_privada():
                     rows = cursor.fetchall()
                     cursor.close()
                     conn.close()
-                                
+
+                except Exception as e:
+                    st.error(f"Erro ao ler banco: {e}")    
+
             if st.session_state.opcao_menu == "🤝 Sala Privada":
                 if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
                     if txt_in.strip():
