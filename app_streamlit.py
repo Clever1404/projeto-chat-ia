@@ -1120,28 +1120,27 @@ def exibir_modal_match(dados_m, tipo_plano, saldo_moedas):
 
 
 def processar_match_lucy(dados_m):
-    # 1. Define os valores padrões caso a busca no banco falhe
+   # Valores padrão iniciais (Evita o NameError)
     tipo_plano = "Grátis"
     saldo_moedas = 0
+    
+    id_usuario_logado = st.session_state.get("usuario_id")
+    
+    if id_usuario_logado is None:
+        st.warning("⚠️ Usuário não identificado na sessão.")
+        return
 
     try:
-        # Captura com segurança o ID do usuário logado
-        id_usuario_logado = st.session_state.get("usuario_id")
-            
-        # CORREÇÃO: Alterado de 'NULL' para 'None' (sintaxe correta do Python)
-        if id_usuario_logado is not None:
-            # Faz a busca no Supabase convertendo o ID para inteiro
-            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
-                
-            # Verifica se a lista contém dados e extrai do primeiro elemento [0]
-            if user_data.data and len(user_data.data) > 0:
-                tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
-                saldo_moedas = user_data.data[0].get("moedas", 0)
-        else:
-            st.warning("⚠️ Usuário não identificado na sessão.")
-
+        # Busca os dados atualizados do usuário no Supabase
+        user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
+        
+        if user_data.data and len(user_data.data) > 0:
+            # Captura com segurança strings exatas correspondentes ao seu banco
+            tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
+            saldo_moedas = user_data.data[0].get("moedas", 0)
     except Exception as e:
-        pass
+        st.error(f"Erro ao carregar dados do banco: {e}")
+        return
 
    # Se passou nas validações, dispara a modal passando os dados necessários
     exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
@@ -2462,7 +2461,7 @@ if st.session_state.alerta_match:
     # Disparia o controlador que vai buscar o plano, moedas e abrir a modal
     processar_match_lucy(dados_m)
 
-    
+
 if st.session_state.abrir_reserva_fluxo:
     dados_r = st.session_state.abrir_reserva_fluxo
     st.session_state.abrir_reserva_fluxo = None
