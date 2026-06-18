@@ -1059,7 +1059,7 @@ def template_chat_ia_completo():
 # ==============================================================================
 
 @st.dialog("🤖 Lucy Notou Afinidade!")
-def exibir_modal_match(dados_m, tipo_plano, saldo_moedas, id_usuario_logado):  
+def exibir_modal_match(dados_m, tipo_plano, saldo_moedas):  
 
     st.markdown(f"Lucy identificou uma excelente afinidade entre você e **{dados_m['nome']}**!")
     
@@ -1158,7 +1158,7 @@ def processar_match_lucy(dados_m):
         return
 
     # Garanta que o nome verificado na modal seja EXATAMENTE igual ao print do debug acima
-    exibir_modal_match(dados_m, tipo_plano, saldo_moedas, id_usuario_logado)
+    exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
 
 
 
