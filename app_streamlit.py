@@ -438,47 +438,66 @@ def template_cadastro():
            
 
 def template_planos():
-    st.markdown('<h1 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
-    
-    # --- TEXTO DESCRITIVO DOS PLANOS CENTRALIZADO ---
-    st.html(
-        """
-        <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
-            <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
-            
-            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
-                <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
-                <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
+    # Inicializa a sub-visão caso ela não exista
+    if "sub_visao" not in st.session_state:
+        st.session_state.sub_visao = "planos"
+
+    # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
+    if st.session_state.sub_visao == "planos":
+        st.markdown('<h1 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
+        
+        # Texto descritivo dos planos centralizado
+        st.html(
+            """
+            <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
+                <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
+                
+                <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
+                    <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+                    <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
+                </div>
+                
+                <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
+                    <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+                    <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
+                </div>
+                
+                <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+                    <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+                    <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+                </div>
             </div>
+            """        
+        )
+        
+        # Botão para ir para a loja (Troca a tela inteira)
+        if st.button("🛒 Ir para a Loja de Moedas e Assinaturas", type="primary", use_container_width=True):
+            st.session_state.sub_visao = "loja"
+            st.rerun()
             
-            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
-                <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
-                <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
-            </div>
+        st.markdown('<br>', unsafe_allow_html=True)
+        
+        # Botão de voltar para o login
+        if st.button("← Voltar para o 🔒 Login", use_container_width=True):
+            st.session_state.opcao_menu = "login"
+            st.rerun()
+
+    # --- TELA 2: RENDERIZAÇÃO DA SUA LOJA (TELA CHEIA) ---
+    elif st.session_state.sub_visao == "loja":
+        # Botão posicionado no topo para o usuário conseguir voltar aos planos
+        if st.button("📋 Ver Descrição dos Planos", use_container_width=True):
+            st.session_state.sub_visao = "planos"
+            st.rerun()
             
-            <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
-                <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
-                <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
-            </div>
-        </div>
-        """        
-    )
-    
-    
-    
-    # 1. Recupera as variáveis do session_state (ajuste as chaves se os nomes forem diferentes no seu app)
-    id_usuario = st.session_state.get("id_usuario", "usuario_teste")
-    saldo_atual = st.session_state.get("saldo_moedas", 0)
-    
-    # 2. Passa os argumentos obrigatórios para a função
-    renderizar_loja_app(id_usuario_atual=id_usuario, saldo_moedas=saldo_atual)
-    
-    
-    
-    # --- BOTÃO DE VOLTAR NO RODAPÉ ---
-    if st.button("← Voltar para o 🔒 Login", use_container_width=True):
-        st.session_state.opcao_menu = "login"
-        st.rerun()
+        st.markdown('<hr style="border: 0.5px solid #30363d; margin: 15px 0;">', unsafe_allow_html=True)
+        
+        # Recupera as variáveis necessárias
+        id_usuario = st.session_state.get("id_usuario", "usuario_teste")
+        saldo_atual = st.session_state.get("saldo_moedas", 0)
+        
+        # Executa a sua loja com a tela totalmente limpa e isolada
+        renderizar_loja_app(id_usuario_atual=id_usuario, saldo_moedas=saldo_atual)
+
 
 
 
