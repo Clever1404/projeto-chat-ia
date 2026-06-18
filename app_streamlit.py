@@ -1665,10 +1665,7 @@ def renderizar_listas_sidebar_e_acoes():
             st.rerun()
         if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True): 
             st.session_state.opcao_menu = "📅 Disponibilidade"
-        # Loja
-        if st.button("🛒 Loja do App", type="secondary", use_container_width=True):
-            st.sidebar.header = "🛒 Loja do App"; st.rerun()  
-
+      
         if st.session_state.eh_admin or st.session_state.username in ['admin', 'Clever1404']:
             if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True):
                 st.session_state.opcao_menu = "🛠️ Painel Admin"; st.rerun()     
@@ -1795,7 +1792,7 @@ def template_gerenciar_conexoes_completo():
         st.session_state.opcao_menu = "💬 Conversar com Lucy"
         st.rerun()
         
-    aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
+    aba_m, aba_e, aba_l = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico", "🛒 Loja do App"]) 
     meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
 
     with aba_m:
@@ -1898,6 +1895,10 @@ def template_gerenciar_conexoes_completo():
                 
         except Exception as e: st.error(f"Erro: {e}")     
 
+    with aba_l:
+        st.markdown("### 🛒 Loja do App")
+        st.sidebar.header = "🛒 Loja do App" 
+        st.rerun() 
 
 # ==============================================================================
 # 9. CORREÇÃO DO PAINEL ADMIN (REATIVAÇÃO DO PARETO E COLUNAS IDADE/GENERO/EMAIL)
