@@ -1329,71 +1329,70 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
 @st.fragment(run_every=4.0)
 def live_chat_privado_engine(m_id, my_id, p_nome_str):
     try:
-        # Tratamento seguro do nome do parceiro de conversa
         nome_exibicao = p_nome_str.split('@')[0].capitalize() if '@' in str(p_nome_str) else str(p_nome_str).capitalize()
     except Exception:
         nome_exibicao = "Usuário"
 
+    # 🔍 PAINEL DE INSPECÇÃO BRUTA DO BANCO (DIAGNÓSTICO INTACTO)
+    st.write("---")
+    st.markdown(f"### 🔍 Diagnóstico de IDs de Segurança:")
+    st.write(f"• ID desta Sala Atual (`m_id`): `{m_id}`")
+    st.write(f"• Seu ID de Usuário (`my_id`): `{my_id}`")
+
     with st.container(height=410, border=False):
         try:
-            # 🟢 ESTRATÉGIA DE SEGURANÇA MÁXIMA: 
-            # Buscamos as últimas mensagens e faremos a filtragem precisa direto no Python
-            res_mensagens = supabase.table("mensagens_chat") \
-                .select("match_id", "remetente_id", "texto", "data_envio") \
-                .order("data_envio", desc=False) \
-                .limit(100) \
+            # Busca as últimas 5 mensagens gravadas na tabela SEM NENHUM FILTRO
+            res_bruto = supabase.table("mensagens_chat") \
+                .select("match_id", "remetente_id", "texto") \
+                .order("id", desc=True) \
+                .limit(5) \
                 .execute()
             
-            todos_os_registros = res_mensagens.data if res_mensagens.data else []
+            dados_reais_no_banco = res_bruto.data if res_bruto.data else []
             
-            # Filtra na memória garantindo que ambos os lados sejam comparados como strings (Evita quebras de int/str)
+            st.markdown("---")
+            st.markdown("**📋 Últimas 5 linhas gravadas REALMENTE no seu banco de dados:**")
+            if not dados_reais_no_banco:
+                st.error("❌ A tabela 'mensagens_chat' está completamente VAZIA no banco!")
+            else:
+                for idx, linha in enumerate(dados_reais_no_banco):
+                    st.code(f"Linha {idx+1} -> match_id gravado: {linha.get('match_id')} | remetente_id gravado: {linha.get('remetente_id')} | texto: '{linha.get('texto')}'")
+            st.markdown("---")
+
+            # --- FILTRAGEM PARA EXIBIR OS BALÕES ---
             id_sala_alvo = str(m_id).strip()
-            rows = [msg for msg in todos_os_registros if str(msg.get("match_id")).strip() == id_sala_alvo]
+            rows = [msg for msg in dados_reais_no_banco if str(msg.get("match_id")).strip() == id_sala_alvo]
 
             if not rows:
-                st.caption("✨ Nenhuma mensagem enviada ainda nesta sala privada. Comece a conversa abaixo!")
+                st.caption("✨ Nenhuma mensagem correspondente para esta sala específica.")
             else:
-                # Renderiza os balões de conversa normalmente
-                for msg_data in rows:
+                for msg_data in reversed(rows): # Inverte para mostrar na ordem correta de chat
                     r_id = msg_data.get("remetente_id")
                     txt = msg_data.get("texto")
-                    dt_str = msg_data.get("data_envio", "")
                     
-                    # Formatação simples da hora (Ex: "14:30")
-                    hora_f = dt_str[11:16] if dt_str and len(dt_str) >= 16 else "--:--"
-                    
-                    # Compara os IDs de remetente como strings para evitar divergência de tipo
                     if str(r_id).strip() == str(my_id).strip():
-                        with st.chat_message("user"): 
-                            st.write(txt)
-                        st.caption(f"Você — {hora_f}")
+                        with st.chat_message("user"): st.write(txt)
                     else:
-                        with st.chat_message("assistant"): 
-                            st.write(txt)
-                        st.caption(f"{nome_exibicao} — {hora_f}")
+                        with st.chat_message("assistant"): st.write(txt)
                     
         except Exception as e:
-            st.error(f"Erro ao carregar histórico de mensagens: {e}")    
+            st.error(f"Erro ao ler banco: {e}")    
 
-    # Campo para envio de novas mensagens privadas
+    # Campo de input do chat privado
     if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
         if txt_in.strip():
             try:
-                id_sala_gravar = int(m_id)
-                id_remetente_gravar = int(my_id)
-                
-                # Grava no Supabase garantindo tipos primitivos limpos
                 supabase.table("mensagens_chat").insert({
-                    "match_id": id_sala_gravar,
-                    "remetente_id": id_remetente_gravar,
+                    "match_id": int(m_id),
+                    "remetente_id": int(my_id),
                     "texto": txt_in.strip()
                 }).execute()
-                
-                # Atualiza instantaneamente a tela do fragmento
                 st.rerun()
             except Exception as e:
-                st.error(f"Erro ao enviar mensagem: {e}")
+                st.error(f"Erro ao enviar: {e}")
 
+
+                
 # 🟢 3. FUNÇÃO PRINCIPAL DA SALA PRIVADA (MOLDE E LAYOUT ESTÁTICO)
 def template_sala_privada():
     match_id = st.session_state.match_id_atual
