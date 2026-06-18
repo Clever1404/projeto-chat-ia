@@ -1382,6 +1382,7 @@ def live_chat_privado_engine(m_id, my_id, p_nome_str):
     if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
         if txt_in.strip():
             try:
+                # No st.chat_input do Python, envie apenas isso:
                 supabase.table("mensagens_chat").insert({
                     "match_id": int(m_id),
                     "remetente_id": int(my_id),
@@ -1392,7 +1393,7 @@ def live_chat_privado_engine(m_id, my_id, p_nome_str):
                 st.error(f"Erro ao enviar: {e}")
 
 
-                
+
 # 🟢 3. FUNÇÃO PRINCIPAL DA SALA PRIVADA (MOLDE E LAYOUT ESTÁTICO)
 def template_sala_privada():
     match_id = st.session_state.match_id_atual
