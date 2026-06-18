@@ -1059,7 +1059,7 @@ def template_chat_ia_completo():
 # ==============================================================================
 
 @st.dialog("🤖 Lucy Notou Afinidade!")
-def exibir_modal_match(dados_m, tipo_plano, saldo_moedas):  
+def exibir_modal_match(dados_m, tipo_plano, saldo_moedas, id_usuario_logado):  
 
     st.markdown(f"Lucy identificou uma excelente afinidade entre você e **{dados_m['nome']}**!")
     
@@ -1102,7 +1102,7 @@ def exibir_modal_match(dados_m, tipo_plano, saldo_moedas):
         st.button(f"⚪ {dados_m['nome']} está offline. Indisponível para chat instantâneo.", disabled=True, use_container_width=True)
         
         if st.button("📅 Agende um encontro virtual", type="secondary", use_container_width=True):
-            if tipo_plano in ["Assinante", "Plano Crédito de Moeda"]:
+            if tipo_plano in ["Assinante", "Plano Crédito de Moedas"]:
                 st.session_state.abrir_reserva_fluxo = {
                     "id_par": dados_m["id_par"], 
                     "nome_par": dados_m["nome"], 
@@ -1120,7 +1120,7 @@ def exibir_modal_match(dados_m, tipo_plano, saldo_moedas):
 
 
 def processar_match_lucy(dados_m):
-   # Valores padrão iniciais (Evita o NameError)
+    # Valores padrão iniciais caso a busca falhe
     tipo_plano = "Grátis"
     saldo_moedas = 0
     
@@ -1131,19 +1131,35 @@ def processar_match_lucy(dados_m):
         return
 
     try:
-        # Busca os dados atualizados do usuário no Supabase
+        # Busca os dados no Supabase
         user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
         
+        # 🟢 CORREÇÃO CRÍTICA: Acessando corretamente o primeiro elemento [0] da lista .data
         if user_data.data and len(user_data.data) > 0:
-            # Captura com segurança strings exatas correspondentes ao seu banco
-            tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
-            saldo_moedas = user_data.data[0].get("moedas", 0)
+            registro_banco = user_data.data[0]
+            
+            # Captura os valores brutos
+            plano_bruto = registro_banco.get("tipo_plano", "Grátis")
+            saldo_moedas = registro_banco.get("moedas", 0)
+            
+            # 🟢 BLINDAGEM: Remove espaços em branco invisíveis no início/fim e padroniza a string
+            if plano_bruto:
+                tipo_plano = str(plano_bruto).strip()
+            
+            # 🔍 PROVA REAL (DEBUG): Remova ou comente essa linha após resolver o problema
+            st.toast(f"DEBUG BANCO -> Plano encontrado: '{tipo_plano}' | Tipo: {type(tipo_plano)}")
+            
+        else:
+            st.error("⚠️ Nenhum registro de usuário foi encontrado no banco de dados.")
+            return
+            
     except Exception as e:
         st.error(f"Erro ao carregar dados do banco: {e}")
         return
 
-   # Se passou nas validações, dispara a modal passando os dados necessários
-    exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
+    # Garanta que o nome verificado na modal seja EXATAMENTE igual ao print do debug acima
+    exibir_modal_match(dados_m, tipo_plano, saldo_moedas, id_usuario_logado)
+
 
 
 
