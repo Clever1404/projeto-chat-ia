@@ -1386,6 +1386,99 @@ def template_sala_privada():
         st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
         st.title("💬 Chat Privado com Suporte a Vídeo")
 
+
+        # ==============================================================================
+        # GERENCIAMENTO DE TEMPO EM TEMPO REAL (SALA PRIVADA)
+        # ==============================================================================
+        # Inicializa o marcador de tempo se ele não existir na sessão
+        if "tempo_inicio_sala" not in st.session_state:
+            import time
+            st.session_state.tempo_inicio_sala = time.time()
+
+        # Busca o plano do usuário atualizado para aplicar as regras# 1. Define os valores padrões caso a busca no banco falhe
+        tipo_plano = "Grátis"
+        saldo_moedas = 0
+
+        try:
+            # Captura com segurança o ID do usuário logado
+            id_usuario_logado = st.session_state.get("usuario_id")
+                            
+            # CORREÇÃO: Alterado de 'NULL' para 'None' (sintaxe correta do Python)
+            if id_usuario_logado is not None:
+                # Faz a busca no Supabase convertendo o ID para inteiro
+                user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
+                                
+                # Verifica se a lista contém dados e extrai do primeiro elemento [0]
+                if user_data.data and len(user_data.data) > 0:
+                    tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
+                    saldo_moedas = user_data.data[0].get("moedas", 0)
+            else:
+                st.warning("⚠️ Usuário não identificado na sessão.")
+
+        except Exception as e:
+            st.error(f"Erro ao carregar dados do banco: {e}")
+
+        # Lógica de controle do Timer para usuários do plano de Crédito
+        if tipo_plano_sala == "Plano Crédito de Moedas":
+            import time
+            tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
+                        
+            # Limite inicial de 10 minutos (600 segundos)
+            tempo_limite_segundos = 600 
+            tempo_restante = tempo_limite_segundos - tempo_decorrido
+
+            if tempo_restante > 0:
+                minutos_r = int(tempo_restante // 60)
+                segundos_r = int(tempo_restante % 60)
+                # Exibe um contador visual no topo do chat privado
+                st.warning(f"⏳ **Tempo Restante nesta sessão:** {minutos_r:02d}:{segundos_r:02d} | Saldo Atual: 🪙 {saldo_moedas_sala} moedas")
+                            
+                # Executa um auto-refresh a cada 5 segundos para atualizar o cronômetro sem travar o input de texto
+                st.fragment(lambda: time.sleep(5) or st.rerun())()
+            else:
+                # O tempo acabou! Tenta renovar debitando mais 10 moedas por +10 minutos
+                if saldo_moedas_sala >= 10:
+                    try:
+                        supabase.table("usuarios").update({"moedas": saldo_moedas_sala - 10}).eq("id", int(my_id)).execute()
+                        st.session_state.tempo_inicio_sala = time.time() # Reseta o cronômetro para mais 10 minutos
+                        st.toast("🪙 Mais 10 minutos adicionados! 10 moedas foram debitadas do seu saldo.", icon="🪙")
+                        st.rerun()
+                    except Exception:
+                        st.error("Erro ao renovar tempo. Encerrando sala...")
+                        st.session_state.opcao_menu = "Plataforma de Planos IA"
+                        st.rerun()
+                else:
+                    # Se não houver saldo suficiente, expulsa da sala imediatamente
+                    st.error("🔒 Seus 10 minutos acabaram e você não tem moedas suficientes para renovar.")
+                    time.sleep(3)
+                    st.session_state.opcao_menu = "Plataforma de Planos IA"
+                    st.rerun()
+                                
+        elif tipo_plano_sala == "Assinante":
+            st.success(f"⭐ **Plano Assinante Ativo:** Você possui acesso ilimitado por tempo indeterminado nesta sala.")
+
+        # ==============================================================================
+        # RENDERIZAÇÃO E HISTÓRICO DE MENSAGENS (SEU CÓDIGO ORIGINAL)
+        # ==============================================================================
+        for r_id, txt, dt in rows:
+        # Tratamento seguro contra valores None/Nulos na data
+            if dt is not None:
+            hora_f = dt.strftime("%H:%M")
+            else:
+                hora_f = "--:--"  # Fallback caso a data antiga esteja nula
+                        
+            if int(r_id) == int(my_id):
+                with st.chat_message("user"):
+                    st.write(txt)
+                st.caption(f"Você — {hora_f}")
+            else:
+                with st.chat_message("assistant"):
+                    st.write(txt)
+                    st.caption(f"{nome_exibicao} — {hora_f}")
+        except Exception as e:
+            st.error(f"Erro ao ler banco: {e}")
+
+
                # Nova funcionalidade: Botão para iniciar a videochamada
         if st.button("🎥 Iniciar Videochamada Privada"):
             nome_da_sala_unica = f"Atendimento_FaleConosco_SalaPrivada_{id_match_int}"
@@ -1419,99 +1512,7 @@ def template_sala_privada():
                     rows = cursor.fetchall()
                     cursor.close()
                     conn.close()
-                    
-                    # ==============================================================================
-                    # GERENCIAMENTO DE TEMPO EM TEMPO REAL (SALA PRIVADA)
-                    # ==============================================================================
-                    # Inicializa o marcador de tempo se ele não existir na sessão
-                    if "tempo_inicio_sala" not in st.session_state:
-                        import time
-                        st.session_state.tempo_inicio_sala = time.time()
-
-                    # Busca o plano do usuário atualizado para aplicar as regras
-                    # 1. Define os valores padrões caso a busca no banco falhe
-                    tipo_plano = "Grátis"
-                    saldo_moedas = 0
-
-                    try:
-                        # Captura com segurança o ID do usuário logado
-                        id_usuario_logado = st.session_state.get("usuario_id")
-                            
-                        # CORREÇÃO: Alterado de 'NULL' para 'None' (sintaxe correta do Python)
-                        if id_usuario_logado is not None:
-                            # Faz a busca no Supabase convertendo o ID para inteiro
-                            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
                                 
-                            # Verifica se a lista contém dados e extrai do primeiro elemento [0]
-                            if user_data.data and len(user_data.data) > 0:
-                                tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
-                                saldo_moedas = user_data.data[0].get("moedas", 0)
-                        else:
-                            st.warning("⚠️ Usuário não identificado na sessão.")
-
-                    except Exception as e:
-                        st.error(f"Erro ao carregar dados do banco: {e}")
-
-                    # Lógica de controle do Timer para usuários do plano de Crédito
-                    if tipo_plano_sala == "Plano Crédito de Moedas":
-                        import time
-                        tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
-                        
-                        # Limite inicial de 10 minutos (600 segundos)
-                        tempo_limite_segundos = 600 
-                        tempo_restante = tempo_limite_segundos - tempo_decorrido
-
-                        if tempo_restante > 0:
-                            minutos_r = int(tempo_restante // 60)
-                            segundos_r = int(tempo_restante % 60)
-                            # Exibe um contador visual no topo do chat privado
-                            st.warning(f"⏳ **Tempo Restante nesta sessão:** {minutos_r:02d}:{segundos_r:02d} | Saldo Atual: 🪙 {saldo_moedas_sala} moedas")
-                            
-                            # Executa um auto-refresh a cada 5 segundos para atualizar o cronômetro sem travar o input de texto
-                            st.fragment(lambda: time.sleep(5) or st.rerun())()
-                        else:
-                            # O tempo acabou! Tenta renovar debitando mais 10 moedas por +10 minutos
-                            if saldo_moedas_sala >= 10:
-                                try:
-                                    supabase.table("usuarios").update({"moedas": saldo_moedas_sala - 10}).eq("id", int(my_id)).execute()
-                                    st.session_state.tempo_inicio_sala = time.time() # Reseta o cronômetro para mais 10 minutos
-                                    st.toast("🪙 Mais 10 minutos adicionados! 10 moedas foram debitadas do seu saldo.", icon="🪙")
-                                    st.rerun()
-                                except Exception:
-                                    st.error("Erro ao renovar tempo. Encerrando sala...")
-                                    st.session_state.opcao_menu = "Plataforma de Planos IA"
-                                    st.rerun()
-                            else:
-                                # Se não houver saldo suficiente, expulsa da sala imediatamente
-                                st.error("🔒 Seus 10 minutos acabaram e você não tem moedas suficientes para renovar.")
-                                time.sleep(3)
-                                st.session_state.opcao_menu = "Plataforma de Planos IA"
-                                st.rerun()
-                                
-                    elif tipo_plano_sala == "Assinante":
-                        st.success(f"⭐ **Plano Assinante Ativo:** Você possui acesso ilimitado por tempo indeterminado nesta sala.")
-
-                    # ==============================================================================
-                    # RENDERIZAÇÃO E HISTÓRICO DE MENSAGENS (SEU CÓDIGO ORIGINAL)
-                    # ==============================================================================
-                    for r_id, txt, dt in rows:
-                        # Tratamento seguro contra valores None/Nulos na data
-                        if dt is not None:
-                            hora_f = dt.strftime("%H:%M")
-                        else:
-                            hora_f = "--:--"  # Fallback caso a data antiga esteja nula
-                        
-                        if int(r_id) == int(my_id):
-                            with st.chat_message("user"):
-                                st.write(txt)
-                                st.caption(f"Você — {hora_f}")
-                        else:
-                            with st.chat_message("assistant"):
-                                st.write(txt)
-                                st.caption(f"{nome_exibicao} — {hora_f}")
-                except Exception as e:
-                    st.error(f"Erro ao ler banco: {e}")
-
             if st.session_state.opcao_menu == "🤝 Sala Privada":
                 if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
                     if txt_in.strip():
@@ -1538,7 +1539,7 @@ def template_sala_privada():
             meu_id_sala = st.session_state.usuario_id[0] if isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
             live_chat_privado_engine(live_sala_id, meu_id_sala, parceiro_nome)
-
+        
 
 
 def renderizar_listas_sidebar_e_acoes(): 
