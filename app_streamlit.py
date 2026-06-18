@@ -1329,70 +1329,67 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
 @st.fragment(run_every=4.0)
 def live_chat_privado_engine(m_id, my_id, p_nome_str):
     try:
-        # Tratamento seguro do nome do parceiro
+        # Tratamento seguro do nome do parceiro de conversa
         nome_exibicao = p_nome_str.split('@')[0].capitalize() if '@' in str(p_nome_str) else str(p_nome_str).capitalize()
     except Exception:
         nome_exibicao = "Usuário"
 
-    # Container visual rolável para o histórico de conversas
     with st.container(height=410, border=False):
         try:
-            # 🟢 BLINDAGEM 1: Garante que o match_id seja um inteiro puro antes da consulta
-            id_sala_limpo = m_id[0] if isinstance(m_id, (tuple, list)) else int(m_id)
-            
-            # Busca as mensagens no Supabase ordenadas por data de envio crescente
+            # 🟢 ESTRATÉGIA DE SEGURANÇA MÁXIMA: 
+            # Buscamos as últimas mensagens e faremos a filtragem precisa direto no Python
             res_mensagens = supabase.table("mensagens_chat") \
-                .select("remetente_id", "texto", "data_envio") \
-                .eq("match_id", id_sala_limpo) \
+                .select("match_id", "remetente_id", "texto", "data_envio") \
                 .order("data_envio", desc=False) \
+                .limit(100) \
                 .execute()
             
-            rows = res_mensagens.data if res_mensagens.data else []
+            todos_os_registros = res_mensagens.data if res_mensagens.data else []
+            
+            # Filtra na memória garantindo que ambos os lados sejam comparados como strings (Evita quebras de int/str)
+            id_sala_alvo = str(m_id).strip()
+            rows = [msg for msg in todos_os_registros if str(msg.get("match_id")).strip() == id_sala_alvo]
 
-            # 🔍 Se não houver mensagens, exibe um aviso amigável
             if not rows:
-                st.caption("✨ Nenhuma mensagem enviada ainda. Comece a conversa abaixo!")
-
-            # Renderiza as mensagens encontradas
-            for msg_data in rows:
-                r_id = msg_data.get("remetente_id")
-                txt = msg_data.get("texto")
-                dt_str = msg_data.get("data_envio", "")
-                
-                # Extrai apenas a hora e minuto da string de data do Supabase (Ex: "2026-06-18T14:30:00...")
-                if dt_str and len(dt_str) >= 16:
-                    hora_f = dt_str[11:16]
-                else:
-                    hora_f = "--:--"
-                
-                # Garante comparação precisa convertendo os IDs de quem enviou para inteiro
-                if int(r_id) == int(my_id):
-                    with st.chat_message("user"): 
-                        st.write(txt)
-                    st.caption(f"Você — {hora_f}")
-                else:
-                    with st.chat_message("assistant"): 
-                        st.write(txt)
-                    st.caption(f"{nome_exibicao} — {hora_f}")
+                st.caption("✨ Nenhuma mensagem enviada ainda nesta sala privada. Comece a conversa abaixo!")
+            else:
+                # Renderiza os balões de conversa normalmente
+                for msg_data in rows:
+                    r_id = msg_data.get("remetente_id")
+                    txt = msg_data.get("texto")
+                    dt_str = msg_data.get("data_envio", "")
+                    
+                    # Formatação simples da hora (Ex: "14:30")
+                    hora_f = dt_str[11:16] if dt_str and len(dt_str) >= 16 else "--:--"
+                    
+                    # Compara os IDs de remetente como strings para evitar divergência de tipo
+                    if str(r_id).strip() == str(my_id).strip():
+                        with st.chat_message("user"): 
+                            st.write(txt)
+                        st.caption(f"Você — {hora_f}")
+                    else:
+                        with st.chat_message("assistant"): 
+                            st.write(txt)
+                        st.caption(f"{nome_exibicao} — {hora_f}")
                     
         except Exception as e:
-            st.error(f"Erro ao carregar mensagens: {e}")    
+            st.error(f"Erro ao carregar histórico de mensagens: {e}")    
 
-    # Campo de digitação de texto atrelado ao fragmento reativo
+    # Campo para envio de novas mensagens privadas
     if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
         if txt_in.strip():
             try:
-                id_sala_limpo = m_id[0] if isinstance(m_id, (tuple, list)) else int(m_id)
-                meu_id_limpo = my_id[0] if isinstance(my_id, (tuple, list)) else int(my_id)
+                id_sala_gravar = int(m_id)
+                id_remetente_gravar = int(my_id)
                 
-                # 🟢 BLINDAGEM 2: Inserção direta utilizando o cliente HTTP nativo do Supabase
+                # Grava no Supabase garantindo tipos primitivos limpos
                 supabase.table("mensagens_chat").insert({
-                    "match_id": id_sala_limpo,
-                    "remetente_id": meu_id_limpo,
+                    "match_id": id_sala_gravar,
+                    "remetente_id": id_remetente_gravar,
                     "texto": txt_in.strip()
                 }).execute()
                 
-                # Força a atualização do fragmento para mostrar a mensagem na tela na mesma hora
+                # Atualiza instantaneamente a tela do fragmento
                 st.rerun()
             except Exception as e:
                 st.error(f"Erro ao enviar mensagem: {e}")
