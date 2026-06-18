@@ -1618,8 +1618,13 @@ def renderizar_listas_sidebar_e_acoes():
             st.session_state.foto_perfil = f"/{c_completo}"; st.rerun() 
 
         st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)    
-
-
+        
+        
+        # Loja
+        if st.button("🛒 Loja do App", type="secondary", use_container_width=True):
+            st.sidebar.header = "🛒 Loja do App"
+            st.rerun()
+        
         # 🔍 MOTOR DE BUSCA DA NOTIFICAÇÃO DA BARRA LATERAL (BOLINHA VERMELHA)
         possui_convite_pendente = False
         try:
