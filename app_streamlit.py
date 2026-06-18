@@ -1261,7 +1261,7 @@ def modal_agendamento_encontro(dados_r):
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT INTO agendamentos_virtuais (
-                        match_id, remetente_id, destinatario_id, dia_semana, periodo, horario_exato, status_convite
+                        match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite
                     ) VALUES (%s, %s, %s, %s, %s, %s, 'aceito');
                 ''', (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), str(hor_s)))
                 
