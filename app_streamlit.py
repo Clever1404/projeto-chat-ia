@@ -1463,7 +1463,7 @@ def template_sala_privada():
         for r_id, txt, dt in rows:
         # Tratamento seguro contra valores None/Nulos na data
             if dt is not None:
-            hora_f = dt.strftime("%H:%M")
+                hora_f = dt.strftime("%H:%M")
             else:
                 hora_f = "--:--"  # Fallback caso a data antiga esteja nula
                         
