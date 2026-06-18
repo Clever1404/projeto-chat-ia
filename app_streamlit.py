@@ -1331,6 +1331,39 @@ def template_sala_privada():
     except Exception as e: 
         print(f"Erro ao buscar status na Sala Privada: {e}")
 
+
+    # ==============================================================================
+    # GERENCIAMENTO DE TEMPO EM TEMPO REAL (SALA PRIVADA)
+    # ==============================================================================
+    # Inicializa o marcador de tempo se ele não existir na sessão
+    if "tempo_inicio_sala" not in st.session_state:
+        import time
+        st.session_state.tempo_inicio_sala = time.time()
+
+    # Busca o plano do usuário atualizado para aplicar as regras# 1. Define os valores padrões caso a busca no banco falhe
+    tipo_plano = "Grátis"
+    saldo_moedas = 0
+
+    try:
+        # Captura com segurança o ID do usuário logado
+        id_usuario_logado = st.session_state.get("usuario_id")
+                            
+        # CORREÇÃO: Alterado de 'NULL' para 'None' (sintaxe correta do Python)
+        if id_usuario_logado is not None:
+            # Faz a busca no Supabase convertendo o ID para inteiro
+            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
+                                
+            # Verifica se a lista contém dados e extrai do primeiro elemento [0]
+            if user_data.data and len(user_data.data) > 0:
+                tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
+                saldo_moedas = user_data.data[0].get("moedas", 0)
+        else:
+            st.warning("⚠️ Usuário não identificado na sessão.")
+
+    except Exception as e:
+        st.error(f"Erro ao carregar dados do banco: {e}")
+
+
     # --- DIVISÃO DA TELA EM COLUNAS ---
     col_lateral_fixa, col_chat_principal = st.columns([1, 2.8])
     
@@ -1386,37 +1419,6 @@ def template_sala_privada():
         st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
         st.title("💬 Chat Privado com Suporte a Vídeo")
 
-
-        # ==============================================================================
-        # GERENCIAMENTO DE TEMPO EM TEMPO REAL (SALA PRIVADA)
-        # ==============================================================================
-        # Inicializa o marcador de tempo se ele não existir na sessão
-        if "tempo_inicio_sala" not in st.session_state:
-            import time
-            st.session_state.tempo_inicio_sala = time.time()
-
-        # Busca o plano do usuário atualizado para aplicar as regras# 1. Define os valores padrões caso a busca no banco falhe
-        tipo_plano = "Grátis"
-        saldo_moedas = 0
-
-        try:
-            # Captura com segurança o ID do usuário logado
-            id_usuario_logado = st.session_state.get("usuario_id")
-                            
-            # CORREÇÃO: Alterado de 'NULL' para 'None' (sintaxe correta do Python)
-            if id_usuario_logado is not None:
-                # Faz a busca no Supabase convertendo o ID para inteiro
-                user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
-                                
-                # Verifica se a lista contém dados e extrai do primeiro elemento [0]
-                if user_data.data and len(user_data.data) > 0:
-                    tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
-                    saldo_moedas = user_data.data[0].get("moedas", 0)
-            else:
-                st.warning("⚠️ Usuário não identificado na sessão.")
-
-        except Exception as e:
-            st.error(f"Erro ao carregar dados do banco: {e}")
 
         # Lógica de controle do Timer para usuários do plano de Crédito
         if tipo_plano_sala == "Plano Crédito de Moedas":
