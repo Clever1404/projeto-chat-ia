@@ -1354,29 +1354,15 @@ def template_sala_privada():
         # Busca os dados no Supabase
         user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
         
-        # 🟢 CORREÇÃO CRÍTICA: Acessando corretamente o primeiro elemento [0] da lista .data
         if user_data.data and len(user_data.data) > 0:
-            registro_banco = user_data.data[0]
-            
-            # Captura os valores brutos
-            plano_bruto = registro_banco.get("tipo_plano", "Grátis")
-            saldo_moedas = registro_banco.get("moedas", 0)
-            
-            # 🟢 BLINDAGEM: Remove espaços em branco invisíveis no início/fim e padroniza a string
-            if plano_bruto:
-                tipo_plano = str(plano_bruto).strip()
-            
-            # 🔍 PROVA REAL (DEBUG): Remova ou comente essa linha após resolver o problema
-            st.toast(f"DEBUG BANCO -> Plano encontrado: '{tipo_plano}' | Tipo: {type(tipo_plano)}")
-            
-        else:
-            st.error("⚠️ Nenhum registro de usuário foi encontrado no banco de dados.")
-            return
-            
+            # Captura exatamente a string "Plano Crédito de Moedas" vinda do banco
+            tipo_plano_sala = str(user_data.data[0].get("tipo_plano", "Grátis")).strip()
+            saldo_moedas_sala = user_data.data[0].get("moedas", 0)
     except Exception as e:
-        st.error(f"Erro ao carregar dados do banco: {e}")
+        st.error(f"Erro ao validar acesso à sala: {e}")
         return
-
+              
+    
 
     # --- DIVISÃO DA TELA EM COLUNAS ---
     col_lateral_fixa, col_chat_principal = st.columns([1, 2.8])
@@ -1436,6 +1422,7 @@ def template_sala_privada():
 
         # Lógica de controle do Timer para usuários do plano de Crédito
         if tipo_plano_sala == "Plano Crédito de Moedas":
+            st.info(f"🪙 Modo Créditos Ativo. Saldo atual: {saldo_moedas_sala} moedas.")
             import time
             tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
                         
