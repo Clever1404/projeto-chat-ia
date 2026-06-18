@@ -1897,7 +1897,7 @@ def template_gerenciar_conexoes_completo():
 
     with aba_l:
         st.markdown("### 🛒 Loja do App")
-        st.sidebar.header = "🛒 Loja do App" 
+        st.session_state.opcao_menu = "🛒 Loja do App"
         st.rerun() 
 
 # ==============================================================================
