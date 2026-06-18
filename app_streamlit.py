@@ -1619,12 +1619,7 @@ def renderizar_listas_sidebar_e_acoes():
 
         st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)    
         
-        
-        # Loja
-        if st.button("🛒 Loja do App", type="secondary", use_container_width=True):
-            st.sidebar.header = "🛒 Loja do App"
-            st.rerun()
-        
+              
         # 🔍 MOTOR DE BUSCA DA NOTIFICAÇÃO DA BARRA LATERAL (BOLINHA VERMELHA)
         possui_convite_pendente = False
         try:
@@ -1669,7 +1664,10 @@ def renderizar_listas_sidebar_e_acoes():
             st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
             st.rerun()
         if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True): 
-            st.session_state.opcao_menu = "📅 Disponibilidade"; st.rerun() 
+            st.session_state.opcao_menu = "📅 Disponibilidade"
+        # Loja
+        if st.button("🛒 Loja do App", type="secondary", use_container_width=True):
+            st.sidebar.header = "🛒 Loja do App"; st.rerun()  
 
         if st.session_state.eh_admin or st.session_state.username in ['admin', 'Clever1404']:
             if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True):
