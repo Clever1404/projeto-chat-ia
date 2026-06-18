@@ -21,6 +21,35 @@ import random
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import plotly.express as px
+import streamlit as bar
+
+
+
+
+# --- OBRIGATÓRIO: DEVE FICAR NO TOPO DO ARQUIVO ---
+if "tela_atual" not in st.session_state:
+    st.session_state.tela_atual = "Home"
+
+if "id_pagamento_pendente" not in st.session_state:
+    st.session_state.id_pagamento_pendente = None
+
+if "tipo_pagamento_pendente" not in st.session_state:
+    st.session_state.tipo_pagamento_pendente = None
+
+if "qr_code_img" not in st.session_state:
+    st.session_state.qr_code_img = None
+
+if "qr_code_texto" not in st.session_state:
+    st.session_state.qr_code_texto = None
+
+if "sidebar_state" not in st.session_state:
+    st.session_state.sidebar_state = "collapsed"
+
+# Configura a página imediatamente
+st.set_page_config(initial_sidebar_state=st.session_state.sidebar_state)
+
+
+
 
 
 UPLOAD_FOLDER = "uploads"
@@ -439,27 +468,27 @@ def template_planos():
         st.session_state.opcao_menu = "login"  # o nome correto do seu menu de chat
         st.rerun()
 
-    if "id_pagamento_pendente" not in st.session_state:
-        st.session_state.id_pagamento_pendente = None
-    if "tipo_pagamento_pendente" not in st.session_state:
-        st.session_state.tipo_pagamento_pendente = None
+    if st.session_state.tela_atual == "Loja":
+        # Apenas puxa a função inteira sem repetir código!
+        renderizar_loja_app()
+    
+        # Adiciona um botão opcional para o usuário conseguir voltar
+        if st.sidebar.button("⬅️ Voltar para o App"):
+            st.session_state.tela_atual = "Home"
+            st.rerun()
+    else:
+        # Se NÃO estiver na loja, roda o seu código padrão do app
+        renderizar_listas_sidebar_e_acoes()
 
-    # --- Seu código complementar de exibição de planos continua aqui ---
-    # =========================================================================
-    # SEÇÃO DE COMPRAS (MERCADO PAGO)
-    # =========================================================================
-    # 1. Inicialize a variável no st.session_state (boa prática)
-    if "opcao_menu" not in st.session_state:
-        st.session_state.opcao_menu = "🛒 Loja do App"
 
-    # 2. Exiba o cabeçalho
-    with st.sidebar:
-        st.header(st.session_state.opcao_menu)
 
+
+# Mude a definição da função para receber as variáveis necessárias
+def renderizar_loja_app(id_usuario_atual, saldo_moedas):
+    st.sidebar.header("🛒 Loja do App")
     opcoes_compra = st.sidebar.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
 
     if st.sidebar.button("Gerar Pix de Pagamento"):
-        # Configura o valor e descrição baseado na escolha do menu lateral
         if "VIP" in opcoes_compra:
             valor, desc, tipo = 19.90, "Plano VIP 30 dias", "vip"
         else:
@@ -470,61 +499,45 @@ def template_planos():
             "description": desc,
             "payment_method_id": "pix",
             "payer": {"email": "cliente@email.com"},
-            # Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
             "external_reference": f"{id_usuario_atual}:{tipo}"
         }
 
-        # Criando o Pix na API do Mercado Pago
         payment_response = sdk.payment().create(payment_data)
         payment = payment_response["response"]
 
         if "point_of_interaction" in payment:
-            # Salva o ID do pagamento gerado para checar depois
             st.session_state.id_pagamento_pendente = payment["id"]
             st.session_state.tipo_pagamento_pendente = tipo
-            
-            # Dados para exibição do Pix
             st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
             st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
             st.sidebar.success("Pix gerado com sucesso!")
         else:
             st.sidebar.error("Erro ao gerar pagamento. Verifique as credenciais.")
 
-    # Exibe o Pix gerado se ele existir na sessão atual
     if st.session_state.id_pagamento_pendente:
         st.sidebar.markdown("---")
         st.sidebar.image(f"data:image/jpeg;base64,{st.session_state.qr_code_img}", width=200)
         st.sidebar.text_input("Copia e Cola:", value=st.session_state.qr_code_texto)
         
-        # BOTÃO CHAVE: O usuário clica após pagar para o código validar na hora
         if st.sidebar.button("🔄 Já paguei, liberar meu acesso"):
-            # Consulta o status do pagamento direto na API do Mercado Pago
             id_pag = st.session_state.id_pagamento_pendente
             tipo_pag = st.session_state.tipo_pagamento_pendente
-            
             check_payment = sdk.payment().get(id_pag)["response"]
             status_pagamento = check_payment.get("status")
 
             if status_pagamento == "approved":
                 if tipo_pag == "vip":
-                    # Atualiza para VIP no Supabase
-                    # Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
                     supabase.table("usuarios").update({"status": "vip"}).eq("id", id_usuario_atual).execute()
                     st.success("🎉 Parabéns! Seu plano VIP foi ativado.")
                 elif tipo_pag == "moedas":
-                    # Soma as novas moedas no Supabase
                     novo_saldo = saldo_moedas + 10
-                    # Correção: Alterado de id_usuario para id_usuario_atual na linha abaixo
                     supabase.table("usuarios").update({"creditos": novo_saldo}).eq("id", id_usuario_atual).execute()
                     st.success("🪙 10 Moedas adicionadas com sucesso ao seu saldo!")
-                
-                # Limpa as variáveis de pagamento pendente da tela
                 st.session_state.id_pagamento_pendente = None
                 st.rerun()
             else:
-                st.sidebar.warning("⚠️ Pagamento ainda não consta como aprovado. Aguarde alguns instantes e tente novamente.")
-     
-
+                st.sidebar.warning("⚠️ Pagamento ainda não consta como aprovado.")
+  
 
 
 # ==============================================================================
@@ -1672,11 +1685,13 @@ def renderizar_listas_sidebar_e_acoes():
         if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True): 
             st.session_state.opcao_menu = "📅 Disponibilidade"
 
-        if st.button("🛒 Loja do App", type="secondary", use_container_width=True): 
-            if "opcao_menu" not in st.session_state:
-                st.session_state.opcao_menu = "🛒 Loja do App"
-                st.rerun() 
-      
+            
+       # No seu menu lateral padrão:
+        if st.sidebar.button("Ir para a Loja 🛒"):
+            st.session_state.abrir_popup_loja = True
+            st.rerun()
+
+              
         if st.session_state.eh_admin or st.session_state.username in ['admin', 'Clever1404']:
             if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True):
                 st.session_state.opcao_menu = "🛠️ Painel Admin"; st.rerun()     
@@ -2487,6 +2502,71 @@ def template_fale_conosco():
     if st.button("← Voltar para o Chat Principal", type="secondary"):
         st.session_state.opcao_menu = "💬 Conversar com Lucy"
         st.rerun()
+
+# Cria a janela flutuante da loja
+@st.dialog("🛒 Loja do App")
+def mostrar_popup_loja():
+    opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
+
+    if st.button("Gerar Pix de Pagamento"):
+        if "VIP" in opcoes_compra:
+            valor, desc, tipo = 19.90, "Plano VIP 30 dias", "vip"
+        else:
+            valor, desc, tipo = 5.00, "Pacote de 10 Moedas", "moedas"
+
+        payment_data = {
+            "transaction_amount": valor,
+            "description": desc,
+            "payment_method_id": "pix",
+            "payer": {"email": "cliente@email.com"},
+            "external_reference": f"{id_usuario_atual}:{tipo}"
+        }
+
+        payment_response = sdk.payment().create(payment_data)
+        payment = payment_response["response"]
+
+        if "point_of_interaction" in payment:
+            st.session_state.id_pagamento_pendente = payment["id"]
+            st.session_state.tipo_pagamento_pendente = tipo
+            st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+            st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+            st.success("Pix gerado com sucesso!")
+        else:
+            st.error("Erro ao gerar pagamento.")
+
+    if st.session_state.id_pagamento_pendente:
+        st.markdown("---")
+        st.image(f"data:image/jpeg;base64,{st.session_state.qr_code_img}", width=200)
+        st.text_input("Copia e Cola:", value=st.session_state.qr_code_texto)
+        
+        if st.button("🔄 Já paguei, liberar meu acesso"):
+            id_pag = st.session_state.id_pagamento_pendente
+            tipo_pag = st.session_state.tipo_pagamento_pendente
+            check_payment = sdk.payment().get(id_pag)["response"]
+            
+            if check_payment.get("status") == "approved":
+                if tipo_pag == "vip":
+                    supabase.table("usuarios").update({"status": "vip"}).eq("id", id_usuario_atual).execute()
+                    st.success("🎉 Plano VIP ativado!")
+                elif tipo_pag == "moedas":
+                    novo_saldo = saldo_moedas + 10
+                    supabase.table("usuarios").update({"creditos": novo_saldo}).eq("id", id_usuario_atual).execute()
+                    st.success("🪙 10 Moedas adicionadas!")
+                st.session_state.id_pagamento_pendente = None
+                st.session_state.abrir_popup_loja = False
+                st.rerun()
+            else:
+                st.warning("⚠️ Pagamento ainda não aprovado.")
+
+# Dispara o pop-up se o botão foi clicado
+if "abrir_popup_loja" in st.session_state and st.session_state.abrir_popup_loja:
+    st.session_state.abrir_popup_loja = False # Reseta o gatilho
+    mostrar_popup_loja()
+
+
+
+
+
 
 
 # ==============================================================================
