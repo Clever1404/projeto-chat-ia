@@ -2455,9 +2455,14 @@ def template_fale_conosco():
 # ==============================================================================
 if st.session_state.alerta_match:
     dados_m = st.session_state.alerta_match
-    st.session_state.alerta_match = None
-    exibir_modal_match(dados_m, tipo_plano, moedas)
+    
+    # 🟢 IMPORTANTE: Limpamos o estado ANTES para evitar loops de repetição
+    st.session_state.alerta_match = None 
+    
+    # Disparia o controlador que vai buscar o plano, moedas e abrir a modal
+    processar_match_lucy(dados_m)
 
+    
 if st.session_state.abrir_reserva_fluxo:
     dados_r = st.session_state.abrir_reserva_fluxo
     st.session_state.abrir_reserva_fluxo = None
