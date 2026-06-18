@@ -43,9 +43,12 @@ if "qr_code_texto" not in st.session_state:
     st.session_state.qr_code_texto = None
 
 if "sidebar_state" not in st.session_state:
-    st.session_state.sidebar_state = "collapsed"
+    st.session_state.sidebar_state = "expanded"  # Mudado para expandido por padrão
 
-# Configura a página imediatamente
+if "tela_atual" not in st.session_state:
+    st.session_state.tela_atual = "Home"
+
+# Configuração que controla o comportamento visual da barra lateral
 st.set_page_config(initial_sidebar_state=st.session_state.sidebar_state)
 
 
@@ -1684,14 +1687,12 @@ def renderizar_listas_sidebar_e_acoes():
             st.rerun()
         if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True): 
             st.session_state.opcao_menu = "📅 Disponibilidade"
-
             
        # No seu menu lateral padrão:
-        if st.sidebar.button("Ir para a Loja 🛒"):
+        if st.sidebar.button("Ir para a Loja 🛒", type="secondary", use_container_width=True):
             st.session_state.abrir_popup_loja = True
             st.rerun()
-
-              
+               
         if st.session_state.eh_admin or st.session_state.username in ['admin', 'Clever1404']:
             if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True):
                 st.session_state.opcao_menu = "🛠️ Painel Admin"; st.rerun()     
@@ -2505,7 +2506,7 @@ def template_fale_conosco():
 
 # Cria a janela flutuante da loja
 @st.dialog("🛒 Loja do App")
-def mostrar_popup_loja():
+def mostrar_popup_loja(id_usuario):
     opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
 
     if st.button("Gerar Pix de Pagamento"):
@@ -2519,7 +2520,7 @@ def mostrar_popup_loja():
             "description": desc,
             "payment_method_id": "pix",
             "payer": {"email": "cliente@email.com"},
-            "external_reference": f"{id_usuario_atual}:{tipo}"
+            "external_reference": f"{id_usuario}:{tipo}"
         }
 
         payment_response = sdk.payment().create(payment_data)
@@ -2558,10 +2559,15 @@ def mostrar_popup_loja():
             else:
                 st.warning("⚠️ Pagamento ainda não aprovado.")
 
+
 # Dispara o pop-up se o botão foi clicado
-if "abrir_popup_loja" in st.session_state and st.session_state.abrir_popup_loja:
-    st.session_state.abrir_popup_loja = False # Reseta o gatilho
-    mostrar_popup_loja()
+if 'abrir_popup_loja' in st.session_state and st.session_state.abrir_popup_loja:
+    st.session_state.abrir_popup_loja = False  # Reseta o gatilho
+    
+    # Busca o ID diretamente do session_state
+    id_usuario = st.session_state.get('id_usuario', 'usuario_anonimo')
+    
+    mostrar_popup_loja(id_usuario)
 
 
 
