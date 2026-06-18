@@ -438,9 +438,7 @@ def template_cadastro():
            
 
 def template_planos():
-    
     st.markdown('<h1 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
-    
     
     # --- TEXTO DESCRITIVO DOS PLANOS CENTRALIZADO ---
     st.html(
@@ -463,26 +461,24 @@ def template_planos():
                 <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
             </div>
         </div>
-        """
-        
+        """        
     )
     
-    if st.button("← Voltar para o 🔒 Login", use_container_width=True):
-        st.session_state.opcao_menu = "login"  # o nome correto do seu menu de chat
-        st.rerun()
-
-    if st.session_state.tela_atual == "Loja":
-        # Apenas puxa a função inteira sem repetir código!
-        renderizar_loja_app()
     
-        # Adiciona um botão opcional para o usuário conseguir voltar
-        if st.sidebar.button("⬅️ Voltar para o App"):
-            st.session_state.tela_atual = "Home"
-            st.rerun()
-    else:
-        # Se NÃO estiver na loja, roda o seu código padrão do app
-        renderizar_listas_sidebar_e_acoes()
-
+    
+    # 1. Recupera as variáveis do session_state (ajuste as chaves se os nomes forem diferentes no seu app)
+    id_usuario = st.session_state.get("id_usuario", "usuario_teste")
+    saldo_atual = st.session_state.get("saldo_moedas", 0)
+    
+    # 2. Passa os argumentos obrigatórios para a função
+    renderizar_loja_app(id_usuario_atual=id_usuario, saldo_moedas=saldo_atual)
+    
+    
+    
+    # --- BOTÃO DE VOLTAR NO RODAPÉ ---
+    if st.button("← Voltar para o 🔒 Login", use_container_width=True):
+        st.session_state.opcao_menu = "login"
+        st.rerun()
 
 
 
@@ -614,7 +610,10 @@ elif menu_higienizado in ["cadastro", "📝 cadastro"]:
     st.session_state.usuario_id = None
     template_cadastro()
     st.stop()  # Garante isolamento total da tela de cadastro
-
+elif menu_higienizado in ["planos", "Planos"]:
+    st.session_state.usuario_id = None
+    template_cadastro()
+    st.stop()  # Garante isolamento total da tela de cadastro
 
 # ==============================================================================
 # 3. LÓGICA DE USUÁRIO LOGADO (Se o script passar daqui, o usuário está na área restrita)
