@@ -1299,7 +1299,7 @@ def modal_agendamento_encontro(dados_r):
 @st.fragment(run_every=5.0)
 def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int):
     tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
-    tempo_limite_segundos = 600  # Limite inicial de 10 minutos
+    tempo_limite_segundos = 600  # Limite inicial de 10 minutos (600 segundos)
     tempo_restante = tempo_limite_segundos - tempo_decorrido
 
     if tempo_restante > 0:
@@ -1310,13 +1310,24 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
         # O tempo acabou! Tenta renovar debitando mais 10 moedas por +10 minutos
         if saldo_moedas_sala >= 10:
             try:
-                # Atualização segura convertendo ID para inteiro
-                supabase.table("usuarios").update({"moedas": saldo_moedas_sala - 10}).eq("id", int(id_usuario_logado)).execute()
-                st.session_state.tempo_inicio_sala = time.time()  # Reseta o cronômetro local
+                # 🟢 CALCULA O NOVO SALDO
+                novo_saldo = saldo_moedas_sala - 10
+                id_limpo = int(id_usuario_logado)
+                
+                # 🟢 CORREÇÃO CRÍTICA: Alterado de 'my_id' para 'id_limpo' no filtro .eq()
+                supabase.table("usuarios").update({"moedas": novo_saldo}).eq("id", id_limpo).execute()
+                
+                # 🟢 ATUALIZA O CACHE NA MEMÓRIA LOCAL: Faz o novo valor refletir na tela imediatamente
+                if "dados_usuario" in st.session_state:
+                    st.session_state.dados_usuario["moedas"] = novo_saldo
+                
+                st.session_state.tempo_inicio_sala = time.time()  # Reseta o cronômetro local para +10 minutos
                 st.toast("🪙 Mais 10 minutos adicionados! 10 moedas foram debitadas.", icon="🪙")
-                st.rerun()  # Força atualização local para recalcular o tempo
-            except Exception:
-                st.error("Erro ao renovar tempo. Encerrando sala...")
+                st.rerun()  # Recarrega localmente o fragmento com os novos valores
+                
+            except Exception as e:
+                st.error(f"Erro ao renovar tempo: {e}")
+                time.sleep(3)
                 st.session_state.opcao_menu = "Plataforma de Planos IA"
                 st.rerun()
         else:
@@ -1334,10 +1345,10 @@ def live_chat_privado_engine(m_id, my_id, p_nome_str):
         nome_exibicao = "Usuário"
 
     # 🔍 PAINEL DE INSPECÇÃO BRUTA DO BANCO (DIAGNÓSTICO INTACTO)
-    st.write("---")
-    st.markdown(f"### 🔍 Diagnóstico de IDs de Segurança:")
-    st.write(f"• ID desta Sala Atual (`m_id`): `{m_id}`")
-    st.write(f"• Seu ID de Usuário (`my_id`): `{my_id}`")
+    #st.write("---")
+    #st.markdown(f"### 🔍 Diagnóstico de IDs de Segurança:")
+    #st.write(f"• ID desta Sala Atual (`m_id`): `{m_id}`")
+    #st.write(f"• Seu ID de Usuário (`my_id`): `{my_id}`")
 
     with st.container(height=410, border=False):
         try:
