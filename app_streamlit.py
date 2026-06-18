@@ -1059,30 +1059,7 @@ def template_chat_ia_completo():
 # ==============================================================================
 
 @st.dialog("🤖 Lucy Notou Afinidade!")
-def modal_match_lucy(dados_m):
-    # 1. Define os valores padrões caso a busca no banco falhe
-    tipo_plano = "Grátis"
-    saldo_moedas = 0
-
-    try:
-        # Captura com segurança o ID do usuário logado
-        id_usuario_logado = st.session_state.get("usuario_id")
-            
-        # CORREÇÃO: Alterado de 'NULL' para 'None' (sintaxe correta do Python)
-        if id_usuario_logado is not None:
-            # Faz a busca no Supabase convertendo o ID para inteiro
-            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
-                
-            # Verifica se a lista contém dados e extrai do primeiro elemento [0]
-            if user_data.data and len(user_data.data) > 0:
-                tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
-                saldo_moedas = user_data.data[0].get("moedas", 0)
-        else:
-            st.warning("⚠️ Usuário não identificado na sessão.")
-
-    except Exception as e:
-        st.error(f"Erro ao carregar dados do banco: {e}")
-
+def exibir_modal_match_lucy(dados_m, tipo_plano, saldo_moedas):  
 
     st.markdown(f"Lucy identificou uma excelente afinidade entre você e **{dados_m['nome']}**!")
     
@@ -1125,7 +1102,7 @@ def modal_match_lucy(dados_m):
         st.button(f"⚪ {dados_m['nome']} está offline. Indisponível para chat instantâneo.", disabled=True, use_container_width=True)
         
         if st.button("📅 Agende um encontro virtual", type="secondary", use_container_width=True):
-            if tipo_plano in ["Assinante", "Crédito"]:
+            if tipo_plano in ["Assinante", "Plano Crédito de Moeda"]:
                 st.session_state.abrir_reserva_fluxo = {
                     "id_par": dados_m["id_par"], 
                     "nome_par": dados_m["nome"], 
@@ -1139,6 +1116,37 @@ def modal_match_lucy(dados_m):
     # ❌ Cancelamento e fechamento
     if st.button("❌ Não tenho interesse", type="secondary", use_container_width=True):
         st.rerun()
+
+
+
+def processar_match_lucy(dados_m):
+    # 1. Define os valores padrões caso a busca no banco falhe
+    tipo_plano = "Grátis"
+    saldo_moedas = 0
+
+    try:
+        # Captura com segurança o ID do usuário logado
+        id_usuario_logado = st.session_state.get("usuario_id")
+            
+        # CORREÇÃO: Alterado de 'NULL' para 'None' (sintaxe correta do Python)
+        if id_usuario_logado is not None:
+            # Faz a busca no Supabase convertendo o ID para inteiro
+            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
+                
+            # Verifica se a lista contém dados e extrai do primeiro elemento [0]
+            if user_data.data and len(user_data.data) > 0:
+                tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
+                saldo_moedas = user_data.data[0].get("moedas", 0)
+        else:
+            st.warning("⚠️ Usuário não identificado na sessão.")
+
+    except Exception as e:
+        pass
+
+   # Se passou nas validações, dispara a modal passando os dados necessários
+    exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
+
+
 
 
 @st.dialog("📅 Reserva de Encontro")
