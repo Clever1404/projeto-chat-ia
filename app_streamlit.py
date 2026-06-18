@@ -448,7 +448,13 @@ def template_planos():
     # =========================================================================
     # SEÇÃO DE COMPRAS (MERCADO PAGO)
     # =========================================================================
-    st.sidebar.header("🛒 Loja do App")
+    # 1. Inicialize a variável no st.session_state (boa prática)
+    if "opcao_menu" not in st.session_state:
+        st.session_state.opcao_menu = "🛒 Loja do App"
+
+    # 2. Exiba o cabeçalho
+    with st.sidebar:
+        st.header(st.session_state.opcao_menu)
 
     opcoes_compra = st.sidebar.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
 
@@ -1667,8 +1673,9 @@ def renderizar_listas_sidebar_e_acoes():
             st.session_state.opcao_menu = "📅 Disponibilidade"
 
         if st.button("🛒 Loja do App", type="secondary", use_container_width=True): 
-            st.session_state.opcao_menu = st.sidebar.header("🛒 Loja do App")"
-            st.rerun() 
+            if "opcao_menu" not in st.session_state:
+                st.session_state.opcao_menu = "🛒 Loja do App"
+                st.rerun() 
       
         if st.session_state.eh_admin or st.session_state.username in ['admin', 'Clever1404']:
             if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True):
