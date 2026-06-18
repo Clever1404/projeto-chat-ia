@@ -1326,53 +1326,76 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
             st.rerun()
 
 
-# 🟢 Altere o tempo para 4 segundos e mude a forma de buscar mensagens
 @st.fragment(run_every=4.0)
 def live_chat_privado_engine(m_id, my_id, p_nome_str):
     try:
-        nome_exibicao = p_nome_str.split('@')[0].capitalize()
+        # Tratamento seguro do nome do parceiro
+        nome_exibicao = p_nome_str.split('@')[0].capitalize() if '@' in str(p_nome_str) else str(p_nome_str).capitalize()
     except Exception:
-        nome_exibicao = str(p_nome_str).capitalize()
+        nome_exibicao = "Usuário"
 
+    # Container visual rolável para o histórico de conversas
     with st.container(height=410, border=False):
         try:
-            # 🟢 Usando o cliente HTTP do Supabase (Mais rápido e consome menos conexões)
-            # 🟢 CORREÇÃO: Alterado 'nulls_first' para 'nullsfirst'
+            # 🟢 BLINDAGEM 1: Garante que o match_id seja um inteiro puro antes da consulta
+            id_sala_limpo = m_id[0] if isinstance(m_id, (tuple, list)) else int(m_id)
+            
+            # Busca as mensagens no Supabase ordenadas por data de envio crescente
             res_mensagens = supabase.table("mensagens_chat") \
                 .select("remetente_id", "texto", "data_envio") \
-                .eq("match_id", int(m_id)) \
-                .order("data_envio", nullsfirst=False) \
+                .eq("match_id", id_sala_limpo) \
+                .order("data_envio", desc=False) \
                 .execute()
+            
             rows = res_mensagens.data if res_mensagens.data else []
 
+            # 🔍 Se não houver mensagens, exibe um aviso amigável
+            if not rows:
+                st.caption("✨ Nenhuma mensagem enviada ainda. Comece a conversa abaixo!")
+
+            # Renderiza as mensagens encontradas
             for msg_data in rows:
                 r_id = msg_data.get("remetente_id")
                 txt = msg_data.get("texto")
-                # Se a data vier como string do Supabase, você pode tratá-Fi de forma simples
                 dt_str = msg_data.get("data_envio", "")
-                hora_f = dt_str[11:16] if len(dt_str) > 16 else "--:--"
                 
+                # Extrai apenas a hora e minuto da string de data do Supabase (Ex: "2026-06-18T14:30:00...")
+                if dt_str and len(dt_str) >= 16:
+                    hora_f = dt_str[11:16]
+                else:
+                    hora_f = "--:--"
+                
+                # Garante comparação precisa convertendo os IDs de quem enviou para inteiro
                 if int(r_id) == int(my_id):
-                    with st.chat_message("user"): st.write(txt)
+                    with st.chat_message("user"): 
+                        st.write(txt)
                     st.caption(f"Você — {hora_f}")
                 else:
-                    with st.chat_message("assistant"): st.write(txt)
+                    with st.chat_message("assistant"): 
+                        st.write(txt)
                     st.caption(f"{nome_exibicao} — {hora_f}")
+                    
         except Exception as e:
-            st.error(f"Erro ao ler banco: {e}")    
+            st.error(f"Erro ao carregar mensagens: {e}")    
 
+    # Campo de digitação de texto atrelado ao fragmento reativo
     if txt_in := st.chat_input("Digite sua mensagem privada...", key="priv_chat_input"):
         if txt_in.strip():
             try:
-                # 🟢 Inserção limpa via cliente Supabase
+                id_sala_limpo = m_id[0] if isinstance(m_id, (tuple, list)) else int(m_id)
+                meu_id_limpo = my_id[0] if isinstance(my_id, (tuple, list)) else int(my_id)
+                
+                # 🟢 BLINDAGEM 2: Inserção direta utilizando o cliente HTTP nativo do Supabase
                 supabase.table("mensagens_chat").insert({
-                    "match_id": int(m_id),
-                    "remetente_id": int(my_id),
+                    "match_id": id_sala_limpo,
+                    "remetente_id": meu_id_limpo,
                     "texto": txt_in.strip()
                 }).execute()
+                
+                # Força a atualização do fragmento para mostrar a mensagem na tela na mesma hora
                 st.rerun()
             except Exception as e:
-                st.error(f"Erro ao enviar: {e}")
+                st.error(f"Erro ao enviar mensagem: {e}")
 
 # 🟢 3. FUNÇÃO PRINCIPAL DA SALA PRIVADA (MOLDE E LAYOUT ESTÁTICO)
 def template_sala_privada():
@@ -1505,11 +1528,21 @@ def template_sala_privada():
             st.iframe(url_jitsi, height=600) 
 
     # 🚀 CHAMADA DO MOTOR DE CHAT REATIVO ISOLADO 
-    live_sala_id = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id) 
-    meu_id_sala = id_usuario_logado[0] if isinstance(id_usuario_logado, (tuple, list)) else int(id_usuario_logado) 
+# --- EXECUÇÃO DO MOTOR DE CHAT DE FORMA 100% LIMPA E LIMPA ---
+    # 🟢 CORREÇÃO CRÍTICA: Garante que estamos pegando APENAS o número ID (o primeiro elemento)
+    if isinstance(match_id, (tuple, list)):
+        live_sala_id = int(match_id[0])
+    else:
+        live_sala_id = int(match_id)
 
-    # Chama a execução da engine de chat fragmentada 
-    live_chat_privado_engine(live_sala_id, meu_id_sala, parceiro_nome) 
+    id_logado_bruto = st.session_state.get("usuario_id")
+    if isinstance(id_logado_bruto, (tuple, list)):
+        meu_id_sala = int(id_logado_bruto[0])
+    else:
+        meu_id_sala = int(id_logado_bruto)
+        
+    # Chama o motor passando os inteiros puros validados
+    live_chat_privado_engine(live_sala_id, meu_id_sala, parceiro_nome)
       
 
 
