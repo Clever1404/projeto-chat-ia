@@ -1569,8 +1569,9 @@ def template_sala_privada():
 
 
     with col_perfil:
-        st.markdown('<div class="box-perfil-fixo">', unsafe_allow_html=True)
-        st.image(parceiro_foto, width=80)
+        st.markdown(f"""
+         <div class="box-perfil-fixo">
+         {avatar_html}</div>""", unsafe_allow_html=True)
         st.markdown(f'<div style="color:white; font-weight:bold; font-size:18px;">{parceiro_nome}</div>', unsafe_allow_html=True)
         st.markdown(f'<div style="color: {status_cor}; font-size:14px; margin-top:5px;">{status_parceiro}</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -2320,57 +2321,63 @@ def template_painel_admin():
                 ).dt.tz_localize(None)
 
         # Busca 2: Histórico Real de Salas Privadas
-        # ✅ CORREÇÃO: Alterado de 'historico_salas' para 'historico_ia' conforme o erro do banco
-        salas_query = (
-            supabase.table("historico_ia")
-            .select("nome_sala", "tipo_usuario", "entrada_em", "saida_em")
-            .execute()
-        )
-
-        if rooms_data := (salas_query.data or []):
-            df_raw_rooms = pd.DataFrame(rooms_data)
-
-            # Converte os timestamps do Supabase para formato legível de data/hora
-            df_raw_rooms["entrada_em"] = pd.to_datetime(
-                df_raw_rooms["entrada_em"], utc=True
-            )
-            df_raw_rooms["saida_em"] = pd.to_datetime(
-                df_raw_rooms["saida_em"], utc=True
+        # Busca 2: Histórico Real de Salas Privadas
+            # ✅ AJUSTE: Certifique-se de usar os nomes de colunas corretos da tabela 'historico_ia'
+            # Se não houver 'nome_sala', use o identificador correto (ex: 'id' ou 'sala_id')
+            salas_query = (
+                supabase.table("historico_ia")
+                .select("id", "tipo_usuario", "entrada_em", "saida_em")  # Trocado 'nome_sala' por 'id' temporariamente
+                .execute()
             )
 
-            # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
-            duracao_delta = (
-                df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
-            )
-            df_raw_rooms["Tempo de Uso (Horas)"] = (
-                duracao_delta.dt.total_seconds() / 3600.0
-            ).round(2)
+            if rooms_data := (salas_query.data or []):
+                df_raw_rooms = pd.DataFrame(rooms_data)
 
-            # Padroniza nomes de colunas e textos para exibição visual limpa
-            df_raw_rooms["tipo_usuario"] = (
-                df_raw_rooms["tipo_usuario"]
-                .astype(str)
-                .str.replace("assinante", "Assinantes")
-                .str.replace("credito", "Usuários com Crédito")
-            )
+                # Se você alterou de 'nome_sala' para 'id' acima, renomeie aqui para o código não quebrar abaixo:
+                if "id" in df_raw_rooms.columns and "nome_sala" not in df_raw_rooms.columns:
+                    df_raw_rooms["nome_sala"] = df_raw_rooms["id"]
 
-            df_salas_real = df_raw_rooms[
-                ["nome_sala", "tipo_usuario", "Tempo de Uso (Horas)"]
-            ].copy()
-            df_salas_real.columns = [
-                "Sala",
-                "Tipo de Usuário",
-                 "Tempo de Uso (Horas)",
-            ]
+                # Converte os timestamps do Supabase para formato legível de data/hora
+                df_raw_rooms["entrada_em"] = pd.to_datetime(
+                    df_raw_rooms["entrada_em"], utc=True
+                )
+                df_raw_rooms["saida_em"] = pd.to_datetime(
+                    df_raw_rooms["saida_em"], utc=True
+                )
 
-            # Agrupa dinamicamente o somatório de horas por perfil de cliente
-            df_tempo_por_perfil = (
-                df_salas_real.groupby("Tipo de Usuário")[
-                    "Tempo de Uso (Horas)"
+                # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
+                duracao_delta = (
+                    df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
+                )
+                    df_raw_rooms["Tempo de Uso (Horas)"] = (
+                        duracao_delta.dt.total_seconds() / 3600.0
+                    ).round(2)
+
+                # Padroniza nomes de colunas e textos para exibição visual limpa
+                df_raw_rooms["tipo_usuario"] = (
+                    df_raw_rooms["tipo_usuario"]
+                    .astype(str)
+                    .str.replace("assinante", "Assinantes")
+                    .str.replace("credito", "Usuários com Crédito")
+                )
+
+                df_salas_real = df_raw_rooms[
+                    ["nome_sala", "tipo_usuario", "Tempo de Uso (Horas)"]
+                ].copy()
+                df_salas_real.columns = [
+                    "Sala",
+                    "Tipo de Usuário",
+                    "Tempo de Uso (Horas)",
                 ]
-                .sum()
-                .reset_index()
-            )
+
+                # Agrupa dinamicamente o somatório de horas por perfil de cliente
+                df_tempo_por_perfil = (
+                    df_salas_real.groupby("Tipo de Usuário")[
+                        "Tempo de Uso (Horas)"
+                    ]
+                    .sum()
+                    .reset_index()
+                )
 
     except Exception as e:
         st.warning(
