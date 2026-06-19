@@ -2345,9 +2345,9 @@ def template_painel_admin():
         import plotly.express as px
 
         # Garante que os contadores sejam inteiros limpos convertendo-os de forma segura
-        val_assinantes = int(total_vip[0]) if isinstance(total_vip, tuple) else int(total_vip)
-        val_credito = int(total_Plano Crédito de Moedas[0]) if isinstance(total_Plano Crédito de Moedas, tuple) else int(total_Plano Crédito de Moedas)
-        val_gratis = int(total_Grátis[0]) if isinstance(total_Grátis, tuple) else int(total_Grátis)
+        val_vip = int(total_vip[0]) if isinstance(total_vip, tuple) else int(total_vip)
+        val_Plano Crédito de Moeda = int(total_Plano Crédito de Moedas[0]) if isinstance(total_Plano Crédito de Moedas, tuple) else int(total_Plano Crédito de Moedas)
+        val_Grátis = int(total_Grátis[0]) if isinstance(total_Grátis, tuple) else int(total_Grátis)
 
         df_pizza = pd.DataFrame(
             {
