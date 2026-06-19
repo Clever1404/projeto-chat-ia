@@ -2294,52 +2294,67 @@ def template_painel_admin():
     g1, g2 = st.columns(2)
 
     with g1:
-        # ✅ BLINDAGEM: O gráfico do Plotly só é gerado e atualizado se existirem dados reais
-        if not df_creditos.empty and df_creditos["quantidade_creditos"].sum() > 0:
-            df_creditos["cum_sum"] = df_creditos[
-                "quantidade_creditos"
-            ].cumsum()
-            df_creditos["cum_percentage"] = (
-                df_creditos["cum_sum"]
-                / df_creditos["quantidade_creditos"].sum()
-            ) * 100
+        # ✅ VALIDAÇÃO TRIPLA: Evita qualquer quebra se o dataframe for nulo, vazio ou sem dados válidos
+        pode_gerar_grafico = False
+            
+        if df_creditos is not None and not df_creditos.empty:
+            if "quantidade_creditos" in df_creditos.columns and "data" in df_creditos.columns:
+            if df_creditos["quantidade_creditos"].sum() > 0:
+                        pode_gerar_grafico = True
 
-            fig_pareto = go.Figure()
-            fig_pareto.add_trace(
-                go.Bar(
-                    x=df_creditos["data"],
-                    y=df_creditos["quantidade_creditos"],
-                     name="Recargas no Dia",
-                    marker_color="#007bff",
-                )
-            )
-            fig_pareto.add_trace(
-                go.Scatter(
-                    x=df_creditos["data"],
-                    y=df_creditos["cum_percentage"],
-                    name="% Acumulada Semanal",
-                    yaxis="y2",
-                    line=dict(color="#28a745", width=3),
-                )
-            )
+        if pode_gerar_grafico:
+            try:
+                df_creditos["cum_sum"] = df_creditos["quantidade_creditos"].cumsum()
+                df_creditos["cum_percentage"] = (
+                    df_creditos["cum_sum"] / df_creditos["quantidade_creditos"].sum()
+                ) * 100
 
-            fig_pareto.update_layout(
-            title="Soma de Recargas e Tendência (Últimos 7 dias)",
-            yaxis=dict(title="Quantidade de Moedas"),
-            yaxis2=dict(
-                title="Percentual Acumulado (%)",
-                overlaying="y",
-                side="right",
-                range=[0, 105],
-            ),
-            template="plotly_dark",
-            paper_bgcolor="#161b22",
-            plot_bgcolor="#161b22",
-            legend=dict(orient="h", y=1.1),
-            )
-            st.plotly_chart(fig_pareto, use_container_width=True)
+                fig_pareto = go.Figure()
+                    
+                # Barras de volume individual
+                fig_pareto.add_trace(
+                    go.Bar(
+                        x=df_creditos["data"],
+                        y=df_creditos["quantidade_creditos"],
+                        name="Recargas no Dia",
+                        marker_color="#007bff",
+                    )
+                )
+                    
+                # Linha de tendência acumulada
+                fig_pareto.add_trace(
+                    go.Scatter(
+                        x=df_creditos["data"],
+                        y=df_creditos["cum_percentage"],
+                        name="% Acumulada Semanal",
+                        yaxis="y2",
+                        line=dict(color="#28a745", width=3),
+                    )
+                )
+
+                # Configuração segura do layout
+                fig_pareto.update_layout(
+                    title="Soma de Recargas e Tendência (Últimos 7 dias)",
+                    yaxis=dict(title="Quantidade de Moedas"),
+                    yaxis2=dict(
+                        title="Percentual Acumulado (%)",
+                        overlaying="y",
+                        side="right",
+                        range=[0, 105],
+                    ),
+                    template="plotly_dark",
+                    paper_bgcolor="#161b22",
+                    plot_bgcolor="#161b22",
+                    legend=dict(orient="h", y=1.1),
+                )
+                st.plotly_chart(fig_pareto, use_container_width=True)
+                    
+            except Exception as erro_plotly:
+                # Se mesmo com dados o Plotly falhar internamente, exibe o aviso em vez de travar a tela azul
+                st.warning("⚠️ Não foi possível renderizar o gráfico de linhas devido a uma inconsistência de dados temporária.")
         else:
-            st.info("ℹ️ Nenhuma recarga realizada nos últimos 7 dias.")
+            # Fallback visual caso o banco não retorne nenhuma recarga recente
+            st.info("ℹ️ Nenhuma atividade de recarga de moedas registrada nos últimos 7 dias.")
 
     with g2:
         import plotly.express as px
