@@ -2190,39 +2190,39 @@ def template_painel_admin():
                 df_raw_rooms["saida_em"], utc=True
             )
 
-                # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
-                duracao_delta = (
-                    df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
-                )
-                df_raw_rooms["tempo_de_uso"] = (
-                    duracao_delta.dt.total_seconds() / 3600.0
-                ).round(2)
+            # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
+            duracao_delta = (
+                df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
+            )
+            df_raw_rooms["tempo_de_uso"] = (
+                duracao_delta.dt.total_seconds() / 3600.0
+            ).round(2)
 
-                # Padroniza nomes de colunas e textos para exibição visual limpa
-                df_raw_rooms["tipo_plano"] = (
-                    df_raw_rooms["tipo_plano"]
-                    .astype(str)
-                    .str.replace("vip", "VIP")
-                    .str.replace("Plano_Crédito_de_Moedas", "Plano_Crédito_de_Moeda")
-                )
+            # Padroniza nomes de colunas e textos para exibição visual limpa
+            df_raw_rooms["tipo_plano"] = (
+                df_raw_rooms["tipo_plano"]
+                .astype(str)
+                .str.replace("vip", "VIP")
+                .str.replace("Plano_Crédito_de_Moedas", "Plano_Crédito_de_Moeda")
+            )
 
-                df_salas_real = df_raw_rooms[
-                    ["match_id", "tipo_plano", "tempo_de_uso (min)"]
-                ].copy()
-                df_salas_real.columns = [
-                    "Sala",
-                    "Tipo de plano",
-                    "Tempo de Uso (min)",
+            df_salas_real = df_raw_rooms[
+                ["match_id", "tipo_plano", "tempo_de_uso (min)"]
+            ].copy()
+            df_salas_real.columns = [
+                "Sala",
+                "Tipo de plano",
+                "Tempo de Uso (min)",
+            ]
+
+            # Agrupa dinamicamente o somatório de horas por perfil de cliente
+            df_tempo_por_perfil = (
+                df_salas_real.groupby("Tipo de plano")[
+                    "Tempo de Uso (Horas)"
                 ]
-
-                # Agrupa dinamicamente o somatório de horas por perfil de cliente
-                df_tempo_por_perfil = (
-                    df_salas_real.groupby("Tipo de plano")[
-                        "Tempo de Uso (Horas)"
-                    ]
-                    .sum()
-                    .reset_index()
-                )
+                .sum()
+                .reset_index()
+            )
 
     except Exception as e:
         st.warning(
