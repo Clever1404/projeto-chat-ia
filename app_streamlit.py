@@ -1442,6 +1442,51 @@ def live_chat_privado_engine(m_id, my_id, p_nome_str):
 
 
 
+
+# 1. FUNÇÃO PARA BUSCAR O HISTÓRICO (Cole acima do template da sala)
+def buscar_mensagens(match_id):
+    try:
+        # Extrai o ID caso ele venha como tupla ou lista do session_state
+        id_match_int = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id)
+        
+        conn = conectar_supabase()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT remetente_id, conteudo, criado_em 
+            FROM mensagens_sala 
+            WHERE match_id = %s 
+            ORDER BY criado_em ASC;
+        """, (id_match_int,))
+        mensagens = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return mensagens
+    except Exception as e:
+        # Retorna uma lista vazia caso a tabela ainda não exista ou dê erro
+        return []
+
+# 2. FUNÇÃO PARA ENVIAR MENSAGEM (Cole acima do template da sala)
+def enviar_mensagem(match_id, remetente_id, texto):
+    if not texto or str(texto).strip() == "":
+        return
+    try:
+        id_match_int = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id)
+        id_remetente_int = remetente_id[0] if isinstance(remetente_id, (tuple, list)) else int(remetente_id)
+        
+        conn = conectar_supabase()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO mensagens_sala (match_id, remetente_id, conteudo) 
+            VALUES (%s, %s, %s);
+        """, (id_match_int, id_remetente_int, str(texto).strip()))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        st.error(f"Erro ao enviar mensagem: {e}")
+
+
+
 # 🟢 3. FUNÇÃO PRINCIPAL DA SALA PRIVADA (MOLDE E LAYOUT ESTÁTICO)
 def template_sala_privada():
     match_id = st.session_state.match_id_atual
