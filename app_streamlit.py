@@ -1716,17 +1716,25 @@ def template_sala_privada():
                     )
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # O bloco do formulário que causou o erro agora vai funcionar perfeitamente:
+        # Caixa de Texto na parte inferior do chat
         with st.form(key="form_enviar_msg", clear_on_submit=True):
-            col_txt, col_btn = st.columns([5, 1])
+            col_txt, col_btn = st.columns([4, 1]) # Dá 80% do espaço para o texto e 20% para o botão
+            
             with col_txt:
-                texto_msg = st.text_input(label="Mensagem", placeholder="Digite uma mensagem...", label_visibility="collapsed")
+                # O Enter funciona nativamente aqui dentro para disparar o form_submit_button
+                texto_msg = st.text_input(
+                    label="Mensagem", 
+                    placeholder="Digite uma mensagem e aperte Enter...", 
+                    label_visibility="collapsed"
+                )
+            
             with col_btn:
                 botao_enviar = st.form_submit_button("Enviar", use_container_width=True)
             
-            if (botao_enviar or texto_msg) and texto_msg.strip():
-                enviar_mensagem(match_id, meu_id, texto_msg) # <-- Agora o Python sabe o que é isso!
-                st.rerun()
+            # CORREÇÃO: O gatilho correto de um st.form é APENAS a variável do botão
+            if botao_enviar and texto_msg.strip():
+                enviar_mensagem(match_id, meu_id, texto_msg)
+                st.rerun() # Atualiza a tela uma única vez para mostrar a nova mensagem
 
     
 
