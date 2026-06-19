@@ -1122,7 +1122,7 @@ def exibir_modal_match(dados_m, tipo_plano, saldo_moedas):
         st.markdown(f"🟢 **{dados_m['nome']} está online agora!**")
         
         # Validação baseada no Plano do Usuário
-        if tipo_plano == "Assinante":
+        if tipo_plano == "vip":
             if st.button("🚀 Entrar na Sala Privada (Acesso Total Ilimitado)", type="primary", use_container_width=True):
                 st.session_state.match_id_atual = dados_m["match_id"]
                 st.session_state.tempo_limite_sala = -1  # Tempo indeterminado
@@ -1156,7 +1156,7 @@ def exibir_modal_match(dados_m, tipo_plano, saldo_moedas):
         st.button(f"⚪ {dados_m['nome']} está offline. Indisponível para chat instantâneo.", disabled=True, use_container_width=True)
         
         if st.button("📅 Agende um encontro virtual", type="secondary", use_container_width=True):
-            if tipo_plano in ["Assinante", "Plano Crédito de Moedas"]:
+            if tipo_plano in ["vip", "Plano Crédito de Moedas"]:
                 st.session_state.abrir_reserva_fluxo = {
                     "id_par": dados_m["id_par"], 
                     "nome_par": dados_m["nome"], 
@@ -1336,7 +1336,7 @@ def modal_agendamento_encontro(dados_r):
 @st.fragment(run_every=5.0)
 def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int):
     tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
-    tempo_limite_segundos = 15# Limite inicial de 10 minutos (600 segundos)
+    tempo_limite_segundos = 600  # Limite inicial de 10 minutos (600 segundos)
     tempo_restante = tempo_limite_segundos - tempo_decorrido
 
     if tempo_restante > 0:
@@ -1680,7 +1680,7 @@ def template_sala_privada():
         if tipo_plano_sala == "Plano Crédito de Moedas":
             st.info(f"🪙 Modo Créditos Ativo. Saldo atual: {saldo_moedas_sala} moedas.")
             renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int) 
-        elif tipo_plano_sala == "Assinante": 
+        elif tipo_plano_sala == "vip": 
             st.success(f"⭐ Plano Assinante Ativo: Acesso ilimitado por tempo indeterminado.") 
 
     # --- COLUNA DA DIREITA (SALA DE CONVERSA) ---
