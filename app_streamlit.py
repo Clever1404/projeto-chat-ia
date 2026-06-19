@@ -2299,8 +2299,8 @@ def template_painel_admin():
             
         if df_creditos is not None and not df_creditos.empty:
             if "quantidade_creditos" in df_creditos.columns and "data" in df_creditos.columns:
-            if df_creditos["quantidade_creditos"].sum() > 0:
-                        pode_gerar_grafico = True
+                if df_creditos["quantidade_creditos"].sum() > 0:
+                    pode_gerar_grafico = True
 
         if pode_gerar_grafico:
             try:
