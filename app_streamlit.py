@@ -2028,217 +2028,224 @@ def template_gerenciar_conexoes_completo():
 # ==============================================================================
 
 def template_painel_admin():
+
     st.markdown("### 👑 Painel de Controle do Administrador")
-        st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
-        # Importações essenciais exigidas para o módulo do Plotly funcionar
-        from datetime import datetime
-        import plotly.graph_objects as go
+    # Importações essenciais exigidas para o módulo do Plotly funcionar
+    from datetime import datetime
+    import plotly.graph_objects as go
 
-        # --------------------------------------------------------------------------
-        # 1. VALORES PADRÃO (FALLBACKS) - Evita qualquer NameError
-        # --------------------------------------------------------------------------
-        df_users = pd.DataFrame(
-            columns=["id", "tipo_plano", "moedas", "ultima_recarga"]
+    # --------------------------------------------------------------------------
+    # 1. VALORES PADRÃO (FALLBACKS) - Evita qualquer NameError
+    # --------------------------------------------------------------------------
+    df_users = pd.DataFrame(
+        columns=["id", "tipo_plano", "moedas", "ultima_recarga"]
+    )
+    df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
+    df_salas_real = pd.DataFrame(
+        columns=["Sala", "Tipo de Usuário", "Tempo de Uso (Horas)"]
+    )
+    df_tempo_por_perfil = pd.DataFrame(
+        columns=["Tipo de Usuário", "Tempo de Uso (Horas)"]
+    )
+
+    total_assinantes, total_credito, total_gratis = 0, 0, 0
+
+    dias_semana_pt = {
+        "Monday": "Segunda",
+        "Tuesday": "Terça",
+        "Wednesday": "Quarta",
+        "Thursday": "Quinta",
+        "Friday": "Sexta",
+        "Saturday": "Sábado",
+        "Sunday": "Domingo",
+    }
+
+    # --------------------------------------------------------------------------
+    # 2. CONSULTA DE DADOS REAIS NO SUPABASE
+    # --------------------------------------------------------------------------
+    try:
+        # Busca 1: Usuários
+        usuarios_query = (
+            supabase.table("usuarios")
+            .select("id", "tipo_plano", "moedas", "ultima_recarga")
+            .execute()
         )
-        df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
-        df_salas_real = pd.DataFrame(
-            columns=["Sala", "Tipo de Usuário", "Tempo de Uso (Horas)"]
-        )
-        df_tempo_por_perfil = pd.DataFrame(
-            columns=["Tipo de Usuário", "Tempo de Uso (Horas)"]
-        )
-
-        total_assinantes, total_credito, total_gratis = 0, 0, 0
-
-        dias_semana_pt = {
-            "Monday": "Segunda",
-            "Tuesday": "Terça",
-            "Wednesday": "Quarta",
-            "Thursday": "Quinta",
-            "Friday": "Sexta",
-            "Saturday": "Sábado",
-            "Sunday": "Domingo",
-        }
-
-        # --------------------------------------------------------------------------
-        # 2. CONSULTA DE DADOS REAIS NO SUPABASE
-        # --------------------------------------------------------------------------
-        try:
-            # Busca 1: Usuários
-            usuarios_query = (
-                supabase.table("usuarios")
-                .select("id", "tipo_plano", "moedas", "ultima_recarga")
-                .execute()
+        if usuarios_query.data:
+            df_users = pd.DataFrame(usuarios_query.data)
+            df_users["tipo_plano"] = (
+                df_users["tipo_plano"]
+                .astype(str)
+                .str.lower()
+                .str.strip()
             )
-            if usuarios_query.data:
-                df_users = pd.DataFrame(usuarios_query.data)
-                df_users["tipo_plano"] = (
-                    df_users["tipo_plano"]
-                    .astype(str)
-                    .str.lower()
-                    .str.strip()
-                )
-                if "ultima_recarga" in df_users.columns and not df_users["ultima_recarga"].isna().all():
-                    df_users["ultima_recarga"] = pd.to_datetime(
-                        df_users["ultima_recarga"], utc=True, errors="coerce"
-                    ).dt.tz_localize(None)
+            if "ultima_recarga" in df_users.columns and not df_users["ultima_recarga"].isna().all():
+                df_users["ultima_recarga"] = pd.to_datetime(
+                    df_users["ultima_recarga"], utc=True, errors="coerce"
+                ).dt.tz_localize(None)
 
-            # Busca 2: Histórico Real de Salas Privadas
-            # ✅ CORREÇÃO: Alterado de 'historico_salas' para 'historico_ia' conforme o erro do banco
-            salas_query = (
-                supabase.table("historico_ia")
-                .select("nome_sala", "tipo_usuario", "entrada_em", "saida_em")
-                .execute()
-            )
+        # Busca 2: Histórico Real de Salas Privadas
+        # ✅ CORREÇÃO: Alterado de 'historico_salas' para 'historico_ia' conforme o erro do banco
+        salas_query = (
+            supabase.table("historico_ia")
+            .select("nome_sala", "tipo_usuario", "entrada_em", "saida_em")
+            .execute()
+        )
 
-            if rooms_data := (salas_query.data or []):
+        if rooms_data := (salas_query.data or []):
                 df_raw_rooms = pd.DataFrame(rooms_data)
 
-                # Converte os timestamps do Supabase para formato legível de data/hora
-                df_raw_rooms["entrada_em"] = pd.to_datetime(
-                    df_raw_rooms["entrada_em"], utc=True
-                )
-                df_raw_rooms["saida_em"] = pd.to_datetime(
-                    df_raw_rooms["saida_em"], utc=True
-                )
+            # Converte os timestamps do Supabase para formato legível de data/hora
+            df_raw_rooms["entrada_em"] = pd.to_datetime(
+                df_raw_rooms["entrada_em"], utc=True
+            )
+            df_raw_rooms["saida_em"] = pd.to_datetime(
+                df_raw_rooms["saida_em"], utc=True
+            )    # Converte os timestamps do Supabase para formato legível de data/hora
+            df_raw_rooms["entrada_em"] = pd.to_datetime(
+                df_raw_rooms["entrada_em"], utc=True
+            )
+            df_raw_rooms["saida_em"] = pd.to_datetime(
+                df_raw_rooms["saida_em"], utc=True
+            )
 
-                # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
-                duracao_delta = (
-                    df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
-                )
-                df_raw_rooms["Tempo de Uso (Horas)"] = (
-                    duracao_delta.dt.total_seconds() / 3600.0
-                ).round(2)
+            # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
+            duracao_delta = (
+                df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
+            )
+            df_raw_rooms["Tempo de Uso (Horas)"] = (
+                duracao_delta.dt.total_seconds() / 3600.0
+            ).round(2)
 
-                # Padroniza nomes de colunas e textos para exibição visual limpa
-                df_raw_rooms["tipo_usuario"] = (
-                    df_raw_rooms["tipo_usuario"]
-                    .astype(str)
-                    .str.replace("assinante", "Assinantes")
-                    .str.replace("credito", "Usuários com Crédito")
-                )
+            # Padroniza nomes de colunas e textos para exibição visual limpa
+            df_raw_rooms["tipo_usuario"] = (
+                df_raw_rooms["tipo_usuario"]
+                .astype(str)
+                .str.replace("assinante", "Assinantes")
+                .str.replace("credito", "Usuários com Crédito")
+            )
 
-                df_salas_real = df_raw_rooms[
-                    ["nome_sala", "tipo_usuario", "Tempo de Uso (Horas)"]
-                ].copy()
-                df_salas_real.columns = [
-                    "Sala",
-                    "Tipo de Usuário",
-                    "Tempo de Uso (Horas)",
+            df_salas_real = df_raw_rooms[
+                ["nome_sala", "tipo_usuario", "Tempo de Uso (Horas)"]
+            ].copy()
+            df_salas_real.columns = [
+                "Sala",
+                "Tipo de Usuário",
+                "Tempo de Uso (Horas)",
+            ]
+
+            # Agrupa dinamicamente o somatório de horas por perfil de cliente
+            df_tempo_por_perfil = (
+                df_salas_real.groupby("Tipo de Usuário")[
+                    "Tempo de Uso (Horas)"
                 ]
+                .sum()
+                .reset_index()
+            )
 
-                # Agrupa dinamicamente o somatório de horas por perfil de cliente
-                df_tempo_por_perfil = (
-                    df_salas_real.groupby("Tipo de Usuário")[
-                        "Tempo de Uso (Horas)"
-                    ]
+    except Exception as e:
+        st.warning(
+            f"Nota: Tabela 'historico_ia' apresentou instabilidade ou erro na busca. {e}"
+        )
+
+    # --------------------------------------------------------------------------
+    # 3. PROCESSAMENTO E AGREGAÇÃO DOS DADOS DE USUÁRIOS
+    # --------------------------------------------------------------------------
+    try:
+        if not df_users.empty:
+            # --- CÁLCULO DO GRÁFICO DE PIZZA ---
+            total_assinantes = int(
+                df_users[df_users["tipo_plano"] != "grátis"].shape[0]
+            )
+            total_credito = int(
+                df_users[
+                    (df_users["tipo_plano"] == "grátis")
+                    & (df_users["moedas"] > 0)
+                ].shape[0]
+            )
+            total_gratis = int(
+                df_users[
+                    (df_users["tipo_plano"] == "grátis")
+                    & (df_users["moedas"] == 0)
+                ].shape[0]
+            )
+
+            # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
+            if "ultima_recarga" in df_users.columns:
+                # Remove linhas com datas nulas antes de agrupar
+                df_users_filtrado = df_users.dropna(subset=["ultima_recarga"])
+                    
+                df_agrupado = (
+                    df_users_filtrado.groupby(df_users_filtrado["ultima_recarga"].dt.date)["moedas"]
                     .sum()
                     .reset_index()
                 )
+                df_agrupado.columns = ["data", "quantidade_creditos"]
+                df_agrupado["data"] = pd.to_datetime(df_agrupado["data"])
 
-        except Exception as e:
-            st.warning(
-                f"Nota: Tabela 'historico_ia' apresentou instabilidade ou erro na busca. {e}"
+                # Filtra os últimos 7 dias com base na data atual
+                hoje = pd.Timestamp(datetime.now().date())
+                ha_uma_semana = hoje - pd.Timedelta(days=7)
+                df_creditos = df_agrupado[
+                    (df_agrupado["data"] >= ha_uma_semana)
+                    & (df_agrupado["data"] <= hoje)
+                ].copy()
+
+                if not df_creditos.empty:
+                    # Transforma a data no nome do dia da semana (ex: 'Monday' -> 'Segunda')
+                    df_creditos["dia_nome_en"] = df_creditos[
+                        "data"
+                    ].dt.day_name()
+                    df_creditos["data"] = df_creditos["dia_nome_en"].map(
+                        dias_semana_pt
+                    )
+
+                    # Ordena os dias cronologicamente de acordo com a semana real
+                    df_creditos = df_creditos.sort_values(
+                        by="quantidade_creditos", ascending=False
+                    )
+
+    except Exception as e:
+        st.error(f"Erro ao processar métricas reais: {e}")
+
+    # --------------------------------------------------------------------------
+    # 5. RENDERIZAÇÃO DOS GRÁFICOS (MÓDULO 3)
+    # --------------------------------------------------------------------------
+    st.subheader("📊 Análise de Créditos e Assinaturas")
+    g1, g2 = st.columns(2)
+
+    with g1:
+        # ✅ BLINDAGEM: O gráfico do Plotly só é gerado e atualizado se existirem dados reais
+        if not df_creditos.empty and df_creditos["quantidade_creditos"].sum() > 0:
+            df_creditos["cum_sum"] = df_creditos[
+                "quantidade_creditos"
+            ].cumsum()
+            df_creditos["cum_percentage"] = (
+                df_creditos["cum_sum"]
+                / df_creditos["quantidade_creditos"].sum()
+            ) * 100
+
+            fig_pareto = go.Figure()
+            fig_pareto.add_trace(
+                go.Bar(
+                     x=df_creditos["data"],
+                    y=df_creditos["quantidade_creditos"],
+                    name="Recargas no Dia",
+                    marker_color="#007bff",
+                )
+            )
+            fig_pareto.add_trace(
+                go.Scatter(
+                    x=df_creditos["data"],
+                    y=df_creditos["cum_percentage"],
+                    name="% Acumulada Semanal",
+                    yaxis="y2",
+                    line=dict(color="#28a745", width=3),
+                )
             )
 
-        # --------------------------------------------------------------------------
-        # 3. PROCESSAMENTO E AGREGAÇÃO DOS DADOS DE USUÁRIOS
-        # --------------------------------------------------------------------------
-        try:
-            if not df_users.empty:
-                # --- CÁLCULO DO GRÁFICO DE PIZZA ---
-                total_assinantes = int(
-                    df_users[df_users["tipo_plano"] != "grátis"].shape[0]
-                )
-                total_credito = int(
-                    df_users[
-                        (df_users["tipo_plano"] == "grátis")
-                        & (df_users["moedas"] > 0)
-                    ].shape[0]
-                )
-                total_gratis = int(
-                    df_users[
-                        (df_users["tipo_plano"] == "grátis")
-                        & (df_users["moedas"] == 0)
-                    ].shape[0]
-                )
-
-                # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
-                if "ultima_recarga" in df_users.columns:
-                    # Remove linhas com datas nulas antes de agrupar
-                    df_users_filtrado = df_users.dropna(subset=["ultima_recarga"])
-                    
-                    df_agrupado = (
-                        df_users_filtrado.groupby(df_users_filtrado["ultima_recarga"].dt.date)["moedas"]
-                        .sum()
-                        .reset_index()
-                    )
-                    df_agrupado.columns = ["data", "quantidade_creditos"]
-                    df_agrupado["data"] = pd.to_datetime(df_agrupado["data"])
-
-                    # Filtra os últimos 7 dias com base na data atual
-                    hoje = pd.Timestamp(datetime.now().date())
-                    ha_uma_semana = hoje - pd.Timedelta(days=7)
-                    df_creditos = df_agrupado[
-                        (df_agrupado["data"] >= ha_uma_semana)
-                        & (df_agrupado["data"] <= hoje)
-                    ].copy()
-
-                    if not df_creditos.empty:
-                        # Transforma a data no nome do dia da semana (ex: 'Monday' -> 'Segunda')
-                        df_creditos["dia_nome_en"] = df_creditos[
-                            "data"
-                        ].dt.day_name()
-                        df_creditos["data"] = df_creditos["dia_nome_en"].map(
-                            dias_semana_pt
-                        )
-
-                        # Ordena os dias cronologicamente de acordo com a semana real
-                        df_creditos = df_creditos.sort_values(
-                            by="quantidade_creditos", ascending=False
-                        )
-
-        except Exception as e:
-            st.error(f"Erro ao processar métricas reais: {e}")
-
-        # --------------------------------------------------------------------------
-        # 5. RENDERIZAÇÃO DOS GRÁFICOS (MÓDULO 3)
-        # --------------------------------------------------------------------------
-        st.subheader("📊 Análise de Créditos e Assinaturas")
-        g1, g2 = st.columns(2)
-
-        with g1:
-            # ✅ BLINDAGEM: O gráfico do Plotly só é gerado e atualizado se existirem dados reais
-            if not df_creditos.empty and df_creditos["quantidade_creditos"].sum() > 0:
-                df_creditos["cum_sum"] = df_creditos[
-                    "quantidade_creditos"
-                ].cumsum()
-                df_creditos["cum_percentage"] = (
-                    df_creditos["cum_sum"]
-                    / df_creditos["quantidade_creditos"].sum()
-                ) * 100
-
-                fig_pareto = go.Figure()
-                fig_pareto.add_trace(
-                    go.Bar(
-                        x=df_creditos["data"],
-                        y=df_creditos["quantidade_creditos"],
-                        name="Recargas no Dia",
-                        marker_color="#007bff",
-                    )
-                )
-                fig_pareto.add_trace(
-                    go.Scatter(
-                        x=df_creditos["data"],
-                        y=df_creditos["cum_percentage"],
-                        name="% Acumulada Semanal",
-                        yaxis="y2",
-                        line=dict(color="#28a745", width=3),
-                    )
-                )
-
-                fig_pareto.update_layout(
+            fig_pareto.update_layout(
                 title="Soma de Recargas e Tendência (Últimos 7 dias)",
                 yaxis=dict(title="Quantidade de Moedas"),
                 yaxis2=dict(
@@ -2250,11 +2257,239 @@ def template_painel_admin():
                 template="plotly_dark",
                 paper_bgcolor="#161b22",
                 plot_bgcolor="#161b22",
-                legend=dict(orient="h", y=1.1),
+                legend=dict(orient="h", y=1.1)
             )
             st.plotly_chart(fig_pareto, use_container_width=True)
         else:
-            st.info("ℹ️ Nenhuma recarga realizada nos últimos 7 dias.")
+            # Caso não existam recargas registradas nos últimos 7 dias, exibe aviso limpo em vez de quebrar
+            st.info("ℹ️ Nenhuma atividade de recarga detectada nos últimos 7 dias para exibição do gráfico de Pareto.")
+    st.markdown("### 👑 Painel de Controle do Administrador")
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Importações essenciais exigidas para o módulo do Plotly funcionar
+    from datetime import datetime
+    import plotly.graph_objects as go
+
+    # --------------------------------------------------------------------------
+    # 1. VALORES PADRÃO (FALLBACKS) - Evita qualquer NameError
+    # --------------------------------------------------------------------------
+    df_users = pd.DataFrame(
+        columns=["id", "tipo_plano", "moedas", "ultima_recarga"]
+    )
+    df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
+    df_salas_real = pd.DataFrame(
+        columns=["Sala", "Tipo de Usuário", "Tempo de Uso (Horas)"]
+    )
+    df_tempo_por_perfil = pd.DataFrame(
+        columns=["Tipo de Usuário", "Tempo de Uso (Horas)"]
+    )
+
+    total_assinantes, total_credito, total_gratis = 0, 0, 0
+
+    dias_semana_pt = {
+        "Monday": "Segunda",
+        "Tuesday": "Terça",
+        "Wednesday": "Quarta",
+        "Thursday": "Quinta",
+        "Friday": "Sexta",
+        "Saturday": "Sábado",
+        "Sunday": "Domingo",
+    }
+
+    # --------------------------------------------------------------------------
+    # 2. CONSULTA DE DADOS REAIS NO SUPABASE
+    # --------------------------------------------------------------------------
+    try:
+         # Busca 1: Usuários
+        usuarios_query = (
+            supabase.table("usuarios")
+            .select("id", "tipo_plano", "moedas", "ultima_recarga")
+            .execute()
+        )
+        if usuarios_query.data:
+            df_users = pd.DataFrame(usuarios_query.data)
+            df_users["tipo_plano"] = (
+                df_users["tipo_plano"]
+                .astype(str)
+                .str.lower()
+                .str.strip()
+            )
+            if "ultima_recarga" in df_users.columns and not df_users["ultima_recarga"].isna().all():
+                df_users["ultima_recarga"] = pd.to_datetime(
+                    df_users["ultima_recarga"], utc=True, errors="coerce"
+                ).dt.tz_localize(None)
+
+        # Busca 2: Histórico Real de Salas Privadas
+        # ✅ CORREÇÃO: Alterado de 'historico_salas' para 'historico_ia' conforme o erro do banco
+        salas_query = (
+            supabase.table("historico_ia")
+            .select("nome_sala", "tipo_usuario", "entrada_em", "saida_em")
+            .execute()
+        )
+
+        if rooms_data := (salas_query.data or []):
+            df_raw_rooms = pd.DataFrame(rooms_data)
+
+            # Converte os timestamps do Supabase para formato legível de data/hora
+            df_raw_rooms["entrada_em"] = pd.to_datetime(
+                df_raw_rooms["entrada_em"], utc=True
+            )
+            df_raw_rooms["saida_em"] = pd.to_datetime(
+                df_raw_rooms["saida_em"], utc=True
+            )
+
+            # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
+            duracao_delta = (
+                df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
+            )
+            df_raw_rooms["Tempo de Uso (Horas)"] = (
+                duracao_delta.dt.total_seconds() / 3600.0
+            ).round(2)
+
+            # Padroniza nomes de colunas e textos para exibição visual limpa
+            df_raw_rooms["tipo_usuario"] = (
+                df_raw_rooms["tipo_usuario"]
+                .astype(str)
+                .str.replace("assinante", "Assinantes")
+                .str.replace("credito", "Usuários com Crédito")
+            )
+
+            df_salas_real = df_raw_rooms[
+                ["nome_sala", "tipo_usuario", "Tempo de Uso (Horas)"]
+            ].copy()
+            df_salas_real.columns = [
+                "Sala",
+                "Tipo de Usuário",
+                 "Tempo de Uso (Horas)",
+            ]
+
+            # Agrupa dinamicamente o somatório de horas por perfil de cliente
+            df_tempo_por_perfil = (
+                df_salas_real.groupby("Tipo de Usuário")[
+                    "Tempo de Uso (Horas)"
+                ]
+                .sum()
+                .reset_index()
+            )
+
+    except Exception as e:
+        st.warning(
+            f"Nota: Tabela 'historico_ia' apresentou instabilidade ou erro na busca. {e}"
+        )
+
+    # --------------------------------------------------------------------------
+    # 3. PROCESSAMENTO E AGREGAÇÃO DOS DADOS DE USUÁRIOS
+    # --------------------------------------------------------------------------
+    try:
+        if not df_users.empty:
+            # --- CÁLCULO DO GRÁFICO DE PIZZA ---
+            total_assinantes = int(
+                df_users[df_users["tipo_plano"] != "grátis"].shape[0]
+            )
+            total_credito = int(
+                df_users[
+                    (df_users["tipo_plano"] == "grátis")
+                     & (df_users["moedas"] > 0)
+                ].shape[0]
+            )
+            total_gratis = int(
+                df_users[
+                    (df_users["tipo_plano"] == "grátis")
+                    & (df_users["moedas"] == 0)
+                ].shape[0]
+            )
+
+            # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
+            if "ultima_recarga" in df_users.columns:
+                # Remove linhas com datas nulas antes de agrupar
+                df_users_filtrado = df_users.dropna(subset=["ultima_recarga"])
+                    
+                df_agrupado = (
+                    df_users_filtrado.groupby(df_users_filtrado["ultima_recarga"].dt.date)["moedas"]
+                    .sum()
+                    .reset_index()
+                )
+                df_agrupado.columns = ["data", "quantidade_creditos"]
+                df_agrupado["data"] = pd.to_datetime(df_agrupado["data"])
+
+                # Filtra os últimos 7 dias com base na data atual
+                hoje = pd.Timestamp(datetime.now().date())
+                ha_uma_semana = hoje - pd.Timedelta(days=7)
+                df_creditos = df_agrupado[
+                    (df_agrupado["data"] >= ha_uma_semana)
+                    & (df_agrupado["data"] <= hoje)
+                ].copy()
+
+                if not df_creditos.empty:
+                    # Transforma a data no nome do dia da semana (ex: 'Monday' -> 'Segunda')
+                    df_creditos["dia_nome_en"] = df_creditos[
+                        "data"
+                    ].dt.day_name()
+                    df_creditos["data"] = df_creditos["dia_nome_en"].map(
+                        dias_semana_pt
+                    )
+
+                    # Ordena os dias cronologicamente de acordo com a semana real
+                    df_creditos = df_creditos.sort_values(
+                        by="quantidade_creditos", ascending=False
+                    )
+
+    except Exception as e:
+        st.error(f"Erro ao processar métricas reais: {e}")
+
+    # --------------------------------------------------------------------------
+    # 5. RENDERIZAÇÃO DOS GRÁFICOS (MÓDULO 3)
+    # --------------------------------------------------------------------------
+    st.subheader("📊 Análise de Créditos e Assinaturas")
+    g1, g2 = st.columns(2)
+
+    with g1:
+        # ✅ BLINDAGEM: O gráfico do Plotly só é gerado e atualizado se existirem dados reais
+        if not df_creditos.empty and df_creditos["quantidade_creditos"].sum() > 0:
+            df_creditos["cum_sum"] = df_creditos[
+                "quantidade_creditos"
+            ].cumsum()
+            df_creditos["cum_percentage"] = (
+                df_creditos["cum_sum"]
+                / df_creditos["quantidade_creditos"].sum()
+            ) * 100
+
+            fig_pareto = go.Figure()
+            fig_pareto.add_trace(
+                go.Bar(
+                    x=df_creditos["data"],
+                    y=df_creditos["quantidade_creditos"],
+                     name="Recargas no Dia",
+                    marker_color="#007bff",
+                )
+            )
+            fig_pareto.add_trace(
+                go.Scatter(
+                    x=df_creditos["data"],
+                    y=df_creditos["cum_percentage"],
+                    name="% Acumulada Semanal",
+                    yaxis="y2",
+                    line=dict(color="#28a745", width=3),
+                )
+            )
+
+            fig_pareto.update_layout(
+            title="Soma de Recargas e Tendência (Últimos 7 dias)",
+            yaxis=dict(title="Quantidade de Moedas"),
+            yaxis2=dict(
+                title="Percentual Acumulado (%)",
+                overlaying="y",
+                side="right",
+                range=[0, 105],
+            ),
+            template="plotly_dark",
+            paper_bgcolor="#161b22",
+            plot_bgcolor="#161b22",
+            legend=dict(orient="h", y=1.1),
+        )
+        st.plotly_chart(fig_pareto, use_container_width=True)
+    else:
+        st.info("ℹ️ Nenhuma recarga realizada nos últimos 7 dias.")
 
     with g2:
         import plotly.express as px
