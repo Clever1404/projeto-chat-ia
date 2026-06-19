@@ -2168,26 +2168,27 @@ def template_painel_admin():
         # Busca 2: Histórico Real de Salas Privadas
             # ✅ AJUSTE: Certifique-se de usar os nomes de colunas corretos da tabela 'historico_ia'
             # Se não houver 'nome_sala', use o identificador correto (ex: 'id' ou 'sala_id')
-            salas_query = (
-                supabase.table("mensagens_sala")
-                .select("match_id", "entrada_em", "saida_em")  # Trocado 'nome_sala' por 'id' temporariamente
-                .execute()
+            # Busca 2: Histórico Real de Salas Privadas
+        # ✅ CORREÇÃO: Removida a coluna 'tipo_usuario' que não existe nesta tabela
+        salas_query = (
+            supabase.table("mensagens_sala")
+            .select("nome_sala", "entrada_em", "saida_em")
+            .execute()
+        )
+
+        if rooms_data := (salas_query.data or []):
+            df_raw_rooms = pd.DataFrame(rooms_data)
+
+            # ✅ COMPENSAÇÃO: Cria a coluna artificialmente para o restante do código rodar sem NameError
+            df_raw_rooms["tipo_usuario"] = "Não Identificado"
+
+            # Converte os timestamps do Supabase para formato legível de data/hora
+            df_raw_rooms["entrada_em"] = pd.to_datetime(
+                df_raw_rooms["entrada_em"], utc=True
             )
-
-            if rooms_data := (salas_query.data or []):
-                df_raw_rooms = pd.DataFrame(rooms_data)
-
-                # Se você alterou de 'nome_sala' para 'id' acima, renomeie aqui para o código não quebrar abaixo:
-                if "id" in df_raw_rooms.columns and "match_id" not in df_raw_rooms.columns:
-                    df_raw_rooms["match_id"] = df_raw_rooms["id"]
-
-                # Converte os timestamps do Supabase para formato legível de data/hora
-                df_raw_rooms["criado_em"] = pd.to_datetime(
-                    df_raw_rooms["criado_em"], utc=True
-                )
-                df_raw_rooms["saida_em"] = pd.to_datetime(
-                    df_raw_rooms["saida_em"], utc=True
-                )
+            df_raw_rooms["saida_em"] = pd.to_datetime(
+                df_raw_rooms["saida_em"], utc=True
+            )
 
                 # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
                 duracao_delta = (
