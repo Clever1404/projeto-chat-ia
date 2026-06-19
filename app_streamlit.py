@@ -2488,8 +2488,8 @@ def template_painel_admin():
             legend=dict(orient="h", y=1.1),
         )
         st.plotly_chart(fig_pareto, use_container_width=True)
-    else:
-        st.info("ℹ️ Nenhuma recarga realizada nos últimos 7 dias.")
+        else:
+            st.info("ℹ️ Nenhuma recarga realizada nos últimos 7 dias.")
 
     with g2:
         import plotly.express as px
