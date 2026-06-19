@@ -2486,8 +2486,8 @@ def template_painel_admin():
             paper_bgcolor="#161b22",
             plot_bgcolor="#161b22",
             legend=dict(orient="h", y=1.1),
-        )
-        st.plotly_chart(fig_pareto, use_container_width=True)
+            )
+            st.plotly_chart(fig_pareto, use_container_width=True)
         else:
             st.info("ℹ️ Nenhuma recarga realizada nos últimos 7 dias.")
 
