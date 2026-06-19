@@ -2097,52 +2097,52 @@ def template_painel_admin():
                 df_raw_rooms = pd.DataFrame(rooms_data)
 
             # Converte os timestamps do Supabase para formato legível de data/hora
-            df_raw_rooms["entrada_em"] = pd.to_datetime(
-                df_raw_rooms["entrada_em"], utc=True
-            )
-            df_raw_rooms["saida_em"] = pd.to_datetime(
-                df_raw_rooms["saida_em"], utc=True
-            )    # Converte os timestamps do Supabase para formato legível de data/hora
-            df_raw_rooms["entrada_em"] = pd.to_datetime(
-                df_raw_rooms["entrada_em"], utc=True
-            )
-            df_raw_rooms["saida_em"] = pd.to_datetime(
-                df_raw_rooms["saida_em"], utc=True
-            )
+                df_raw_rooms["entrada_em"] = pd.to_datetime(
+                    df_raw_rooms["entrada_em"], utc=True
+                )
+                df_raw_rooms["saida_em"] = pd.to_datetime(
+                    df_raw_rooms["saida_em"], utc=True
+                )    # Converte os timestamps do Supabase para formato legível de data/hora
+                df_raw_rooms["entrada_em"] = pd.to_datetime(
+                    df_raw_rooms["entrada_em"], utc=True
+                )
+                df_raw_rooms["saida_em"] = pd.to_datetime(
+                    df_raw_rooms["saida_em"], utc=True
+                )
 
-            # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
-            duracao_delta = (
-                df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
-            )
-            df_raw_rooms["Tempo de Uso (Horas)"] = (
-                duracao_delta.dt.total_seconds() / 3600.0
-            ).round(2)
+                # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
+                duracao_delta = (
+                    df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
+                )
+                df_raw_rooms["Tempo de Uso (Horas)"] = (
+                    duracao_delta.dt.total_seconds() / 3600.0
+                ).round(2)
 
-            # Padroniza nomes de colunas e textos para exibição visual limpa
-            df_raw_rooms["tipo_usuario"] = (
-                df_raw_rooms["tipo_usuario"]
-                .astype(str)
-                .str.replace("assinante", "Assinantes")
-                .str.replace("credito", "Usuários com Crédito")
-            )
+                # Padroniza nomes de colunas e textos para exibição visual limpa
+                df_raw_rooms["tipo_usuario"] = (
+                    df_raw_rooms["tipo_usuario"]
+                    .astype(str)
+                .   str.replace("assinante", "Assinantes")
+                    .str.replace("credito", "Usuários com Crédito")
+                )
 
-            df_salas_real = df_raw_rooms[
-                ["nome_sala", "tipo_usuario", "Tempo de Uso (Horas)"]
-            ].copy()
-            df_salas_real.columns = [
-                "Sala",
+                df_salas_real = df_raw_rooms[
+                    ["nome_sala", "tipo_usuario", "Tempo de Uso (Horas)"]
+                ].copy()
+                df_salas_real.columns = [
+                    "Sala",
                 "Tipo de Usuário",
-                "Tempo de Uso (Horas)",
-            ]
-
-            # Agrupa dinamicamente o somatório de horas por perfil de cliente
-            df_tempo_por_perfil = (
-                df_salas_real.groupby("Tipo de Usuário")[
-                    "Tempo de Uso (Horas)"
+                    "Tempo de Uso (Horas)",
                 ]
-                .sum()
-                .reset_index()
-            )
+
+                # Agrupa dinamicamente o somatório de horas por perfil de cliente
+                df_tempo_por_perfil = (
+                    df_salas_real.groupby("Tipo de Usuário")[
+                        "Tempo de Uso (Horas)"
+                    ]
+                    .sum()
+                    .reset_index()
+                )
 
     except Exception as e:
         st.warning(
