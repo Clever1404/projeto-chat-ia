@@ -2192,7 +2192,7 @@ def template_painel_admin():
                 duracao_delta = (
                     df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
                 )
-                df_raw_rooms["tempo_de_uso"] / 60 = (
+                df_raw_rooms["tempo_de_uso"] = (
                     duracao_delta.dt.total_seconds() / 3600.0
                 ).round(2)
 
