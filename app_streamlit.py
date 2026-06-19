@@ -2201,7 +2201,7 @@ def template_painel_admin():
                     df_raw_rooms["tipo_plano"]
                     .astype(str)
                     .str.replace("vip", "VIP")
-                    .str.replace("Plano Crédito de Moedas", "Plano Crédito de Moeda")
+                    .str.replace("Plano_Crédito_de_Moedas", "Plano_Crédito_de_Moeda")
                 )
 
                 df_salas_real = df_raw_rooms[
@@ -2346,13 +2346,13 @@ def template_painel_admin():
 
         # Garante que os contadores sejam inteiros limpos convertendo-os de forma segura
         val_vip = int(total_vip[0]) if isinstance(total_vip, tuple) else int(total_vip)
-        val_Plano Crédito de Moeda = int(total_Plano Crédito de Moedas[0]) if isinstance(total_Plano Crédito de Moedas, tuple) else int(total_Plano Crédito de Moedas)
+        val_Plano_Crédito_de_Moedas = int(total_Plano_Crédito_de_Moedas[0]) if isinstance(total_Plano_Crédito_de_Moedas, tuple) else int(total_Plano_Crédito_de_Moedas)
         val_Grátis = int(total_Grátis[0]) if isinstance(total_Grátis, tuple) else int(total_Grátis)
 
         df_pizza = pd.DataFrame(
             {
                 "Categoria": ["Assinantes", "Com Créditos", "Grátis"],
-                "Total": [val_vip, val_Plano Crédito de Moedas, val_Grátis],
+                "Total": [val_vip, val_Plano_Crédito_de_Moedas, val_Grátis],
             }
         )
         
