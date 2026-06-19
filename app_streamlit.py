@@ -1443,35 +1443,15 @@ def live_chat_privado_engine(m_id, my_id, p_nome_str):
 
 
 
-# 1. FUNÇÃO PARA BUSCAR O HISTÓRICO (Cole acima do template da sala)
-def buscar_mensagens(match_id):
-    try:
-        # Extrai o ID caso ele venha como tupla ou lista do session_state
-        id_match_int = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id)
-        
-        conn = conectar_supabase()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT remetente_id, conteudo, criado_em 
-            FROM mensagens_sala 
-            WHERE match_id = %s 
-            ORDER BY criado_em ASC;
-        """, (id_match_int,))
-        mensagens = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return mensagens
-    except Exception as e:
-        # Retorna uma lista vazia caso a tabela ainda não exista ou dê erro
-        return []
-
-# 2. FUNÇÃO PARA ENVIAR MENSAGEM (Cole acima do template da sala)
+# ==============================================================================
+# 1. COLOQUE ESTA FUNÇÃO AQUI (DEVE FICAR ACIMA DO TEMPLATE_SALA_PRIVADA)
+# ==============================================================================
 def enviar_mensagem(match_id, remetente_id, texto):
     if not texto or str(texto).strip() == "":
         return
     try:
-        id_match_int = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id)
-        id_remetente_int = remetente_id[0] if isinstance(remetente_id, (tuple, list)) else int(remetente_id)
+        id_match_int = match_id if isinstance(match_id, (tuple, list)) else int(match_id)
+        id_remetente_int = remetente_id if isinstance(remetente_id, (tuple, list)) else int(remetente_id)
         
         conn = conectar_supabase()
         cursor = conn.cursor()
@@ -1486,10 +1466,34 @@ def enviar_mensagem(match_id, remetente_id, texto):
         st.error(f"Erro ao enviar mensagem: {e}")
 
 
+# ==============================================================================
+# 2. COLOQUE ESTA FUNÇÃO TAMBÉM ACIMA DO TEMPLATE_SALA_PRIVADA
+# ==============================================================================
+def buscar_mensagens(match_id):
+    try:
+        id_match_int = match_id if isinstance(match_id, (tuple, list)) else int(match_id)
+        conn = conectar_supabase()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT remetente_id, conteudo, criado_em 
+            FROM mensagens_sala 
+            WHERE match_id = %s 
+            ORDER BY criado_em ASC;
+        """, (id_match_int,))
+        mensagens = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return mensagens
+    except Exception:
+        return []
 
-# 🟢 3. FUNÇÃO PRINCIPAL DA SALA PRIVADA (MOLDE E LAYOUT ESTÁTICO)
+
+# ==============================================================================
+# 3. SUA FUNÇÃO PRINCIPAL (SÓ CHAMA AS FUNÇÕES ACIMA DEPOIS DELAS EXISTIREM)
+# ==============================================================================
 def template_sala_privada():
     match_id = st.session_state.match_id_atual
+    meu_id = st.session_state.usuario_id
     
     # 1. CSS AVANÇADO PARA FIXAR ELEMENTOS E ESTILIZAR ESTILO WHATSAPP
     st.markdown(
@@ -1712,26 +1716,17 @@ def template_sala_privada():
                     )
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # Caixa de Texto na parte inferior do chat
+        # O bloco do formulário que causou o erro agora vai funcionar perfeitamente:
         with st.form(key="form_enviar_msg", clear_on_submit=True):
-            col_txt, col_btn = st.columns([5, 1]) # Dá mais espaço para o texto e deixa o botão menor
-            
+            col_txt, col_btn = st.columns([5, 1])
             with col_txt:
-                # O Enter funciona nativamente aqui dentro para submeter o formulário
-                texto_msg = st.text_input(
-                    label="Mensagem", 
-                    placeholder="Digite uma mensagem e aperte Enter...", 
-                    label_visibility="collapsed"
-                )
-            
+                texto_msg = st.text_input(label="Mensagem", placeholder="Digite uma mensagem...", label_visibility="collapsed")
             with col_btn:
-                # O botão serve como alternativa ao clique do mouse
                 botao_enviar = st.form_submit_button("Enviar", use_container_width=True)
             
-            # Executa a ação se o botão for clicado OU se o Enter for pressionado
             if (botao_enviar or texto_msg) and texto_msg.strip():
-                enviar_mensagem(match_id, meu_id, texto_msg)
-                st.rerun() # Força o Streamlit a recarregar e desenhar o novo balão na tela
+                enviar_mensagem(match_id, meu_id, texto_msg) # <-- Agora o Python sabe o que é isso!
+                st.rerun()
 
     
 
