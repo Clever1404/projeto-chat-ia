@@ -1446,13 +1446,70 @@ def live_chat_privado_engine(m_id, my_id, p_nome_str):
 def template_sala_privada():
     match_id = st.session_state.match_id_atual
     
-    st.markdown("""
+    # 1. CSS AVANÇADO PARA FIXAR ELEMENTOS E ESTILIZAR ESTILO WHATSAPP
+    st.markdown(
+        """
         <style>
-        .block-container { padding-top: 1.5rem !important; padding-bottom: 1rem !important; }
-        .box-perfil-fixo { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-bottom: 15px; text-align: center; }
-        .foto-parceiro-sala { width: 70px !important; height: 70px !important; border-radius: 50% !important; object-fit: cover !important; border: 2px solid #30363d !important; margin: 0 auto 10px auto; display: block; }
+        /* Remove paddings padrões do Streamlit para col colar no topo */
+        .block-container { 
+            padding-top: 1rem !important; 
+            padding-bottom: 0rem !important; 
+        }
+        
+        /* Fixa o Perfil Lateral e impede rolagem dele */
+        .box-perfil-fixo { 
+            background-color: #161b22; 
+            border: 1px solid #30363d; 
+            border-radius: 8px; 
+            padding: 15px; 
+            text-align: center;
+            position: sticky;
+            top: 2rem;
+        }
+        
+        /* Balões estilo WhatsApp */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px;
+        }
+        .msg-bubble {
+            border-radius: 8px;
+            padding: 8px 12px;
+            max-width: 75%;
+            font-size: 15px;
+            line-height: 1.4;
+            position: relative;
+        }
+        .msg-meu {
+            background-color: #056162;
+            color: white;
+            align-self: flex-end;
+            border-top-right-radius: 0px;
+        }
+        .msg-parceiro {
+            background-color: #262d31;
+            color: white;
+            align-self: flex-start;
+            border-top-left-radius: 0px;
+        }
+        .msg-autor {
+            font-size: 11px;
+            font-weight: bold;
+            color: #34b7f1;
+            margin-bottom: 3px;
+        }
+        .msg-tempo {
+            font-size: 10px;
+            color: #8696a0;
+            text-align: right;
+            margin-top: 4px;
+        }
         </style>
-    """, unsafe_allow_html=True)
+        """, 
+        unsafe_allow_html=True
+    )
     
     parceiro_nome = "Usuário"
     parceiro_foto = None
@@ -1506,36 +1563,23 @@ def template_sala_privada():
         tipo_plano_sala = "Grátis"
         saldo_moedas_sala = 0
 
-    # Divisão da interface em colunas
-    col_lateral_fixa, col_chat_principal = st.columns([1, 2.8])
-    
-    with col_lateral_fixa:
-        avatar_html = ""
-        caminho_disco = str(parceiro_foto).strip().lstrip('/')
-        if parceiro_foto and os.path.exists(caminho_disco):
-            try:
-                with open(caminho_disco, "rb") as image_file:
-                    encoded_string = base64.b64encode(image_file.read()).decode()
-                avatar_html = f'<img src="data:image/jpeg;base64,{encoded_string}" class="foto-parceiro-sala">'
-            except Exception:
-                avatar_html = f'<div style="font-size: 40px; margin-bottom: 10px; text-align:center;">{"👩" if parceiro_gen == "F" else "👨"}</div>'
-        else:
-            avatar_html = f'<div style="font-size: 40px; margin-bottom: 10px; text-align:center;">{"👩" if parceiro_gen == "F" else "👨"}</div>'
-            
-        nome_exibicao_parceiro = parceiro_nome.split('@')[0].capitalize()
-        st.markdown(f"""
-            <div class="box-perfil-fixo">
-                {avatar_html}
-                <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: #f0f6fc;">{nome_exibicao_parceiro}</h3>
-                <p style="color: {status_cor}; font-weight: bold; font-size: 13px; margin: 5px 0 0 0;">{status_parceiro}</p>
-            </div>
-        """, unsafe_allow_html=True)
-            
+
+    # 2. INTERFACE DIVIDIDA EM COLUNAS
+    col_perfil, col_chat = st.columns([1, 3])
+
+
+    with col_perfil:
+        st.markdown('<div class="box-perfil-fixo">', unsafe_allow_html=True)
+        st.image(parceiro_foto, width=80)
+        st.markdown(f'<div style="color:white; font-weight:bold; font-size:18px;">{parceiro_nome}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="color: {status_cor}; font-size:14px; margin-top:5px;">{status_parceiro}</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
         st.markdown("""
-            <div class="info-box-segura" style="margin-bottom: 15px;">
-                <h3>🔒 Ambiente Seguro</h3>
-                <p>Esta é uma sala de transmissão privada e criptografada temporária.</p>
-            </div>
+                    <div class="info-box-segura" style="margin-bottom: 15px;">
+                        <h3>🔒 Ambiente Seguro</h3>
+                        <p>Esta é uma sala de transmissão privada e criptografada temporária.</p>
+                    </div>
         """, unsafe_allow_html=True)
         
         if st.button("🚪 Sair da Sala Privada", type="primary", use_container_width=True):
@@ -1552,12 +1596,7 @@ def template_sala_privada():
                 st.rerun()
             except Exception as e: st.error(f"Erro: {e}")
 
-    with col_chat_principal:
-        st.markdown(f"## 💬 Chat Privado — ID #{id_match_int}")
-        st.caption("Aproveite o seu encontro virtual reservado.")
-        st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
-
-        # 🚀 CHAMADA DO TIMOR DE CRÉDITOS ISOLADO (Evita o loop infinito global)
+           # 🚀 CHAMADA DO TIMOR DE CRÉDITOS ISOLADO (Evita o loop infinito global)
         if tipo_plano_sala == "Plano Crédito de Moedas":
             st.info(f"🪙 Modo Créditos Ativo. Saldo atual: {saldo_moedas_sala} moedas.")
             renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int) 
@@ -1572,24 +1611,70 @@ def template_sala_privada():
             st.info("A videochamada foi iniciada abaixo. Garanta as permissões no navegador.") 
             st.iframe(url_jitsi, height=600) 
 
-    # 🚀 CHAMADA DO MOTOR DE CHAT REATIVO ISOLADO 
-# --- EXECUÇÃO DO MOTOR DE CHAT DE FORMA 100% LIMPA E LIMPA ---
-    # 🟢 CORREÇÃO CRÍTICA: Garante que estamos pegando APENAS o número ID (o primeiro elemento)
-    if isinstance(match_id, (tuple, list)):
-        live_sala_id = int(match_id[0])
-    else:
-        live_sala_id = int(match_id)
+    # --- COLUNA DA DIREITA (SALA DE CONVERSA) ---
+    with col_chat:
+        # Título Fixo no Topo do Chat
+        st.markdown(f"### 💬 Sala Privada com {parceiro_nome}")
+        st.divider()
 
-    id_logado_bruto = st.session_state.get("usuario_id")
-    if isinstance(id_logado_bruto, (tuple, list)):
-        meu_id_sala = int(id_logado_bruto[0])
-    else:
-        meu_id_sala = int(id_logado_bruto)
-        
-    # Chama o motor passando os inteiros puros validados
-    live_chat_privado_engine(live_sala_id, meu_id_sala, parceiro_nome)
-      
+        # Retângulo Interno com Rolagem Automática (Usando container nativo do Streamlit com altura travada)
+        # O parâmetro height força a barra de rolagem apenas dentro deste bloco de histórico
+        with st.container(height=400, border=True):
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+            
+            # Buscando mensagens do banco (Exemplo simulado baseado na sua nova tabela)
+            mensagens = buscar_mensagens(match_id) 
+            
+            for msg in mensagens:
+                remetente_id, conteudo, criado_em = msg[0], msg[1], msg[2]
+                horario = criado_em.strftime("%H:%M") if criado_em else ""
+                
+                if remetente_id == meu_id:
+                    # Mensagem enviada por mim (Lado Direito - Verde Escuro)
+                    st.markdown(
+                        f"""
+                        <div class="msg-bubble msg-meu">
+                            <div class="msg-autor">Você</div>
+                            <div>{conteudo}</div>
+                            <div class="msg-tempo">{horario}</div>
+                        </div>
+                        """, unsafe_allow_html=True
+                    )
+                else:
+                    # Mensagem enviada pelo parceiro (Lado Esquerdo - Cinza Escuro)
+                    st.markdown(
+                        f"""
+                        <div class="msg-bubble msg-parceiro">
+                            <div class="msg-autor">{parceiro_nome}</div>
+                            <div>{conteudo}</div>
+                            <div class="msg-tempo">{horario}</div>
+                        </div>
+                        """, unsafe_allow_html=True
+                    )
+            st.markdown('</div>', unsafe_allow_html=True)
 
+        # Caixa de Texto na parte inferior do chat
+        with st.form(key="form_enviar_msg", clear_on_submit=True):
+            col_txt, col_btn = st.columns([5, 1]) # Dá mais espaço para o texto e deixa o botão menor
+            
+            with col_txt:
+                # O Enter funciona nativamente aqui dentro para submeter o formulário
+                texto_msg = st.text_input(
+                    label="Mensagem", 
+                    placeholder="Digite uma mensagem e aperte Enter...", 
+                    label_visibility="collapsed"
+                )
+            
+            with col_btn:
+                # O botão serve como alternativa ao clique do mouse
+                botao_enviar = st.form_submit_button("Enviar", use_container_width=True)
+            
+            # Executa a ação se o botão for clicado OU se o Enter for pressionado
+            if (botao_enviar or texto_msg) and texto_msg.strip():
+                enviar_mensagem(match_id, meu_id, texto_msg)
+                st.rerun() # Força o Streamlit a recarregar e desenhar o novo balão na tela
+
+    
 
 def renderizar_listas_sidebar_e_acoes(): 
     with st.sidebar: 
@@ -1943,370 +2028,217 @@ def template_gerenciar_conexoes_completo():
 # ==============================================================================
 
 def template_painel_admin():
-    st.markdown("<h2>🛠️ Painel Administrativo de Controle Avançado</h2>", unsafe_allow_html=True)
-    st.caption("Métricas demográficas, performance preditiva da Lucy IA e moderação de contas em tempo real.")
-    st.markdown("<hr style='border-color: #30363d; margin: 10px 0 25px 0;'>", unsafe_allow_html=True)
-
-    # --- 1. COLETA E PREPARAÇÃO DOS DADOS DO POSTGRESQL ---
-    usuarios_bd = []
-    dados_agendados = {}
-    dados_realizados = {}
-    dados_matches = {}
-    total_salas_ativas = 0
-
-    try:
-        conn = conectar_supabase()
-        cursor = conn.cursor()
-        
-        # Busca a lista completa de moderação de usuários
-        cursor.execute("SELECT id, username, email, genero, idade, procura_por, status FROM usuarios ORDER BY id ASC;")
-        usuarios_bd = cursor.fetchall()
-        
-        # Contador Real de Salas Virtuais Online Simultâneas (Encontros confirmados ocorrendo HOJE)
-        cursor.execute("""
-            SELECT COUNT(DISTINCT match_id) FROM agendamentos_virtuais 
-            WHERE status_convite = 'aceito' 
-              AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s));
-        """, (dia_atual_servidor,))
-        total_salas_ativas = cursor.fetchone()[0]
-
-        # Estatísticas Semanais por Dia para o Gráfico de Pareto
-        cursor.execute("SELECT TRIM(LOWER(dia_semana)), COUNT(*) FROM agendamentos_virtuais GROUP BY 1;")
-        dados_agendados = dict(cursor.fetchall())
-        
-        cursor.execute("""
-            SELECT TRIM(LOWER(a.dia_semana)), COUNT(DISTINCT mc.id) 
-            FROM agendamentos_virtuais a 
-            JOIN mensagens_chat mc ON mc.match_id = a.match_id 
-            GROUP BY 1;
-        """)
-        dados_realizados = dict(cursor.fetchall())
-        
-        cursor.execute("""
-            SELECT TRIM(LOWER(a.dia_semana)), COUNT(DISTINCT m.id) 
-            FROM agendamentos_virtuais a 
-            JOIN matches m ON m.id = a.match_id 
-            GROUP BY 1;
-        """)
-        dados_matches = dict(cursor.fetchall())
-
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        st.error(f"Erro na varredura analítica do banco: {e}")
-
-    if not usuarios_bd:
-        st.warning("Nenhum dado de usuário localizado para gerar o painel.")
-        return
-
-    # Converte a tupla de usuários em DataFrame para facilitar as plotagens de Pizza e buscas
-    df_usuarios_mod = pd.DataFrame(usuarios_bd, columns=["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", "Status Presença"])
-
-    # --- 2. RENDERIZAÇÃO DOS CARDS DE MÉTRICAS COMPACTOS (KPIs) ---
-    c_k1, c_k2, c_k3 = st.columns(3)
-    with c_k1:
-        st.metric("Total de Perfis Cadastrados", len(df_usuarios_mod))
-    with c_k2:
-        ativos_now = len(df_usuarios_mod[df_usuarios_mod["Status Presença"].str.contains("Online", na=False)])
-        st.metric("Usuários Online Agora", ativos_now)
-    with c_k3:
-        # Contador de salas humanas ativas online requisitado
-        st.metric("Salas Virtuais Ativas (Hoje)", total_salas_ativas, help="Total de salas de encontros confirmados abertas para transmissão hoje")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
-    aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
-
-    # ==============================================================================
-    # ABA 1: COMPUTAÇÃO GRÁFICA AVANÇADA, PARETO EM LINHA E PIZZAS DEMOGRÁFICAS
-    # ==============================================================================
-    with aba_graficos:
-        st.markdown("### 📊 Gráfico de Pareto Mensal Unificado")
-        st.caption("Barras representam volumetria individual por dia. A linha vermelha computa o acumulado crescente semanal.")
-        
-        dias_b = ['segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado', 'domingo']
-        dias_exibicao = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
-        
-        # Coleta das volumetrias individuais mapeadas das queries do banco de dados
-        v_agendados = [dados_agendados.get(d, 0) for d in dias_b]
-        v_realizados = [dados_realizados.get(d, 0) for d in dias_b]
-        v_matches = [dados_matches.get(d, 0) for d in dias_b]
-        
-        # Cálculo estatístico do Acumulado Semanal Crescente (Curva de Pareto)
-        v_totais_dia = [v_agendados[i] + v_realizados[i] + v_matches[i] for i in range(7)]
-        v_acumulado = []
-        soma_incremental = 0
-        for val in v_totais_dia:
-            soma_incremental += val
-            v_acumulado.append(soma_incremental)
-
-        # 1. Dataset plano estruturado para a plotagem de barras do Altair
-        dados_pareto_lista = []
-        for i, dia in enumerate(dias_exibicao):
-            dados_pareto_lista.append({"Dia": dia, "Métrica": "Agendados", "Quantidade": v_agendados[i]})
-            dados_pareto_lista.append({"Dia": dia, "Métrica": "Realizados", "Quantidade": v_realizados[i]})
-            dados_pareto_lista.append({"Dia": dia, "Métrica": "Matches", "Quantidade": v_matches[i]})
-            
-        df_barras_altair = pd.DataFrame(dados_pareto_lista)
-        df_linha_altair = pd.DataFrame({"Dia": dias_exibicao, "Acumulado Semanal": v_acumulado})
-
-        # 2. Renderização do Gráfico Combinado de Pareto via Altair (Nativo do Streamlit)
-        import altair as alt
-
-        # Plotagem das barras agrupadas por métrica por dia
-        grafico_barras = alt.Chart(df_barras_altair).mark_bar().encode(
-            x=alt.X('Dia:N', sort=dias_exibicao, title="Dia da Semana"),
-            y=alt.Y('Quantidade:Q', title="Volumetria Individual"),
-            color=alt.Color('Métrica:N', scale=alt.Scale(domain=['Agendados', 'Realizados', 'Matches'], range=['#1f6feb', '#238636', '#e3b341']))
-        )
-
-        # Plotagem da linha contínua vermelha do acumulado sobreposta
-        grafico_linha = alt.Chart(df_linha_altair).mark_line(color='#ef4444', strokeWidth=3, point=True).encode(
-            x=alt.X('Dia:N', sort=dias_exibicao),
-            y=alt.Y('Acumulado Semanal:Q', title="Total Acumulado")
-        )
-
-        # Mescla os dois gráficos com eixos independentes para barras e linha
-        grafico_pareto_final = alt.layer(grafico_barras, grafico_linha).resolve_scale(
-            y='independent'
-        ).properties(width='container', height=280)
-
-        # Imprime o Pareto na tela do painel
-        st.altair_chart(grafico_pareto_final, theme="streamlit")
-
-        st.markdown("<hr style='border-color: #21262d; margin: 25px 0;'>", unsafe_allow_html=True)
-        
-        # --- 3. RETORNO DOS OUTROS DOIS GRÁFICOS COMPLEMENTARES DE DISTRIBUIÇÃO ---
-        st.markdown("### 🗺️ Análise Demográfica e Procura por Orientação")
-        st.caption("Mapeamento visual da base de usuários cadastrados na plataforma.")
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        col_piz1, col_piz2 = st.columns(2)
-        
-        with col_piz1:
-            st.markdown("<p style='font-size:14px; font-weight:bold; text-align:center; color:#f0f6fc;'>Distribução por Gênero Cadastrado</p>", unsafe_allow_html=True)
-            df_usuarios_mod["Gênero_Nome"] = df_usuarios_mod["Gênero"].map({"M": "Homem", "F": "Mulher", "O": "Outros"}).fillna("Não Informado")
-            contagem_genero = df_usuarios_mod["Gênero_Nome"].value_counts()
-            
-            st.bar_chart(contagem_genero, color="#1f6feb", height=180, use_container_width=True)
-            
-        with col_piz2:
-            st.markdown("<p style='font-size:14px; font-weight:bold; text-align:center; color:#f0f6fc;'>Orientação de Interesse (Procura Por)</p>", unsafe_allow_html=True)
-            df_usuarios_mod["Procura_Nome"] = df_usuarios_mod["Procura Por"].map({"M": "Procura Homem", "F": "Procura Mulher", "O": "Procura Ambos"}).fillna("Não Configurado")
-            contagem_procura = df_usuarios_mod["Procura_Nome"].value_counts()
-            
-            st.bar_chart(contagem_procura, color="#238636", height=180, use_container_width=True)
-
-
-        st.markdown("### 👑 Painel de Controle do Administrador")
+    st.markdown("### 👑 Painel de Controle do Administrador")
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Configuração inicial do Streamlit (opcional, remova se já tiver no topo do seu código)
-        st.set_page_config(layout="wide")
-
+        # Importações essenciais exigidas para o módulo do Plotly funcionar
+        from datetime import datetime
+        import plotly.graph_objects as go
 
         # --------------------------------------------------------------------------
-    # 1. VALORES PADRÃO (FALLBACKS) - Evita qualquer NameError
-    # --------------------------------------------------------------------------
-    df_users = pd.DataFrame(
-        columns=["id", "tipo_plano", "moedas", "ultima_recarga"]
-    )
-    df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
-    df_salas_real = pd.DataFrame(
-        columns=["Sala", "Tipo de Usuário", "Tempo de Uso (Horas)"]
-    )
-    df_tempo_por_perfil = pd.DataFrame(
-        columns=["Tipo de Usuário", "Tempo de Uso (Horas)"]
-    )
-
-    total_assinantes, total_credito, total_gratis = 0, 0, 0
-
-    dias_semana_pt = {
-        "Monday": "Segunda",
-        "Tuesday": "Terça",
-        "Wednesday": "Quarta",
-        "Thursday": "Quinta",
-        "Friday": "Sexta",
-        "Saturday": "Sábado",
-        "Sunday": "Domingo",
-    }
-
-    # --------------------------------------------------------------------------
-    # 2. CONSULTA DE DADOS REAIS NO SUPABASE
-    # --------------------------------------------------------------------------
-    try:
-        # Busca 1: Usuários
-        usuarios_query = (
-            supabase.table("usuarios")
-            .select("id", "tipo_plano", "moedas", "ultima_recarga")
-            .execute()
+        # 1. VALORES PADRÃO (FALLBACKS) - Evita qualquer NameError
+        # --------------------------------------------------------------------------
+        df_users = pd.DataFrame(
+            columns=["id", "tipo_plano", "moedas", "ultima_recarga"]
         )
-        if usuarios_query.data:
-            df_users = pd.DataFrame(usuarios_query.data)
-            df_users["tipo_plano"] = (
-                df_users["tipo_plano"]
-                .astype(str)
-                .str.lower()
-                .str.strip()
-            )
-            df_users["ultima_recarga"] = pd.to_datetime(
-                df_users["ultima_recarga"], utc=True
-            ).dt.tz_localize(None)
-
-        # Busca 2: Histórico Real de Salas Privadas
-        # NOTA: Caso o nome da sua tabela seja diferente, mude apenas a string abaixo
-        salas_query = (
-            supabase.table("historico_salas")
-            .select("nome_sala", "tipo_usuario", "entrada_em", "saida_em")
-            .execute()
+        df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
+        df_salas_real = pd.DataFrame(
+            columns=["Sala", "Tipo de Usuário", "Tempo de Uso (Horas)"]
+        )
+        df_tempo_por_perfil = pd.DataFrame(
+            columns=["Tipo de Usuário", "Tempo de Uso (Horas)"]
         )
 
-        if rooms_data := (salas_query.data or []):
-            df_raw_rooms = pd.DataFrame(rooms_data)
+        total_assinantes, total_credito, total_gratis = 0, 0, 0
 
-            # Converte os timestamps do Supabase para formato legível de data/hora
-            df_raw_rooms["entrada_em"] = pd.to_datetime(
-                df_raw_rooms["entrada_em"], utc=True
+        dias_semana_pt = {
+            "Monday": "Segunda",
+            "Tuesday": "Terça",
+            "Wednesday": "Quarta",
+            "Thursday": "Quinta",
+            "Friday": "Sexta",
+            "Saturday": "Sábado",
+            "Sunday": "Domingo",
+        }
+
+        # --------------------------------------------------------------------------
+        # 2. CONSULTA DE DADOS REAIS NO SUPABASE
+        # --------------------------------------------------------------------------
+        try:
+            # Busca 1: Usuários
+            usuarios_query = (
+                supabase.table("usuarios")
+                .select("id", "tipo_plano", "moedas", "ultima_recarga")
+                .execute()
             )
-            df_raw_rooms["saida_em"] = pd.to_datetime(
-                df_raw_rooms["saida_em"], utc=True
+            if usuarios_query.data:
+                df_users = pd.DataFrame(usuarios_query.data)
+                df_users["tipo_plano"] = (
+                    df_users["tipo_plano"]
+                    .astype(str)
+                    .str.lower()
+                    .str.strip()
+                )
+                if "ultima_recarga" in df_users.columns and not df_users["ultima_recarga"].isna().all():
+                    df_users["ultima_recarga"] = pd.to_datetime(
+                        df_users["ultima_recarga"], utc=True, errors="coerce"
+                    ).dt.tz_localize(None)
+
+            # Busca 2: Histórico Real de Salas Privadas
+            # ✅ CORREÇÃO: Alterado de 'historico_salas' para 'historico_ia' conforme o erro do banco
+            salas_query = (
+                supabase.table("historico_ia")
+                .select("nome_sala", "tipo_usuario", "entrada_em", "saida_em")
+                .execute()
             )
 
-            # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
-            duracao_delta = (
-                df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
-            )
-            df_raw_rooms["Tempo de Uso (Horas)"] = (
-                duracao_delta.dt.total_seconds() / 3600.0
-            ).round(2)
+            if rooms_data := (salas_query.data or []):
+                df_raw_rooms = pd.DataFrame(rooms_data)
 
-            # Padroniza nomes de colunas e textos para exibição visual limpa
-            df_raw_rooms["tipo_usuario"] = (
-                df_raw_rooms["tipo_usuario"]
-                .astype(str)
-                .str.replace("assinante", "Assinantes")
-                .str.replace("credito", "Usuários com Crédito")
-            )
+                # Converte os timestamps do Supabase para formato legível de data/hora
+                df_raw_rooms["entrada_em"] = pd.to_datetime(
+                    df_raw_rooms["entrada_em"], utc=True
+                )
+                df_raw_rooms["saida_em"] = pd.to_datetime(
+                    df_raw_rooms["saida_em"], utc=True
+                )
 
-            df_salas_real = df_raw_rooms[
-                ["nome_sala", "tipo_usuario", "Tempo de Uso (Horas)"]
-            ].copy()
-            df_salas_real.columns = [
-                "Sala",
-                "Tipo de Usuário",
-                "Tempo de Uso (Horas)",
-            ]
+                # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
+                duracao_delta = (
+                    df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
+                )
+                df_raw_rooms["Tempo de Uso (Horas)"] = (
+                    duracao_delta.dt.total_seconds() / 3600.0
+                ).round(2)
 
-            # Agrupa dinamicamente o somatório de horas por perfil de cliente
-            df_tempo_por_perfil = (
-                df_salas_real.groupby("Tipo de Usuário")[
-                    "Tempo de Uso (Horas)"
+                # Padroniza nomes de colunas e textos para exibição visual limpa
+                df_raw_rooms["tipo_usuario"] = (
+                    df_raw_rooms["tipo_usuario"]
+                    .astype(str)
+                    .str.replace("assinante", "Assinantes")
+                    .str.replace("credito", "Usuários com Crédito")
+                )
+
+                df_salas_real = df_raw_rooms[
+                    ["nome_sala", "tipo_usuario", "Tempo de Uso (Horas)"]
+                ].copy()
+                df_salas_real.columns = [
+                    "Sala",
+                    "Tipo de Usuário",
+                    "Tempo de Uso (Horas)",
                 ]
-                .sum()
-                .reset_index()
-            )
 
-    except Exception as e:
-        st.warning(
-            f"Nota: Tabela 'historico_salas' não encontrada ou erro na busca. {e}"
-        )
-
-    # --------------------------------------------------------------------------
-    # 3. PROCESSAMENTO E AGREGAÇÃO DOS DADOS DE USUÁRIOS
-    # --------------------------------------------------------------------------
-    try:
-        
-        if not df_users.empty:
-            # --- CÁLCULO DO GRÁFICO DE PIZZA ---
-            total_assinantes = int(
-                df_users[df_users["tipo_plano"] != "Grátis"].shape[0]
-            )
-            total_credito = int(
-                df_users[
-                    (df_users["tipo_plano"] == "Grátis")
-                    & (df_users["moedas"] > 0)
-                ].shape[0]
-            )
-            # Substituído "Sem Assinatura" por "Grátis" conforme solicitado
-            total_gratis = int(
-                df_users[
-                    (df_users["tipo_plano"] == "Grátis")
-                    & (df_users["moedas"] == 0)
-                ].shape[0]
-            )
-
-            # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
-            # Agrupa e soma as moedas pela data pura
-            df_agrupado = (
-                df_users.groupby("ultima_recarga")["moedas"]
-                .sum()
-                .reset_index()
-            )
-            df_agrupado.columns = ["data", "quantidade_creditos"]
-
-            # Filtra os últimos 7 dias com base na data atual
-            hoje = pd.Timestamp(datetime.now().date())
-            ha_uma_semana = hoje - pd.Timedelta(days=7)
-            df_creditos = df_agrupado[
-                (df_agrupado["data"] >= ha_uma_semana)
-                & (df_agrupado["data"] <= hoje)
-            ].copy()
-
-            if not df_creditos.empty:
-                # Transforma a data no nome do dia da semana (ex: 'Monday' -> 'Segunda')
-                df_creditos["dia_nome_en"] = df_creditos[
-                    "data"
-                ].dt.day_name()
-                df_creditos["data"] = df_creditos["dia_nome_en"].map(
-                    dias_semana_pt
+                # Agrupa dinamicamente o somatório de horas por perfil de cliente
+                df_tempo_por_perfil = (
+                    df_salas_real.groupby("Tipo de Usuário")[
+                        "Tempo de Uso (Horas)"
+                    ]
+                    .sum()
+                    .reset_index()
                 )
 
-                # Ordena os dias cronologicamente de acordo com a semana real
-                df_creditos = df_creditos.sort_values(
-                    by="quantidade_creditos", ascending=False
-                )
-
-    except Exception as e:
-        st.error(f"Erro ao processar métricas reais: {e}")
-
-
-    # --------------------------------------------------------------------------
-    # 5. RENDERIZAÇÃO DOS GRÁFICOS (MÓDULO 3)
-    # --------------------------------------------------------------------------
-    st.subheader("📊 Análise de Créditos e Assinaturas")
-    g1, g2 = st.columns(2)
-
-    with g1:
-        if not df_creditos.empty:
-            df_creditos["cum_sum"] = df_creditos[
-                "quantidade_creditos"
-            ].cumsum()
-            df_creditos["cum_percentage"] = (
-                df_creditos["cum_sum"]
-                / df_creditos["quantidade_creditos"].sum()
-            ) * 100
-
-            fig_pareto = go.Figure()
-            fig_pareto.add_trace(
-                go.Bar(
-                    x=df_creditos["data"],
-                    y=df_creditos["quantidade_creditos"],
-                    name="Recargas no Dia",
-                    marker_color="#007bff",
-                )
-            )
-            fig_pareto.add_trace(
-                go.Scatter(
-                    x=df_creditos["data"],
-                    y=df_creditos["cum_percentage"],
-                    name="% Acumulada Semanal",
-                    yaxis="y2",
-                    line=dict(color="#28a745", width=3),
-                )
+        except Exception as e:
+            st.warning(
+                f"Nota: Tabela 'historico_ia' apresentou instabilidade ou erro na busca. {e}"
             )
 
-            fig_pareto.update_layout(
+        # --------------------------------------------------------------------------
+        # 3. PROCESSAMENTO E AGREGAÇÃO DOS DADOS DE USUÁRIOS
+        # --------------------------------------------------------------------------
+        try:
+            if not df_users.empty:
+                # --- CÁLCULO DO GRÁFICO DE PIZZA ---
+                total_assinantes = int(
+                    df_users[df_users["tipo_plano"] != "grátis"].shape[0]
+                )
+                total_credito = int(
+                    df_users[
+                        (df_users["tipo_plano"] == "grátis")
+                        & (df_users["moedas"] > 0)
+                    ].shape[0]
+                )
+                total_gratis = int(
+                    df_users[
+                        (df_users["tipo_plano"] == "grátis")
+                        & (df_users["moedas"] == 0)
+                    ].shape[0]
+                )
+
+                # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
+                if "ultima_recarga" in df_users.columns:
+                    # Remove linhas com datas nulas antes de agrupar
+                    df_users_filtrado = df_users.dropna(subset=["ultima_recarga"])
+                    
+                    df_agrupado = (
+                        df_users_filtrado.groupby(df_users_filtrado["ultima_recarga"].dt.date)["moedas"]
+                        .sum()
+                        .reset_index()
+                    )
+                    df_agrupado.columns = ["data", "quantidade_creditos"]
+                    df_agrupado["data"] = pd.to_datetime(df_agrupado["data"])
+
+                    # Filtra os últimos 7 dias com base na data atual
+                    hoje = pd.Timestamp(datetime.now().date())
+                    ha_uma_semana = hoje - pd.Timedelta(days=7)
+                    df_creditos = df_agrupado[
+                        (df_agrupado["data"] >= ha_uma_semana)
+                        & (df_agrupado["data"] <= hoje)
+                    ].copy()
+
+                    if not df_creditos.empty:
+                        # Transforma a data no nome do dia da semana (ex: 'Monday' -> 'Segunda')
+                        df_creditos["dia_nome_en"] = df_creditos[
+                            "data"
+                        ].dt.day_name()
+                        df_creditos["data"] = df_creditos["dia_nome_en"].map(
+                            dias_semana_pt
+                        )
+
+                        # Ordena os dias cronologicamente de acordo com a semana real
+                        df_creditos = df_creditos.sort_values(
+                            by="quantidade_creditos", ascending=False
+                        )
+
+        except Exception as e:
+            st.error(f"Erro ao processar métricas reais: {e}")
+
+        # --------------------------------------------------------------------------
+        # 5. RENDERIZAÇÃO DOS GRÁFICOS (MÓDULO 3)
+        # --------------------------------------------------------------------------
+        st.subheader("📊 Análise de Créditos e Assinaturas")
+        g1, g2 = st.columns(2)
+
+        with g1:
+            # ✅ BLINDAGEM: O gráfico do Plotly só é gerado e atualizado se existirem dados reais
+            if not df_creditos.empty and df_creditos["quantidade_creditos"].sum() > 0:
+                df_creditos["cum_sum"] = df_creditos[
+                    "quantidade_creditos"
+                ].cumsum()
+                df_creditos["cum_percentage"] = (
+                    df_creditos["cum_sum"]
+                    / df_creditos["quantidade_creditos"].sum()
+                ) * 100
+
+                fig_pareto = go.Figure()
+                fig_pareto.add_trace(
+                    go.Bar(
+                        x=df_creditos["data"],
+                        y=df_creditos["quantidade_creditos"],
+                        name="Recargas no Dia",
+                        marker_color="#007bff",
+                    )
+                )
+                fig_pareto.add_trace(
+                    go.Scatter(
+                        x=df_creditos["data"],
+                        y=df_creditos["cum_percentage"],
+                        name="% Acumulada Semanal",
+                        yaxis="y2",
+                        line=dict(color="#28a745", width=3),
+                    )
+                )
+
+                fig_pareto.update_layout(
                 title="Soma de Recargas e Tendência (Últimos 7 dias)",
                 yaxis=dict(title="Quantidade de Moedas"),
                 yaxis2=dict(
@@ -2325,29 +2257,37 @@ def template_painel_admin():
             st.info("ℹ️ Nenhuma recarga realizada nos últimos 7 dias.")
 
     with g2:
+        import plotly.express as px
+
+        # Garante que os contadores sejam inteiros limpos convertendo-os de forma segura
+        val_assinantes = int(total_assinantes[0]) if isinstance(total_assinantes, tuple) else int(total_assinantes)
+        val_credito = int(total_credito[0]) if isinstance(total_credito, tuple) else int(total_credito)
+        val_gratis = int(total_gratis[0]) if isinstance(total_gratis, tuple) else int(total_gratis)
+
         df_pizza = pd.DataFrame(
             {
                 "Categoria": ["Assinantes", "Com Créditos", "Grátis"],
-                "Total": [
-                    total_assinantes,
-                    total_credito,
-                    total_gratis,
-                ],
+                "Total": [val_assinantes, val_credito, val_gratis],
             }
         )
-        cores_pizza = ["#28a745", "#007bff", "#6e7681"]
-        fig_pizza = px.pie(
-            df_pizza,
-            values="Total",
-            names="Categoria",
-            title="Distribuição de Perfis de Usuários",
-            color_discrete_sequence=cores_pizza,
-        )
-        fig_pizza.update_layout(
-            template="plotly_dark",
-            paper_bgcolor="#161b22",
-        )
-        st.plotly_chart(fig_pizza, use_container_width=True)
+        
+        # Só exibe o gráfico se houver algum usuário na base para evitar gráfico em branco
+        if df_pizza["Total"].sum() > 0:
+            cores_pizza = ["#28a745", "#007bff", "#6e7681"]
+            fig_pizza = px.pie(
+                df_pizza,
+                values="Total",
+                names="Categoria",
+                title="Distribuição de Perfis de Usuários",
+                color_discrete_sequence=cores_pizza,
+            )
+            fig_pizza.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="#161b22",
+            )
+            st.plotly_chart(fig_pizza, use_container_width=True)
+        else:
+            st.info("ℹ️ Nenhum dado de perfil disponível para gerar a distribuição.")
 
     st.markdown("---")
 
@@ -2380,17 +2320,18 @@ def template_painel_admin():
             ) 
             st.plotly_chart(fig_tempo, use_container_width=True) 
 
-            with c2: 
-                st.write("#### 📑 Detalhes dos Encontros Calculados") 
-                st.dataframe( 
+        # ✅ CORREÇÃO: Alinhamento corrigido (estava dentro do bloco 'with c1')
+        with c2: 
+            st.write("#### 📑 Detalhes dos Encontros Calculados") 
+            st.dataframe( 
                 df_salas_real, 
-                    use_container_width=True, 
-                    hide_index=True, 
-                ) 
+                use_container_width=True, 
+                hide_index=True, 
+            ) 
     else: 
         st.info( 
             "ℹ️ Nenhuma atividade ou registro de sala privada encontrado no banco de dados." 
-        ) 
+        )
 
 
     
@@ -2421,7 +2362,7 @@ def template_painel_admin():
         )
        
 
-    # ==============================================================================
+   # ==============================================================================
     # ABA 2: MODERAÇÃO DE CONTAS E BARRA DE BUSCA AVANÇADA
     # ==============================================================================
     with aba_moderacao:
@@ -2446,6 +2387,9 @@ def template_painel_admin():
         # --- CONTAINER DE EXCLUSÃO INDIVIDUAL (MODERAÇÃO CASCO GROSSO) ---
         st.subheader("🗑️ Gerenciador de Exclusão de Perfis")
         
+        # Variável de controle para adiar o rerun e evitar quebra de fluxo do Streamlit
+        usuario_deletado_com_sucesso = False
+
         for idx, row in df_filtrado.iterrows():
             u_id = row["ID"]
             u_name = row["Nome / Username"]
@@ -2464,37 +2408,48 @@ def template_painel_admin():
                     
                 with col_botao_u:
                     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-                    # Função Excluir Usuário acoplada com deleção em cascata total no Postgres
+                    
                     if st.button("❌ Excluir Usuário", key=f"adm_drop_user_{u_id}", type="primary", use_container_width=True):
                         try:
                             conn_del = conectar_supabase()
                             cursor_del = conn_del.cursor()
                             
-                            # Limpa cirurgicamente todas as tabelas amarradas por FK (Deleção em Cascata Garantida)
+                            # 1. Limpa tabelas com dependências diretas de ID de usuário
                             cursor_del.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (int(u_id),))
                             cursor_del.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(u_id),))
                             cursor_del.execute("DELETE FROM mensagens_chat WHERE remetente_id = %s;", (int(u_id),))
-                            cursor_del.execute("DELETE FROM agendamentos_virtuais WHERE remetente_id = %s OR destinatario_id = %s;", (int(u_id), int(u_id)))
+                            
+                            # 2. Garante a limpeza em tabelas de relacionamentos mútuos (Matches e Agendamentos)
+                            # Nota de segurança: Adicionado match_id em cascata implícita se houver amarração
+                            cursor_del.execute("""
+                                DELETE FROM agendamentos_virtuais 
+                                WHERE match_id IN (SELECT id FROM matches WHERE usuario_1_id = %s OR usuario_2_id = %s);
+                            """, (int(u_id), int(u_id)))
+                            
                             cursor_del.execute("DELETE FROM matches WHERE usuario_1_id = %s OR usuario_2_id = %s;", (int(u_id), int(u_id)))
                             
-                            # Remove o usuário definitivo da tabela principal
+                            # 3. Remove o usuário definitivo da tabela principal
                             cursor_del.execute("DELETE FROM usuarios WHERE id = %s;", (int(u_id),))
                             
                             conn_del.commit()
                             cursor_del.close()
                             conn_del.close()
                             
-                            st.toast(f"🎉 Perfil de {u_name} removido com sucesso do PostgreSQL!")
-                            st.rerun()
+                            st.toast(f"🎉 Perfil de {u_name} removido com sucesso!")
+                            usuario_deletado_com_sucesso = True
+                            
                         except Exception as e:
                             st.error(f"Erro ao deletar usuário: {e}")
+
+        # ✅ Correção do fluxo: Executa o rerun FORA do loop após processar o clique do botão
+        if usuario_deletado_com_sucesso:
+            st.rerun()
 
     # Botão de retorno na base do painel
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("← Voltar ao Chat Principal", type="secondary", use_container_width=True, key="btn_admin_back_to_lucy"):
         st.session_state.opcao_menu = "💬 Conversar com Lucy"
         st.rerun()
-
    
 
 # NOVO: Página simples de Fale Conosco
