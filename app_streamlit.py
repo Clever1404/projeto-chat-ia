@@ -2349,9 +2349,9 @@ def template_painel_admin():
                 duracao_delta = (
                     df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
                 )
-                    df_raw_rooms["Tempo de Uso (Horas)"] = (
-                        duracao_delta.dt.total_seconds() / 3600.0
-                    ).round(2)
+                df_raw_rooms["Tempo de Uso (Horas)"] = (
+                    duracao_delta.dt.total_seconds() / 3600.0
+                ).round(2)
 
                 # Padroniza nomes de colunas e textos para exibição visual limpa
                 df_raw_rooms["tipo_usuario"] = (
