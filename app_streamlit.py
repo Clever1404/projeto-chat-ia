@@ -1257,6 +1257,24 @@ def modal_agendamento_encontro(dados_r):
         meu_id_limpo = limpar_id_absoluto(st.session_state.usuario_id)
         parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
 
+        
+        # --- CÁLCULO INTELIGENTE DA DATA (CORREÇÃO DO BUG DO PASSADO) ---
+        dias_map = {
+            'Segunda-feira': 0, 'Terça-feira': 1, 'Quarta-feira': 2,
+            'Quinta-feira': 3, 'Sexta-feira': 4, 'Sábado': 5, 'Domingo': 6
+        }
+        hoje = datetime.datetime.now()
+        dia_alvo = dias_map[dia_s]
+        dias_de_diferenca = (dia_alvo - hoje.weekday()) % 7
+
+        # Se for o mesmo dia da semana, mas o horário escolhido já passou hoje, joga +7 dias para a frente
+        if dias_de_diferenca == 0 and hor_s < hoje.time():
+            dias_de_diferenca = 7
+
+        # Variável gerada: guarda o formato YYYY-MM-DD da próxima data real válida
+        data_final = (hoje + datetime.timedelta(days=dias_de_diferenca)).date()
+
+
         # --- 2. TRAVA DE DISPONIBILIDADE DIRETA NO POSTGRESQL ---
         meu_registro_existe = False
         parceiro_registro_existe = False
@@ -1336,7 +1354,7 @@ def modal_agendamento_encontro(dados_r):
 @st.fragment(run_every=5.0)
 def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int):
     tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
-    tempo_limite_segundos = 600  # Limite inicial de 10 minutos (600 segundos)
+    tempo_limite_segundos = 15  # Limite inicial de 10 minutos (600 segundos)
     tempo_restante = tempo_limite_segundos - tempo_decorrido
 
     if tempo_restante > 0:
