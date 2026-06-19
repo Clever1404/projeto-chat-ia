@@ -2101,12 +2101,244 @@ def template_gerenciar_conexoes_completo():
                 
         except Exception as e: st.error(f"Erro: {e}")     
 
-    
 # ==============================================================================
 # 9. CORREÇÃO DO PAINEL ADMIN (REATIVAÇÃO DO PARETO E COLUNAS IDADE/GENERO/EMAIL)
 # ==============================================================================
 
 def template_painel_admin():
+    st.markdown("<h2>🛠️ Painel Administrativo de Controle Avançado</h2>", unsafe_allow_html=True)
+    st.caption("Métricas demográficas, performance preditiva da Lucy IA e moderação de contas em tempo real.")
+    st.markdown("<hr style='border-color: #30363d; margin: 10px 0 25px 0;'>", unsafe_allow_html=True)
+
+    # --- 1. COLETA E PREPARAÇÃO DOS DADOS DO POSTGRESQL ---
+    usuarios_bd = []
+    dados_agendados = {}
+    dados_realizados = {}
+    dados_matches = {}
+    total_salas_ativas = 0
+
+    try:
+        conn = conectar_supabase()
+        cursor = conn.cursor()
+        
+        # Busca a lista completa de moderação de usuários
+        cursor.execute("SELECT id, username, email, genero, idade, procura_por, status FROM usuarios ORDER BY id ASC;")
+        usuarios_bd = cursor.fetchall()
+        
+        # Contador Real de Salas Virtuais Online Simultâneas (Encontros confirmados ocorrendo HOJE)
+        cursor.execute("""
+            SELECT COUNT(DISTINCT match_id) FROM agendamentos_virtuais 
+            WHERE status_convite = 'aceito' 
+              AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s));
+        """, (dia_atual_servidor,))
+        total_salas_ativas = cursor.fetchone()[0]
+
+        # Estatísticas Semanais por Dia para o Gráfico de Pareto
+        cursor.execute("SELECT TRIM(LOWER(dia_semana)), COUNT(*) FROM agendamentos_virtuais GROUP BY 1;")
+        dados_agendados = dict(cursor.fetchall())
+        
+        cursor.execute("""
+            SELECT TRIM(LOWER(a.dia_semana)), COUNT(DISTINCT mc.id) 
+            FROM agendamentos_virtuais a 
+            JOIN mensagens_chat mc ON mc.match_id = a.match_id 
+            GROUP BY 1;
+        """)
+        dados_realizados = dict(cursor.fetchall())
+        
+        cursor.execute("""
+            SELECT TRIM(LOWER(a.dia_semana)), COUNT(DISTINCT m.id) 
+            FROM agendamentos_virtuais a 
+            JOIN matches m ON m.id = a.match_id 
+            GROUP BY 1;
+        """)
+        dados_matches = dict(cursor.fetchall())
+
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        st.error(f"Erro na varredura analítica do banco: {e}")
+
+    if not usuarios_bd:
+        st.warning("Nenhum dado de usuário localizado para gerar o painel.")
+        return
+
+    # Converte a tupla de usuários em DataFrame para facilitar as plotagens de Pizza e buscas
+    df_usuarios_mod = pd.DataFrame(usuarios_bd, columns=["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", "Status Presença"])
+
+    # --- 2. RENDERIZAÇÃO DOS CARDS DE MÉTRICAS COMPACTOS (KPIs) ---
+    c_k1, c_k2, c_k3 = st.columns(3)
+    with c_k1:
+        st.metric("Total de Perfis Cadastrados", len(df_usuarios_mod))
+    with c_k2:
+        ativos_now = len(df_usuarios_mod[df_usuarios_mod["Status Presença"].str.contains("Online", na=False)])
+        st.metric("Usuários Online Agora", ativos_now)
+    with c_k3:
+        # NOVO: Contador de salas humanas ativas online requisitado
+        st.metric("Salas Virtuais Ativas (Hoje)", total_salas_ativas, help="Total de salas de encontros confirmados abertas para transmissão hoje")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
+    aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
+
+    # ==============================================================================
+    # ABA 1: COMPUTAÇÃO GRÁFICA AVANÇADA, PARETO EM LINHA E PIZZAS DEMOGRÁFICAS
+    # ==============================================================================
+    with aba_graficos:
+        st.markdown("### 📊 Gráfico de Pareto Mensal Unificado")
+        st.caption("Barras representam volumetria individual por dia. A linha vermelha computa o acumulado crescente semanal.")
+        
+        dias_b = ['segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado', 'domingo']
+        dias_exibicao = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+        
+        # Coleta das volumetrias individuais mapeadas das queries do banco de dados
+        v_agendados = [dados_agendados.get(d, 0) for d in dias_b]
+        v_realizados = [dados_realizados.get(d, 0) for d in dias_b]
+        v_matches = [dados_matches.get(d, 0) for d in dias_b]
+        
+        # Cálculo estatístico do Acumulado Semanal Crescente (Curva de Pareto)
+        v_totais_dia = [v_agendados[i] + v_realizados[i] + v_matches[i] for i in range(7)]
+        v_acumulado = []
+        soma_incremental = 0
+        for val in v_totais_dia:
+            soma_incremental += val
+            v_acumulado.append(soma_incremental)
+
+        # 1. Dataset plano estruturado para a plotagem de barras do Altair
+        dados_pareto_lista = []
+        for i, dia in enumerate(dias_exibicao):
+            dados_pareto_lista.append({"Dia": dia, "Métrica": "Agendados", "Quantidade": v_agendados[i]})
+            dados_pareto_lista.append({"Dia": dia, "Métrica": "Realizados", "Quantidade": v_realizados[i]})
+            dados_pareto_lista.append({"Dia": dia, "Métrica": "Matches", "Quantidade": v_matches[i]})
+            
+        df_barras_altair = pd.DataFrame(dados_pareto_lista)
+        df_linha_altair = pd.DataFrame({"Dia": dias_exibicao, "Acumulado Semanal": v_acumulado})
+
+        # 2. Renderização do Gráfico Combinado de Pareto via Altair (Nativo do Streamlit)
+        import altair as alt
+
+        # Plotagem das barras agrupadas por métrica por dia
+        grafico_barras = alt.Chart(df_barras_altair).mark_bar().encode(
+            x=alt.X('Dia:N', sort=dias_exibicao, title="Dia da Semana"),
+            y=alt.Y('Quantidade:Q', title="Volumetria Individual"),
+            color=alt.Color('Métrica:N', scale=alt.Scale(domain=['Agendados', 'Realizados', 'Matches'], range=['#1f6feb', '#238636', '#e3b341']))
+        )
+
+        # Plotagem da linha contínua vermelha do acumulado sobreposta
+        grafico_linha = alt.Chart(df_linha_altair).mark_line(color='#ef4444', strokeWidth=3, point=True).encode(
+            x=alt.X('Dia:N', sort=dias_exibicao),
+            y=alt.Y('Acumulado Semanal:Q', title="Total Acumulado")
+        )
+
+        # Mescla os dois gráficos com eixos independentes para barras e linha
+        grafico_pareto_final = alt.layer(grafico_barras, grafico_linha).resolve_scale(
+            y='independent'
+        ).properties(width='container', height=280)
+
+        # Imprime o Pareto na tela do painel
+        st.altair_chart(grafico_pareto_final, theme="streamlit")
+
+        st.markdown("<hr style='border-color: #21262d; margin: 25px 0;'>", unsafe_allow_html=True)
+        
+        # --- 3. RETORNO DOS OUTROS DOIS GRÁFICOS COMPLEMENTARES DE DISTRIBUIÇÃO (CORRIGIDO) ---
+        st.markdown("### 🗺️ Análise Demográfica e Procura por Orientação")
+        st.caption("Mapeamento visual da base de usuários cadastrados na plataforma.")
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        col_piz1, col_piz2 = st.columns(2)
+        
+        with col_piz1:
+            st.markdown("<p style='font-size:14px; font-weight:bold; text-align:center; color:#f0f6fc;'>Distribução por Gênero Cadastrado</p>", unsafe_allow_html=True)
+            df_usuarios_mod["Gênero_Nome"] = df_usuarios_mod["Gênero"].map({"M": "Homem", "F": "Mulher", "O": "Outros"}).fillna("Não Informado")
+            contagem_genero = df_usuarios_mod["Gênero_Nome"].value_counts()
+            
+            # 🔍 CORREÇÃO: Trocado 'use_container_width=True' por 'use_container_width=True'
+            st.bar_chart(contagem_genero, color="#1f6feb", height=180, use_container_width=True)
+            
+        with col_piz2:
+            st.markdown("<p style='font-size:14px; font-weight:bold; text-align:center; color:#f0f6fc;'>Orientação de Interesse (Procura Por)</p>", unsafe_allow_html=True)
+            df_usuarios_mod["Procura_Nome"] = df_usuarios_mod["Procura Por"].map({"M": "Procura Homem", "F": "Procura Mulher", "O": "Procura Ambos"}).fillna("Não Configurado")
+            contagem_procura = df_usuarios_mod["Procura_Nome"].value_counts()
+            
+            # 🔍 CORREÇÃO: Trocado 'use_container_width=True' por 'use_container_width=True'
+            st.bar_chart(contagem_procura, color="#238636", height=180, use_container_width=True)
+
+    # ==============================================================================
+    # ABA 2: MODERAÇÃO DE CONTAS E BARRA DE BUSCA AVANÇADA
+    # ==============================================================================
+    with aba_moderacao:
+        st.markdown("### 🔍 Moderação de Contas e Busca Avançada de Usuários")
+        
+        busca_termo = st.text_input("🔍 Digite o Nome ou E-mail do usuário para filtrar:", placeholder="Ex: Gabriel, Mariana, admin...")
+        
+        if busca_termo:
+            df_filtrado = df_usuarios_mod[
+                df_usuarios_mod["Nome / Username"].str.contains(busca_termo, case=False, na=False) |
+                df_usuarios_mod["E-mail"].str.contains(busca_termo, case=False, na=False)
+            ]
+            st.caption(f"Exibindo {len(df_filtrado)} resultado(s) para a busca '{busca_termo}'")
+        else:
+            df_filtrado = df_usuarios_mod
+
+        # 🔍 CORREÇÃO: Trocado 'use_container_width=True' por 'use_container_width=True' na tabela de moderação
+        st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+
+        # --- CONTAINER DE EXCLUSÃO INDIVIDUAL (MODERAÇÃO CASCO GROSSO) ---
+        st.subheader("🗑️ Gerenciador de Exclusão de Perfis")
+        
+        for idx, row in df_filtrado.iterrows():
+            u_id = row["ID"]
+            u_name = row["Nome / Username"]
+            u_status = row["Status Presença"]
+            
+            # Bloqueia a autoexclusão do perfil mestre admin
+            if u_id == 1 or str(u_name).lower() in ['admin', 'cleverson', 'clever1404']: 
+                continue
+                
+            with st.container(border=True):
+                col_info_u, col_botao_u = st.columns([3, 1])
+                
+                with col_info_u:
+                    st.write(f"**#{u_id} - {str(u_name).capitalize()}** | E-mail: {row['E-mail']} | Gênero: {row['Gênero']} | Idade: {row['Idade']} anos")
+                    st.caption(f"Status Atual: {u_status} | Interesse: Procura por {row['Procura Por']}")
+                    
+                with col_botao_u:
+                    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                    # NOVO: Função Excluir Usuário acoplada com deleção em cascata total no Postgres
+                    if st.button("❌ Excluir Usuário", key=f"adm_drop_user_{u_id}", type="primary", use_container_width=True):
+                        try:
+                            conn_del = conectar_supabase()
+                            cursor_del = conn_del.cursor()
+                            
+                            # Limpa cirurgicamente todas as tabelas amarradas por FK (Deleção em Cascata Garantida)
+                            cursor_del.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (int(u_id),))
+                            cursor_del.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(u_id),))
+                            cursor_del.execute("DELETE FROM mensagens_chat WHERE remetente_id = %s;", (int(u_id),))
+                            cursor_del.execute("DELETE FROM agendamentos_virtuais WHERE remetente_id = %s OR destinatario_id = %s;", (int(u_id), int(u_id)))
+                            cursor_del.execute("DELETE FROM matches WHERE usuario_1_id = %s OR usuario_2_id = %s;", (int(u_id), int(u_id)))
+                            
+                            # Remove o usuário definitivo da tabela principal
+                            cursor_del.execute("DELETE FROM usuarios WHERE id = %s;", (int(u_id),))
+                            
+                            conn_del.commit()
+                            cursor_del.close()
+                            conn_del.close()
+                            
+                            st.toast(f"🎉 Perfil de {u_name} removido com sucesso do PostgreSQL!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao deletar usuário: {e}")
+
+    # Botão de retorno na base do painel
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("← Voltar ao Chat Principal", type="secondary", use_container_width=True, key="btn_admin_back_to_lucy"):
+        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+        st.rerun()
+
+
+
     st.markdown("### 👑 Painel de Controle do Administrador")
     st.markdown("<br>", unsafe_allow_html=True)
 
