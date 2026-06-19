@@ -2122,13 +2122,14 @@ def template_painel_admin():
     )
     df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
     df_salas_real = pd.DataFrame(
-        columns=["Sala", "Tipo de Usuário", "Tempo de Uso (Horas)"]
+        columns=["Sala", "Tempo de Uso (Horas)"]
     )
     df_tempo_por_perfil = pd.DataFrame(
-        columns=["Tipo de Usuário", "Tempo de Uso (Horas)"]
+        columns=["Tempo de Uso (Horas)"]
     )
 
     total_assinantes, total_credito, total_gratis = 0, 0, 0
+    total_vip = 0
 
     dias_semana_pt = {
         "Monday": "Segunda",
@@ -2169,7 +2170,7 @@ def template_painel_admin():
             # Se não houver 'nome_sala', use o identificador correto (ex: 'id' ou 'sala_id')
             salas_query = (
                 supabase.table("mensagens_sala")
-                .select("match_id", "tipo_usuario", "entrada_em", "saida_em")  # Trocado 'nome_sala' por 'id' temporariamente
+                .select("match_id", "entrada_em", "saida_em")  # Trocado 'nome_sala' por 'id' temporariamente
                 .execute()
             )
 
@@ -2248,6 +2249,20 @@ def template_painel_admin():
                     & (df_users["moedas"] == 0)
                 ].shape[0]
             )
+
+
+            # ✅ ADICIONE ESTA LINHA PARA FILTRAR OS VIPS (ajuste o termo 'vip' se o nome no banco for diferente)
+            total_vip = int(
+                df_users[df_users["tipo_plano"] == "vip"].shape[0]
+            )
+
+            total_credito = int(
+                df_users[
+                    (df_users["tipo_plano"] == "grátis")
+                    & (df_users["moedas"] > 0)
+                ].shape[0]
+            )
+
 
             # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
             if "ultima_recarga" in df_users.columns:
@@ -2359,21 +2374,22 @@ def template_painel_admin():
     with g2:
         import plotly.express as px
 
-        # Garante que os contadores sejam inteiros limpos convertendo-os de forma segura
-        val_vip = int(total_vip[0]) if isinstance(total_vip, tuple) else int(total_vip)
-        val_Plano_Crédito_de_Moedas = int(total_Plano_Crédito_de_Moedas[0]) if isinstance(total_Plano_Crédito_de_Moedas, tuple) else int(total_Plano_Crédito_de_Moedas)
-        val_Grátis = int(total_Grátis[0]) if isinstance(total_Grátis, tuple) else int(total_Grátis)
+        # Limpeza segura de tipos para evitar falhas de tuplas
+        val_assinantes = int(total_assinantes) if isinstance(total_assinantes, tuple) else int(total_assinantes)
+        val_vip = int(total_vip) if isinstance(total_vip, tuple) else int(total_vip) # ✅ Agora não dará NameError!
+        val_credito = int(total_credito) if isinstance(total_credito, tuple) else int(total_credito)
+        val_gratis = int(total_gratis) if isinstance(total_gratis, tuple) else int(total_gratis)
 
         df_pizza = pd.DataFrame(
             {
-                "Categoria": ["Assinantes", "Com Créditos", "Grátis"],
-                "Total": [val_vip, val_Plano_Crédito_de_Moedas, val_Grátis],
+                "Categoria": ["Assinantes", "VIP", "Com Créditos", "Grátis"],
+                "Total": [val_assinantes, val_vip, val_credito, val_gratis],
             }
         )
         
-        # Só exibe o gráfico se houver algum usuário na base para evitar gráfico em branco
         if df_pizza["Total"].sum() > 0:
-            cores_pizza = ["#28a745", "#007bff", "#6e7681"]
+            # Adicionada uma cor roxa (#6f42c1) para representar a categoria VIP
+            cores_pizza = ["#28a745", "#6f42c1", "#007bff", "#6e7681"]
             fig_pizza = px.pie(
                 df_pizza,
                 values="Total",
@@ -2387,7 +2403,7 @@ def template_painel_admin():
             )
             st.plotly_chart(fig_pizza, use_container_width=True)
         else:
-            st.info("ℹ️ Nenhum dado de perfil disponível para gerar a distribuição.")
+            st.info("ℹ️ Nenhum dado de perfil disponível para gerar a distribuição.")    
 
     st.markdown("---")
 
