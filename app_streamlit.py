@@ -1569,6 +1569,19 @@ def template_sala_privada():
 
 
     with col_perfil:
+        avatar_html = ""
+        caminho_disco = str(parceiro_foto).strip().lstrip('/')
+        
+        # Converte a foto real para Base64 se o arquivo físico existir na pasta
+        if parceiro_foto and os.path.exists(caminho_disco):
+            try:
+                with open(caminho_disco, "rb") as image_file:
+                    encoded_string = base64.b64encode(image_file.read()).decode()
+                avatar_html = f'<img src="data:image/jpeg;base64,{encoded_string}" class="foto-parceiro-sala">'
+            except Exception:
+                avatar_html = f'<div style="font-size: 40px; margin-bottom: 10px; text-align:center;">{"👩" if parceiro_gen == "F" else "👨"}</div>'
+        else:
+            avatar_html = f'<div style="font-size: 40px; margin-bottom: 10px; text-align:center;">{"👩" if parceiro_gen == "F" else "👨"}</div>'
         st.markdown(f"""
          <div class="box-perfil-fixo">
          {avatar_html}</div>""", unsafe_allow_html=True)
