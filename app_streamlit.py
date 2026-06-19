@@ -1215,9 +1215,6 @@ def processar_match_lucy(dados_m):
     exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
 
 
-
-
-
 @st.dialog("📅 Reserva de Encontro")
 def modal_agendamento_encontro(dados_r):
     st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
@@ -1368,11 +1365,16 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
             except Exception as e:
                 st.error(f"Erro ao renovar tempo: {e}")
                 time.sleep(3)
-                st.session_state.opcao_menu = "Plataforma de Planos IA"
+                st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                st.session_state.opcao_menu = "🛒 Loja do App"  # Use a string exata que o seu disparador global espera
+                # 2. Ativa o gatilho que o seu disparador global já escuta
+                st.session_state.abrir_popup_loja = True
+                # 3. Força o recarregamento para aplicar a mudança de tela e abrir o pop-up
                 st.rerun()
         else:
             st.error("🔒 Seus 10 minutos acabaram e você não tem moedas suficientes para renovar.")
             time.sleep(3)
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
             st.session_state.opcao_menu = "🛒 Loja do App"  # Use a string exata que o seu disparador global espera
             # 2. Ativa o gatilho que o seu disparador global já escuta
             st.session_state.abrir_popup_loja = True
