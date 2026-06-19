@@ -1487,6 +1487,26 @@ def buscar_mensagens(match_id):
     except Exception:
         return []
 
+def limpar_historico_sala(match_id):
+    try:
+        id_match_int = match_id if isinstance(match_id, (tuple, list)) else int(match_id)
+        
+        conn = conectar_supabase()
+        cursor = conn.cursor()
+        
+        # Deleta todas as mensagens vinculadas a este match específico
+        cursor.execute("DELETE FROM mensagens_sala WHERE match_id = %s;", (id_match_int,))
+        
+        # OBRIGATÓRIO: Salva as alterações no banco de dados
+        conn.commit()
+        
+        cursor.close()
+        conn.close()
+        return True
+    except Exception as e:
+        st.error(f"Erro ao limpar histórico: {e}")
+        return False
+
 
 # ==============================================================================
 # 3. SUA FUNÇÃO PRINCIPAL (SÓ CHAMA AS FUNÇÕES ACIMA DEPOIS DELAS EXISTIREM)
@@ -1651,13 +1671,9 @@ def template_sala_privada():
             st.rerun()
             
         if st.button("🗑️ Limpar Histórico do Chat", type="secondary", use_container_width=True):
-            try:
-                conn = conectar_supabase(); cursor = conn.cursor()
-                cursor.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(id_match_int),))
-                conn.commit(); cursor.close(); conn.close()
-                st.toast("Histórico da sala privada limpo com sucesso!")
-                st.rerun()
-            except Exception as e: st.error(f"Erro: {e}")
+            if limpar_historico_sala(match_id):
+                st.success("Histórico apagado!")
+                st.rerun() 
 
            # 🚀 CHAMADA DO TIMOR DE CRÉDITOS ISOLADO (Evita o loop infinito global)
         if tipo_plano_sala == "Plano Crédito de Moedas":
@@ -1666,6 +1682,12 @@ def template_sala_privada():
         elif tipo_plano_sala == "Assinante": 
             st.success(f"⭐ Plano Assinante Ativo: Acesso ilimitado por tempo indeterminado.") 
 
+    # --- COLUNA DA DIREITA (SALA DE CONVERSA) ---
+    with col_chat:
+        # Título Fixo no Topo do Chat
+        st.markdown(f"### 💬 Sala Privada com {parceiro_nome}")
+        st.divider()
+
         # Funcionalidade de Videochamada fixa 
         if st.button("🎥 Iniciar Videochamada Privada"): 
             nome_da_sala_unica = f"Atendimento_FaleConosco_SalaPrivada_{id_match_int}" 
@@ -1673,12 +1695,6 @@ def template_sala_privada():
         
             st.info("A videochamada foi iniciada abaixo. Garanta as permissões no navegador.") 
             st.iframe(url_jitsi, height=600) 
-
-    # --- COLUNA DA DIREITA (SALA DE CONVERSA) ---
-    with col_chat:
-        # Título Fixo no Topo do Chat
-        st.markdown(f"### 💬 Sala Privada com {parceiro_nome}")
-        st.divider()
 
         # Retângulo Interno com Rolagem Automática (Usando container nativo do Streamlit com altura travada)
         # O parâmetro height força a barra de rolagem apenas dentro deste bloco de histórico
