@@ -1373,7 +1373,10 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
         else:
             st.error("🔒 Seus 10 minutos acabaram e você não tem moedas suficientes para renovar.")
             time.sleep(3)
-            st.session_state.opcao_menu = "Plataforma de Planos IA"
+            st.session_state.opcao_menu = "🛒 Loja do App"  # Use a string exata que o seu disparador global espera
+            # 2. Ativa o gatilho que o seu disparador global já escuta
+            st.session_state.abrir_popup_loja = True
+            # 3. Força o recarregamento para aplicar a mudança de tela e abrir o pop-up
             st.rerun()
 
 
