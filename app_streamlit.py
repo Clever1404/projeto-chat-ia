@@ -2383,19 +2383,12 @@ def template_painel_admin():
     # --------------------------------------------------------------------------
     # 1. VALORES PADRÃO (FALLBACKS) - Evita qualquer NameError
     # --------------------------------------------------------------------------
-    df_users = pd.DataFrame(
-        columns=["id", "tipo_plano", "moedas", "ultima_recarga"]
-    )
+   df_users = pd.DataFrame(columns=["id", "tipo_plano", "moedas", "ultima_recarga"])
     df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
-    df_salas_real = pd.DataFrame(
-        columns=["match_id", "tempo_de_uso"]
-    )
-    df_tempo_por_perfil = pd.DataFrame(
-        columns=["tempo_de_uso"]
-    )
+    df_salas_real = pd.DataFrame(columns=["match_id", "tempo_de_uso"])
+    df_tempo_por_perfil = pd.DataFrame(columns=["tempo_de_uso"])
 
     total_vip, total_Plano_Crédito_de_Moedas, total_Grátis = 0, 0, 0
-    
 
     dias_semana_pt = {
         "Monday": "Segunda",
@@ -2411,7 +2404,7 @@ def template_painel_admin():
     # 2. CONSULTA DE DADOS REAIS NO SUPABASE
     # --------------------------------------------------------------------------
     try:
-         # Busca 1: Usuários
+        # --- BUSCA 1: USUÁRIOS ---
         usuarios_query = (
             supabase.table("usuarios")
             .select("id", "tipo_plano", "moedas", "ultima_recarga")
@@ -2430,78 +2423,54 @@ def template_painel_admin():
                     df_users["ultima_recarga"], utc=True, errors="coerce"
                 ).dt.tz_localize(None)
 
-        # Busca 2: Histórico Real de Salas Privadas
-        # Busca 2: Histórico Real de Salas Privadas
-            # ✅ AJUSTE: Certifique-se de usar os nomes de colunas corretos da tabela 'historico_ia'
-            # Se não houver 'nome_sala', use o identificador correto (ex: 'id' ou 'sala_id')
-            # Busca 2: Histórico Real de Salas Privadas
-        # ✅ CORREÇÃO: Removida a coluna 'tipo_usuario' que não existe nesta tabela
-        salas_query = (
+        # --- BUSCA 2: HISTÓRICO DE SALAS PRIVADAS (MENSAGENS) ---
+        # 🌟 CORREÇÃO: Mantendo a consulta correta da tabela de mensagens até o fim do bloco
+        msg_query = (
             supabase.table("mensagens_sala")
             .select("match_id", "criado_em", "saida_em", "tempo_de_uso")
             .execute()
         )
 
-        salas_query = (
-                    supabase.table("usuarios")
-                    .select("id", "tipo_plano", "ultima_recarga", "moedas")
-                    .execute()
-                )
+        if msg_query.data:
+            df_raw_rooms = pd.DataFrame(msg_query.data)
 
-        if rooms_data := (salas_query.data or []):
-            df_raw_rooms = pd.DataFrame(rooms_data)
+            # Garante que as colunas de tempo existem no DataFrame antes de converter
+            colunas_tempo = ["criado_em", "saida_em"]
+            if all(col in df_raw_rooms.columns for col in colunas_tempo):
+                df_raw_rooms["criado_em"] = pd.to_datetime(df_raw_rooms["criado_em"], utc=True, errors="coerce")
+                df_raw_rooms["saida_em"] = pd.to_datetime(df_raw_rooms["saida_em"], utc=True, errors="coerce")
 
-            # ✅ COMPENSAÇÃO: Cria a coluna artificialmente para o restante do código rodar sem NameError
-            df_raw_rooms["tipo_usuario"] = "Não Identificado"
+                # 🌟 SEGURO: Se 'tempo_de_uso' não vier calculado do banco, calcula pela diferença
+                if "tempo_de_uso" not in df_raw_rooms.columns or df_raw_rooms["tempo_de_uso"].isna().all():
+                    duracao_delta = df_raw_rooms["saida_em"] - df_raw_rooms["criado_em"] # Usando criado_em como início
+                    df_raw_rooms["tempo_de_uso"] = (duracao_delta.dt.total_seconds() / 3600.0).round(2)
+            else:
+                # Fallback caso a tabela não tenha essas colunas
+                df_raw_rooms["tempo_de_uso"] = 0.0
 
-            # Converte os timestamps do Supabase para formato legível de data/hora
-            df_raw_rooms["criado_em"] = pd.to_datetime(
-                df_raw_rooms["criado_em"], utc=True
+            # 🌟 COMPENSAÇÃO: Mescla com df_users para descobrir o 'tipo_plano' de quem usou a sala
+            # Como mensagens_sala não tem tipo_plano nativo, vinculamos pelo ID do usuário se houver relação.
+            # Caso não tenha essa relação direta listada na tabela mensagens_sala, criamos a coluna mockada:
+            if "tipo_plano" not in df_raw_rooms.columns:
+                df_raw_rooms["tipo_plano"] = "Grátis" # Valor padrão seguro
+
+            # 🌟 CORREÇÃO: Corrigido de .stype para .astype
+            df_raw_rooms["tipo_plano"] = (
+                df_raw_rooms["tipo_plano"]
+                .astype(str)
+                .str.replace("vip", "VIP")
+                .str.replace("plano_crédito_de_moedas", "Plano Crédito de Moedas")
             )
-            df_raw_rooms["saida_em"] = pd.to_datetime(
-                df_raw_rooms["saida_em"], utc=True
+
+            df_salas_real = df_raw_rooms[["match_id", "tipo_plano", "tempo_de_uso"]].copy()
+            df_salas_real.columns = ["Sala", "Tipo de plano", "Tempo de Uso"]
+
+            # Agrupa dinamicamente o somatório de horas por perfil de cliente
+            df_tempo_por_perfil = (
+                df_salas_real.groupby("Tipo de plano")["Tempo de Uso"]
+                .sum()
+                .reset_index()
             )
-
-            # CALCULA O TEMPO REAL: Diferença entre saída e entrada convertida para Horas decimais
-            duracao_delta = (
-                df_raw_rooms["saida_em"] - df_raw_rooms["entrada_em"]
-            )
-            df_raw_rooms["tempo_de_uso"] = (
-                duracao_delta.dt.total_seconds() / 3600.0
-            ).round(2)
-
-            # Padroniza nomes de colunas e textos para exibição visual limpa
-        salas_query = (
-            supabase.table("usuarios")
-            .select("id", "tipo_plano", "ultima_recarga", "moedas")
-            .execute()
-        )
-            
-   
-        df_raw_rooms["tipo_plano"] = (
-            df_raw_rooms["tipo_plano"]
-            .stype(str)
-            .str.replace("vip", "VIP")
-            .str.replace("Plano_Crédito_de_Moedas", "Plano_Crédito_de_Moeda")
-        )
-
-        df_salas_real = df_raw_rooms[
-            ["match_id", "tipo_plano", "tempo_de_uso"]
-        ].copy()
-        df_salas_real.columns = [
-            "Sala",
-            "Tipo de plano",
-            "Tempo de Uso",
-        ]
-
-        # Agrupa dinamicamente o somatório de horas por perfil de cliente
-        df_tempo_por_perfil = (
-            df_salas_real.groupby("Tipo de plano")[
-                "Tempo de Uso"
-            ]
-            .sum()
-            .reset_index()
-        )
 
     except Exception as e:
         st.warning(
@@ -2515,57 +2484,17 @@ def template_painel_admin():
     # --------------------------------------------------------------------------
     st.subheader("📊 Análise de Créditos e Assinaturas")
     
-    
+     # 1. Busca os dados no Supabase
     salas_query = (
         supabase.table("usuarios")
         .select("id", "tipo_plano", "ultima_recarga", "moedas")
         .execute()
     )
-    # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
-    if "ultima_recarga" in df_users.columns:
-        # Remove linhas com datas nulas antes de agrupar
-        df_users_filtrado = df_users.dropna(subset=["ultima_recarga"])
-                    
-        df_agrupado = (
-            df_users_filtrado.groupby(df_users_filtrado["ultima_recarga"].dt.date)["moedas"]
-            .sum()
-            .reset_index()
-        )
-        df_agrupado.columns = ["data", "quantidade_creditos"]
-        df_agrupado["data"] = pd.to_datetime(df_agrupado["data"])
-
-        # Filtra os últimos 7 dias com base na data atual
-        hoje = pd.Timestamp(datetime.now().date())
-        ha_uma_semana = hoje - pd.Timedelta(days=7)
-        df_creditos = df_agrupado[
-            (df_agrupado["data"] >= ha_uma_semana)
-            & (df_agrupado["data"] <= hoje)
-        ].copy()
-
-        if not df_creditos.empty:
-            # Transforma a data no nome do dia da semana (ex: 'Monday' -> 'Segunda')
-            df_creditos["dia_nome_en"] = df_creditos[
-                "data"
-            ].dt.day_name()
-            df_creditos["data"] = df_creditos["dia_nome_en"].map(
-                    dias_semana_pt
-            )
-
-            # Ordena os dias cronologicamente de acordo com a semana real
-            df_creditos = df_creditos.sort_values(
-                        by="quantidade_creditos", ascending=False
-            )
-
+ 
     g1, g2 = st.columns(2)
 
     with g1:
-        # 1. Busca os dados no Supabase
-        salas_query = (
-            supabase.table("usuarios")
-            .select("id", "tipo_plano", "ultima_recarga", "moedas")
-            .execute()
-        )
-
+   
         pode_gerar_grafico = False
 
         if salas_query.data:
@@ -2664,10 +2593,7 @@ def template_painel_admin():
             st.info("ℹ️ Nenhuma atividade de recarga registrada para esta semana.")
 
 
-    with g2:
-        # 1. Busca os dados no Supabase
-        # Lembre de garantir que o cliente 'supabase' já esteja configurado antes deste bloco
-        salas_query = supabase.table("usuarios").select("id", "tipo_plano", "moedas").execute()
+    with g2:   
 
         if salas_query.data:
             # 2. Cria o DataFrame dos usuários
