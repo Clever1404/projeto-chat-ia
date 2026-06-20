@@ -2394,7 +2394,7 @@ def template_painel_admin():
         columns=["tempo_de_uso"]
     )
 
-    total_vip, total_Plano_Credito_de_Moedas, total_Grátis = 0, 0, 0
+    total_vip, total_Plano_Crédito_de_Moedas, total_Grátis = 0, 0, 0
     
 
     dias_semana_pt = {
@@ -2641,8 +2641,8 @@ def template_painel_admin():
     with g2:
         import plotly.express as px
 
-        total_vip, total_Plano_Credito_de_Moedas, total_Grátis = 0, 0, 0
-        
+        total_vip, total_Plano_Crédito_de_Moedas, total_Grátis = 0, 0, 0
+
         # Limpeza segura de tipos para evitar falhas de tuplas
         val_vip = int(total_vip) if isinstance(total_vip, tuple) else int(total_vip) # ✅ Agora não dará NameError!
         val_Plano_Crédito_de_Moedas = int(total_Plano_Crédito_de_Moedas) if isinstance(total_Plano_Crédito_de_Moedas, tuple) else int(total_Plano_Crédito_de_Moedas)
