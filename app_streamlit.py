@@ -1217,7 +1217,8 @@ def processar_match_lucy(dados_m):
 
 @st.dialog("📅 Reserva de Encontro")
 def modal_agendamento_encontro(dados_r):
-    from datetime import datetime, timedelta
+   # Importação com apelido limpo para evitar QUALQUER conflito de nomes
+    import datetime as dt
 
     st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
     st.caption("A Lucy cruzará sua grade horária com a do seu par antes de validar o convite.")
@@ -1260,14 +1261,13 @@ def modal_agendamento_encontro(dados_r):
         parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
 
         
-        # --- CÁLCULO INTELIGENTE DA DATA ---
+         # --- CÁLCULO INTELIGENTE DA DATA ---
         dias_map = {
             'Segunda-feira': 0, 'Terça-feira': 1, 'Quarta-feira': 2,
             'Quinta-feira': 3, 'Sexta-feira': 4, 'Sábado': 5, 'Domingo': 6
         }
         
-        # Uso estrito e seguro do datetime para evitar NameError/AttributeError
-        hoje = datetime.datetime.now()
+        hoje = dt.datetime.now()
         dia_alvo = dias_map[dia_s]
         dias_de_diferenca = (dia_alvo - hoje.weekday()) % 7
 
@@ -1275,15 +1275,14 @@ def modal_agendamento_encontro(dados_r):
         if dias_de_diferenca == 0 and hor_s < hoje.time():
             dias_de_diferenca = 7
 
-        data_final = (hoje + datetime.timedelta(days=dias_de_diferenca)).date()
-
+        data_final = (hoje + dt.timedelta(days=dias_de_diferenca)).date()
 
         # --- 2. TRAVA DE DISPONIBILIDADE DIRETA NO POSTGRESQL ---
         meu_registro_existe = False
         parceiro_registro_existe = False
         parceiro_tem_algum_horario = False
         
-        try:
+       try:
             conn_check = conectar_supabase()
             cursor_check = conn_check.cursor()
             
@@ -1293,10 +1292,14 @@ def modal_agendamento_encontro(dados_r):
                   AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
                   AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
             """, (meu_id_limpo, str(dia_s), str(per_s)))
-            meu_registro_existe = (cursor_check.fetchone()[0] > 0)
+            
+            # Pega o valor correto numérico de dentro do COUNT
+            retorno_meu = cursor_check.fetchone()
+            meu_registro_existe = (retorno_meu[0] > 0) if retorno_meu else False
             
             cursor_check.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
-            parceiro_tem_algum_horario = (cursor_check.fetchone()[0] > 0)
+            retorno_total_parceiro = cursor_check.fetchone()
+            parceiro_tem_algum_horario = (retorno_total_parceiro[0] > 0) if retorno_total_parceiro else False
             
             cursor_check.execute("""
                 SELECT COUNT(*) FROM disponibilidade_usuarios 
@@ -1304,7 +1307,8 @@ def modal_agendamento_encontro(dados_r):
                   AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
                   AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
             """, (parceiro_id_limpo, str(dia_s), str(per_s)))
-            parceiro_registro_existe = (cursor_check.fetchone()[0] > 0)
+            retorno_parceiro = cursor_check.fetchone()
+            parceiro_registro_existe = (retorno_parceiro[0] > 0) if retorno_parceiro else False
             
             cursor_check.close()
             conn_check.close()
@@ -1312,6 +1316,7 @@ def modal_agendamento_encontro(dados_r):
         except Exception as e:
             st.error(f"Erro ao consultar disponibilidade: {e}")
 
+            
         # --- 3. EXECUÇÃO DAS TRAVAS E PERSISTÊNCIA COMPLETA ---
         if per_s == 'manha' and (hora_int < 6 or hora_int >= 12):
             st.error("❌ Horário inválido! Para o período da manhã, ajuste entre **06:00 e 11:59**.")
