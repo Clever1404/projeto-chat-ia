@@ -1681,7 +1681,26 @@ def template_sala_privada():
         """, unsafe_allow_html=True)
         
         if st.button("🚪 Sair da Sala Privada", type="primary", use_container_width=True):
-            st.session_state.match_id_atual = None
+            # Captura o ID da sala atual (ajuste para a variável que você usa para guardar o match_id)
+            id_sala_atual = st.session_state.get("match_id_atual") 
+            if id_sala_atual:
+                try:
+                    import datetime
+                    # Gera o carimbo de data/hora atual no formato ISO exigido pelo Supabase
+                    horario_saida = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    
+                    # 2. Executa o UPDATE direto no Supabase filtrando pelo match_id da sala
+                    supabase.table("mensagens_sala")\
+                        .update({"saida_em": horario_saida})\
+                        .eq("match_id", id_sala_atual)\
+                        .execute()
+                        
+                    st.success("Sala encerrada e salva com sucesso!")
+                    
+                except Exception as erro_update:
+                    st.error(f"Erro ao salvar horário de saída no banco: {erro_update}")
+            
+            # 3. Limpa o estado da sessão e redireciona o usuário no menu
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
             st.rerun()
             
@@ -2159,12 +2178,12 @@ def template_painel_admin():
         cursor.execute("SELECT id, username, email, genero, idade, procura_por, status FROM usuarios ORDER BY id ASC;")
         usuarios_bd = cursor.fetchall()
         
-        # 2. REGRA B (SQL): Busca a lista de IDs de salas REAIS que foram criadas hoje no banco
+        # 2. REGRA B CORRIGIDA: CAST nativo para tratar timestamptz sem quebrar o driver
         cursor.execute("""
-            SELECT DISTINCT match_id 
+            SELECT DISTINCT match_id, criado_em 
             FROM mensagens_sala 
             WHERE match_id IS NOT NULL 
-              AND criado_em::date = CURRENT_DATE;
+              AND CAST(criado_em AS date) = CURRENT_DATE;
         """)
         salas_hoje_tuplas = cursor.fetchall()
         # Transforma a lista de tuplas em uma lista simples de strings/IDs de salas
@@ -2458,25 +2477,25 @@ def template_painel_admin():
                 st.sidebar.markdown("### 📋 Visualização de Termos e Regras dos Planos")
                 # Nota: Você também pode usar st.sidebar.subheader() se preferir o estilo padrão
 
-                st.html("""
-                    <div style="background-color: #161b22; padding: 20px; border-radius: 8px; border: 1px solid #30363d;">
-                        <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
-                            <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
-                            <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
+                    st.html("""
+                        <div style="background-color: #161b22; padding: 20px; border-radius: 8px; border: 1px solid #30363d;">
+                            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
+                                <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+                                <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
+                            </div>
+                                
+                            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
+                                <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+                                <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
+                            </div>
+                                
+                            <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+                                <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+                                <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+                            </div>
                         </div>
-                            
-                        <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
-                            <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
-                            <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
-                        </div>
-                            
-                        <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
-                            <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
-                            <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
-                        </div>
-                    </div>
-                """
-                )
+                    """
+                    )
 
 
                 # 3. Restante dos elementos (como o selectbox)
