@@ -2675,23 +2675,31 @@ def template_painel_admin():
 
     with g2:
         # 1. Busca os dados no Supabase
-        # 1. Busca os dados no Supabase
-        # Certifique-se de que a variável 'supabase' está devidamente inicializada antes deste bloco
+        # Lembre de garantir que o cliente 'supabase' já esteja configurado antes deste bloco
         salas_query = supabase.table("usuarios").select("id", "tipo_plano", "moedas").execute()
 
         if salas_query.data:
             # 2. Cria o DataFrame dos usuários
             df_usuarios = pd.DataFrame(salas_query.data)
             
-            # 3. PADRONIZAÇÃO COMPLETA: Remove espaços extras e força letras minúsculas para a busca
+            # 3. PADRONIZAÇÃO: Remove espaços extras e força letras minúsculas
             df_usuarios["tipo_plano"] = df_usuarios["tipo_plano"].astype(str).str.strip().str.lower()
             
-            # 4. Conta a ocorrência de cada plano de forma limpa
+            # --- FILTRO NA BARRA LATERAL ---
+            st.sidebar.subheader("⚙️ Configurações do Painel")
+            visao_perfil = st.sidebar.selectbox(
+                "Visualizar no gráfico:",
+                options=["Apenas Clientes", "Todos (Incluir Admin)"],
+                index=0  # Padrão: Mostra apenas clientes para não distorcer a visão comercial
+            )
+            # -------------------------------
+
+            # 4. Conta as ocorrências de cada plano de forma limpa
             contagem_planos = df_usuarios["tipo_plano"].value_counts()
             
-            # 5. Monta os totais buscando estritamente pelos termos normalizados em minúsculo
+            # 5. Agrupa os totais buscando estritamente pelos termos padronizados (em minúsculo)
             val_vip = int(contagem_planos.get("vip", 0))
-            val_admin = int(contagem_planos.get("admin", 0))  # 🌟 Buscando em minúsculo devido ao .str.lower()
+            val_admin = int(contagem_planos.get("admin", 0))
             
             val_credito = (
                 int(contagem_planos.get("plano crédito de moedas", 0)) + 
@@ -2706,22 +2714,27 @@ def template_painel_admin():
                 int(contagem_planos.get("nan", 0))
             )
             
-            # 6. Estrutura o DataFrame final com os nomes bonitos para exibição no gráfico
-            df_pizza = pd.DataFrame({
-                "Categoria": ["VIP", "Admin", "Plano Crédito de Moedas", "Grátis"],
-                "Total": [val_vip, val_admin, val_credito, val_gratis]
-            })
+            # 6. Monta a estrutura de dados baseada na escolha do filtro lateral
+            if visao_perfil == "Apenas Clientes":
+                df_pizza = pd.DataFrame({
+                    "Categoria": ["VIP", "Plano Crédito de Moedas", "Grátis"],
+                    "Total": [val_vip, val_credito, val_gratis]
+                })
+                cores_pizza = ["#6f42c1", "#28a745", "#007bff"]  # Roxo, Verde, Azul
+            else:
+                df_pizza = pd.DataFrame({
+                    "Categoria": ["VIP", "Admin", "Plano Crédito de Moedas", "Grátis"],
+                    "Total": [val_vip, val_admin, val_credito, val_gratis]
+                })
+                cores_pizza = ["#6f42c1", "#ffc107", "#28a745", "#007bff"]  # Roxo, Amarelo, Verde, Azul
             
-            # 7. Gera o gráfico de pizza se houver pelo menos 1 usuário
+            # 7. Gera e estiliza o gráfico de pizza
             if df_pizza["Total"].sum() > 0:
-                # Quatro cores para mapear perfeitamente as quatro categorias acima
-                cores_pizza = ["#6f42c1", "#ffc107", "#28a745", "#007bff"] 
-                
                 fig_pizza = px.pie(
                     df_pizza, 
                     values="Total", 
                     names="Categoria",
-                    title="Distribuição de Perfis de Usuários",
+                    title=f"Distribuição de Perfis ({visao_perfil})",
                     color_discrete_sequence=cores_pizza
                 )
                 fig_pizza.update_layout(template="plotly_dark", paper_bgcolor="#161b22")
