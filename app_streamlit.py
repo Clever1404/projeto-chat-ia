@@ -2383,7 +2383,7 @@ def template_painel_admin():
     # --------------------------------------------------------------------------
     # 1. VALORES PADRÃO (FALLBACKS) - Evita qualquer NameError
     # --------------------------------------------------------------------------
-   df_users = pd.DataFrame(columns=["id", "tipo_plano", "moedas", "ultima_recarga"])
+    df_users = pd.DataFrame(columns=["id", "tipo_plano", "moedas", "ultima_recarga"])
     df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
     df_salas_real = pd.DataFrame(columns=["match_id", "tempo_de_uso"])
     df_tempo_por_perfil = pd.DataFrame(columns=["tempo_de_uso"])
