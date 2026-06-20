@@ -2604,8 +2604,15 @@ def template_painel_admin():
     g1, g2 = st.columns(2)
 
     with g1:
+        salas_query = (
+        supabase.table("usuarios")
+        .select("id", "tipo_plano", "ultima_recarga", "moedas")
+        .execute()
+        )
+
         # ✅ VALIDAÇÃO TRIPLA: Evita qualquer quebra se o dataframe for nulo, vazio ou sem dados válidos
         pode_gerar_grafico = False
+        
             
         if df_creditos is not None and not df_creditos.empty:
             if "quantidade_creditos" in df_creditos.columns and "data" in df_creditos.columns:
@@ -2668,6 +2675,13 @@ def template_painel_admin():
 
     with g2:
         import plotly.express as px
+
+        salas_query = (
+        supabase.table("usuarios")
+        .select("id", "tipo_plano", "ultima_recarga", "moedas")
+        .execute()
+        )
+
 
         total_vip, total_Plano_Crédito_de_Moedas, total_Grátis = 0, 0, 0
 
