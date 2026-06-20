@@ -2643,8 +2643,8 @@ def template_painel_admin():
 
         # Limpeza segura de tipos para evitar falhas de tuplas
         val_vip = int(total_vip) if isinstance(total_vip, tuple) else int(total_vip) # ✅ Agora não dará NameError!
-        val_credito = int(total_credito) if isinstance(total_credito, tuple) else int(total_credito)
-        val_gratis = int(total_gratis) if isinstance(total_gratis, tuple) else int(total_gratis)
+        val_Plano_Crédito_de_Moedas = int(total_Plano_Crédito_de_Moedas) if isinstance(total_Plano_Crédito_de_Moedas, tuple) else int(total_Plano_Crédito_de_Moedas)
+        val_gratis = int(total_Grátis) if isinstance(total_Grátis, tuple) else int(total_Grátis)
 
         df_pizza = pd.DataFrame(
             {
