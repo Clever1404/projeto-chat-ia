@@ -2532,12 +2532,11 @@ def template_painel_admin():
                 options=["Apenas Clientes", "Todos (Incluir Admin)"],
                 index=0  # Padrão: Mostra apenas clientes para não distorcer a visão comercial
             )
-
-
+            
             # --------------------------------------------------------------------------
             # MÓDULO 5: VISUALIZAÇÃO DOS CARDÁPIOS DE PLANOS
             # --------------------------------------------------------------------------
-            st.subheader("📋 Visualização de Termos e Regras dos Planos")
+            st.sidebar.("📋 Visualização de Termos e Regras dos Planos")
                 
             st.html("""
             <div style="background-color: #161b22; padding: 20px; border-radius: 8px; border: 1px solid #30363d;">
