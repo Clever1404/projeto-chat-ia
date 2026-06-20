@@ -2151,6 +2151,21 @@ def template_painel_admin():
     dados_matches = {}
     total_salas_ativas = 0
 
+    # 🌟 CORREÇÃO: Captura o dia da semana atual em inglês e traduz para o texto do seu banco
+    import datetime
+    dia_ingles = datetime.datetime.now().strftime("%A") # Ex: "Monday", "Tuesday"...
+    
+    mapeamento_dias = {
+        "Monday": "segunda",
+        "Tuesday": "terça",
+        "Wednesday": "quarta",
+        "Thursday": "quinta",
+        "Friday": "sexta",
+        "Saturday": "sábado",
+        "Sunday": "domingo"
+    }
+    dia_atual_servidor = mapeamento_dias.get(dia_ingles, "segunda")
+
     try:
         conn = conectar_supabase()
         cursor = conn.cursor()
@@ -2160,6 +2175,7 @@ def template_painel_admin():
         usuarios_bd = cursor.fetchall()
         
         # Contador Real de Salas Virtuais Online Simultâneas (Encontros confirmados ocorrendo HOJE)
+        # 🌟 Agora 'dia_atual_servidor' existe e vai passar o parâmetro correto (ex: 'sábado') para o %s
         cursor.execute("""
             SELECT COUNT(DISTINCT match_id) FROM agendamentos_virtuais 
             WHERE status_convite = 'aceito' 
@@ -2198,30 +2214,20 @@ def template_painel_admin():
 
     # Converte a tupla de usuários em DataFrame para facilitar as plotagens de Pizza e buscas
     df_usuarios_mod = pd.DataFrame(usuarios_bd, columns=["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", "Status Presença"])
-    
-    
-        # Verifica se o DataFrame de dados brutos das salas existe e possui linhas
-        if 'df_raw_rooms' in locals() or 'df_raw_rooms' in globals():
-            if not df_raw_rooms.empty:
-                
-                # 🟢 REGRA REAL: Se a coluna 'saida_em' existe, uma sala está ativa se o encerramento estiver nulo/vazio
-                if "saida_em" in df_raw_rooms.columns:
-                    total_salas_ativas = int(df_raw_rooms["saida_em"].isna().sum())
-                    
-                # 🟡 REGRA DE BACKUP: Se não houver a coluna 'saida_em', contamos o volume total de registros recentes do dia
-                elif "criado_em" in df_raw_rooms.columns:
-                    df_raw_rooms["data_sala"] = pd.to_datetime(df_raw_rooms["criado_em"]).dt.date
-                    import datetime
-                    hoje = datetime.date.today()
-                    total_salas_ativas = int(df_raw_rooms[df_raw_rooms["data_sala"] == hoje].shape[0])
-                    
-                # 🔵 REGRA MOCK: Se estiver rodando com os dados simulados do passo anterior, força a exibição do tamanho do mock
-                if total_salas_ativas == 0 and len(df_raw_rooms) <= 4:
-                    total_salas_ativas = len(df_raw_rooms)
 
-        # Garante que o valor final seja um número inteiro válido
-        total_salas_ativas = int(total_salas_ativas)
-        # --------------------------------------------------------------
+    # --- 2. RENDERIZAÇÃO DOS CARDS DE MÉTRICAS COMPACTOS (KPIs) ---
+    c_k1, c_k2, c_k3 = st.columns(3)
+    with c_k1:
+        st.metric("Total de Perfis Cadastrados", len(df_usuarios_mod))
+    with c_k2:
+        ativos_now = len(df_usuarios_mod[df_usuarios_mod["Status Presença"].str.contains("Online", na=False)])
+        st.metric("Usuários Online Agora", ativos_now)
+    with c_k3:
+        st.metric("Salas Virtuais Ativas (Hoje)", total_salas_ativas, help="Total de salas de encontros confirmados abertas para transmissão hoje")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    
 
     # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
     aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
