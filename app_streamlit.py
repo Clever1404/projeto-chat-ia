@@ -2508,52 +2508,7 @@ def template_painel_admin():
             f"Nota: Tabela 'mensagens_sala' apresentou instabilidade ou erro na busca. {e}"
         )
 
-
-   # --------------------------------------------------------------------------
-    # 3. PROCESSAMENTO E AGREGAÇÃO DOS DADOS DE USUÁRIOS
-    # --------------------------------------------------------------------------
-    salas_query = (
-        supabase.table("usuarios")
-        .select("id", "tipo_plano", "ultima_recarga", "moedas")
-        .execute()
-    )
-
-    try:
-        if not df_users.empty:
-            # --- CÁLCULO DO GRÁFICO DE PIZZA ---
-            total_assinantes = int(
-                df_users[df_users["tipo_plano"] != "Grátis"].shape[0]
-            )
-            total_credito = int(
-                df_users[
-                    (df_users["tipo_plano"] == "Grátis")
-                     & (df_users["moedas"] > 0)
-                ].shape[0]
-            )
-            total_gratis = int(
-                df_users[
-                    (df_users["tipo_plano"] == "Grátis")
-                    & (df_users["moedas"] == 0)
-                ].shape[0]
-            )
-
-
-            # ✅ ADICIONE ESTA LINHA PARA FILTRAR OS VIPS (ajuste o termo 'vip' se o nome no banco for diferente)
-            total_vip = int(
-                df_users[df_users["tipo_plano"] == "vip"].shape[0]
-            )
-
-            total_credito = int(
-                df_users[
-                    (df_users["tipo_plano"] == "Grátis")
-                    & (df_users["moedas"] > 0)
-                ].shape[0]
-            )
-
-
-
-    except Exception as e:
-        st.error(f"Erro ao processar métricas reais: {e}")
+    
 
     # --------------------------------------------------------------------------
     # 5. RENDERIZAÇÃO DOS GRÁFICOS (MÓDULO 3)
@@ -2604,24 +2559,46 @@ def template_painel_admin():
     g1, g2 = st.columns(2)
 
     with g1:
+        # 1. Busca os dados no Supabase
         salas_query = (
-        supabase.table("usuarios")
-        .select("id", "tipo_plano", "ultima_recarga", "moedas")
-        .execute()
+            supabase.table("usuarios")
+            .select("id", "tipo_plano", "ultima_recarga", "moedas")
+            .execute()
         )
 
-        # ✅ VALIDAÇÃO TRIPLA: Evita qualquer quebra se o dataframe for nulo, vazio ou sem dados válidos
         pode_gerar_grafico = False
-        
+
+        if salas_query.data:
+            # 2. Transforma a consulta de usuários no DataFrame correto (df_creditos)
+            df_dados_brutos = pd.DataFrame(salas_query.data)
             
-        if df_creditos is not None and not df_creditos.empty:
-            if "quantidade_creditos" in df_creditos.columns and "data" in df_creditos.columns:
-                if df_creditos["quantidade_creditos"].sum() > 0:
-                    pode_gerar_grafico = True
+            # 3. Tratamento dos dados para o gráfico de linhas/pareto
+            if "ultima_recarga" in df_dados_brutos.columns and "moedas" in df_dados_brutos.columns:
+                # Remove registros onde a data de recarga está vazia/nula
+                df_filtrado = df_dados_brutos.dropna(subset=["ultima_recarga"]).copy()
+                
+                if not df_filtrado.empty:
+                    # Converte a coluna de texto para formato de Data real (ignora horas)
+                    df_filtrado["data"] = pd.to_datetime(df_filtrado["ultima_recarga"]).dt.date
+                    
+                    # Agrupa as moedas somando por dia para gerar o histórico
+                    df_creditos = (
+                        df_filtrado.groupby("data")["moedas"]
+                        .sum()
+                        .reset_index(name="quantidade_creditos")
+                    )
+                    
+                    # Ordena por data para a linha do tempo fazer sentido cronológico
+                    df_creditos = df_creditos.sort_values("data")
+                    
+                    # Valida se a soma de moedas é maior que zero
+                    if df_creditos["quantidade_creditos"].sum() > 0:
+                        pode_gerar_grafico = True
 
         if pode_gerar_grafico:
             try:
-                df_creditos["cum_sum"] = df_creditos["quantidade_creditos"].cumsum()
+                # 4. Cálculos do acumulado (Pareto)
+                df_creditos["cum_sum"] = df_creditos["quantidade_credits"].cumsum() if "quantidade_credits" in df_creditos else df_creditos["quantidade_creditos"].cumsum()
                 df_creditos["cum_percentage"] = (
                     df_creditos["cum_sum"] / df_creditos["quantidade_creditos"].sum()
                 ) * 100
@@ -2643,7 +2620,7 @@ def template_painel_admin():
                     go.Scatter(
                         x=df_creditos["data"],
                         y=df_creditos["cum_percentage"],
-                        name="% Acumulada Semanal",
+                        name="% Acumulada",
                         yaxis="y2",
                         line=dict(color="#28a745", width=3),
                     )
@@ -2651,7 +2628,7 @@ def template_painel_admin():
 
                 # Configuração segura do layout
                 fig_pareto.update_layout(
-                    title="Soma de Recargas e Tendência (Últimos 7 dias)",
+                    title="Soma de Recargas e Tendência Histórica",
                     yaxis=dict(title="Quantidade de Moedas"),
                     yaxis2=dict(
                         title="Percentual Acumulado (%)",
@@ -2667,11 +2644,10 @@ def template_painel_admin():
                 st.plotly_chart(fig_pareto, use_container_width=True)
                     
             except Exception as erro_plotly:
-                # Se mesmo com dados o Plotly falhar internamente, exibe o aviso em vez de travar a tela azul
-                st.warning("⚠️ Não foi possível renderizar o gráfico de linhas devido a uma inconsistência de dados temporária.")
+                st.warning(f"⚠️ Erro interno ao desenhar o gráfico: {erro_plotly}")
         else:
-            # Fallback visual caso o banco não retorne nenhuma recarga recente
-            st.info("ℹ️ Nenhuma atividade de recarga de moedas registrada nos últimos 7 dias.")
+            st.info("ℹ️ Nenhuma atividade de recarga de moedas registrada ou dados insuficientes.")
+
 
     with g2:
         # 1. Busca os dados no Supabase
