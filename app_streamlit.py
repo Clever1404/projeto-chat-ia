@@ -2438,9 +2438,15 @@ def template_painel_admin():
         # ✅ CORREÇÃO: Removida a coluna 'tipo_usuario' que não existe nesta tabela
         salas_query = (
             supabase.table("mensagens_sala")
-            .select("match_id", "criado_em", "saida_em")
+            .select("match_id", "criado_em", "saida_em", "tempo_de_uso")
             .execute()
         )
+
+        salas_query = (
+                    supabase.table("usuarios")
+                    .select("id", "tipo_plano", "ultima_recarga", "moedas")
+                    .execute()
+                )
 
         if rooms_data := (salas_query.data or []):
             df_raw_rooms = pd.DataFrame(rooms_data)
@@ -2467,7 +2473,7 @@ def template_painel_admin():
             # Padroniza nomes de colunas e textos para exibição visual limpa
         salas_query = (
             supabase.table("usuarios")
-            .select("id", "tipo_plano", "match_id", "tempo_de_uso", "ultima_recarga")
+            .select("id", "tipo_plano", "ultima_recarga", "moedas")
             .execute()
         )
             
@@ -2508,7 +2514,7 @@ def template_painel_admin():
     # --------------------------------------------------------------------------
     salas_query = (
         supabase.table("usuarios")
-        .select("id", "tipo_plano", "tempo_de_uso", "ultima_recarga")
+        .select("id", "tipo_plano", "ultima_recarga", "moedas")
         .execute()
     )
 
@@ -2557,7 +2563,7 @@ def template_painel_admin():
     
     salas_query = (
         supabase.table("usuarios")
-        .select("id", "tipo_plano", "tempo_de_uso", "ultima_recarga")
+        .select("id", "tipo_plano", "ultima_recarga", "moedas")
         .execute()
     )
     # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
