@@ -2675,26 +2675,34 @@ def template_painel_admin():
 
     with g2:
         # 1. Busca os dados no Supabase
+        # Se der erro de NameError em 'supabase', lembre de iniciá-lo antes: supabase = create_client(url, key)
         salas_query = supabase.table("usuarios").select("id", "tipo_plano", "moedas").execute()
 
         if salas_query.data:
             # 2. Cria o DataFrame dos usuários
             df_usuarios = pd.DataFrame(salas_query.data)
             
-            # 3. Conta os planos automaticamente
+            # 3. PADRONIZAÇÃO: Remove espaços extras e transforma tudo em minúsculo
+            df_usuarios["tipo_plano"] = df_usuarios["tipo_plano"].astype(str).str.strip().str.lower()
+            
+            # 4. Conta os planos automaticamente com base no texto padronizado
             contagem_planos = df_usuarios["tipo_plano"].value_counts()
             
-            # 4. Monta os totais para a pizza
+            # Opcional: Descomente a linha abaixo para ver no terminal exatamente como o banco está retornando os nomes
+            # print(contagem_planos)
+            
+            # 5. Monta os totais para a pizza (buscando pelos termos em minúsculo)
+            # Aqui tratamos todas as variações possíveis de escrita do banco
+            val_vip = int(contagem_planos.get("vip", 0))
+            val_credito = int(contagem_planos.get("plano crédito de moedas", 0)) + int(contagem_planos.get("plano credito de moedas", 0))
+            val_gratis = int(contagem_planos.get("grátis", 0)) + int(contagem_planos.get("gratis", 0))
+            
             df_pizza = pd.DataFrame({
-                "Categoria": ["vip", "Plano Crédito de moedas", "Grátis"],
-                "Total": [
-                    int(contagem_planos.get("vip", 0)),
-                    int(contagem_planos.get("Plano Crédito de moedas", 0)),
-                    int(contagem_planos.get("Grátis", 0))
-                ]
+                "Categoria": ["VIP", "Plano Crédito de Moedas", "Grátis"],
+                "Total": [val_vip, val_credito, val_gratis]
             })
             
-            # 5. Gera o gráfico de pizza
+            # 6. Gera o gráfico de pizza
             if df_pizza["Total"].sum() > 0:
                 cores_pizza = ["#6f42c1", "#28a745", "#007bff"]
                 fig_pizza = px.pie(
