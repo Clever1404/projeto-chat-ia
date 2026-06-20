@@ -1217,6 +1217,8 @@ def processar_match_lucy(dados_m):
 
 @st.dialog("📅 Reserva de Encontro")
 def modal_agendamento_encontro(dados_r):
+    import datetime
+    
     st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
     st.caption("A Lucy cruzará sua grade horária com a do seu par antes de validar o convite.")
     
@@ -1258,21 +1260,21 @@ def modal_agendamento_encontro(dados_r):
         parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
 
         
-        # --- CÁLCULO INTELIGENTE DA DATA (CORREÇÃO DO BUG E DO IMPORT) ---
+        # --- CÁLCULO INTELIGENTE DA DATA ---
         dias_map = {
             'Segunda-feira': 0, 'Terça-feira': 1, 'Quarta-feira': 2,
             'Quinta-feira': 3, 'Sexta-feira': 4, 'Sábado': 5, 'Domingo': 6
         }
-        # Substituído datetime.datetime.now() por dt_class.now()
-        hoje = dt_class.now()
+        
+        # Uso estrito e seguro do datetime para evitar NameError/AttributeError
+        hoje = datetime.datetime.now()
         dia_alvo = dias_map[dia_s]
         dias_de_diferenca = (dia_alvo - hoje.weekday()) % 7
 
-        # Se for o mesmo dia da semana, mas o horário escolhido já passou hoje, joga +7 dias para a frente
+        # Se for hoje, mas o horário escolhido já passou, joga para a próxima semana (+7 dias)
         if dias_de_diferenca == 0 and hor_s < hoje.time():
             dias_de_diferenca = 7
 
-        # Usando datetime.timedelta diretamente
         data_final = (hoje + datetime.timedelta(days=dias_de_diferenca)).date()
 
 
