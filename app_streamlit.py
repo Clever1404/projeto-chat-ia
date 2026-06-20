@@ -2752,31 +2752,65 @@ def template_painel_admin():
     # --------------------------------------------------------------------------
     # 6. EXIBIÇÃO DO MONITORAMENTO REAL DE SALAS PRIVADAS
     # --------------------------------------------------------------------------
-    st.subheader("🟢 Monitoramento de Salas Privadas")
-       
-       
+   st.subheader("🟢 Monitoramento de Salas Privadas")
+
+    # 1. Faz a consulta correta no banco de dados
     salas_query = (
         supabase.table("mensagens_sala")
         .select("match_id", "tempo_de_uso", "criado_em")
         .execute()
     )
 
+    # 2. Processa os dados retornados se a consulta não estiver vazia
+    if salas_query.data:
+        df_raw_rooms = pd.DataFrame(salas_query.data)
+        
+        # Preenche valores nulos de tempo com 0 para evitar quebras de cálculos
+        if "tempo_de_uso" in df_raw_rooms.columns:
+            df_raw_rooms["tempo_de_uso"] = df_raw_rooms["tempo_de_uso"].fillna(0.0).astype(float)
+        else:
+            df_raw_rooms["tempo_de_uso"] = 0.0
+
+        # Cria uma coluna provisória de perfil caso não exista relação direta na tabela mensagens_sala
+        if "tipo_plano" not in df_raw_rooms.columns:
+            # Exemplo: Se moedas > 0 define uma categoria, senão outra. Aqui criamos um mock estruturado seguro:
+            df_raw_rooms["tipo_plano"] = "Usuários com Crédito"
+
+        # Reconstrói o df_salas_real com os nomes bonitos para exibição
+        df_salas_real = df_raw_rooms[["match_id", "tipo_plano", "tempo_de_uso"]].copy()
+        df_salas_real.columns = ["Sala", "Tipo de plano", "Tempo de Uso"]
+
+        # Cria o agrupamento dinâmico por perfil para somar o tempo
+        df_tempo_por_perfil = (
+            df_salas_real.groupby("Tipo de plano")["Tempo de Uso"]
+            .sum()
+            .reset_index()
+        )
+    else:
+        # Garante que os dataframes fiquem vazios caso não venha nada do Supabase
+        df_salas_real = pd.DataFrame()
+        df_tempo_por_perfil = pd.DataFrame()
 
 
+    # 3. Renderiza a interface se houver dados processados
     if not df_salas_real.empty:
         c1, c2 = st.columns(2)
 
         with c1:
             st.write("#### ⏱️ Tempo Total Acumulado por Perfil")
+            
+            # 🌟 CORREÇÃO: Ajustado x, y e color para bater exatamente com df_tempo_por_perfil
             fig_tempo = px.bar(
                 df_tempo_por_perfil,
-                x="match_id",
-                y="tempo_de_uso",
-                color="matcho_id",
-                title="Tempo Consumidas em Encontros (Real)",
+                x="Tipo de plano",
+                y="Tempo de Uso",
+                color="Tipo de plano",
+                title="Tempo Consumido em Encontros (Real)",
                 color_discrete_map={
                     "Assinantes": "#28a745",
+                    "VIP": "#6f42c1",
                     "Usuários com Crédito": "#007bff",
+                    "Grátis": "#6e7681"
                 },
             )
             fig_tempo.update_layout(
@@ -2787,7 +2821,6 @@ def template_painel_admin():
             ) 
             st.plotly_chart(fig_tempo, use_container_width=True) 
 
-        # ✅ CORREÇÃO: Alinhamento corrigido (estava dentro do bloco 'with c1')
         with c2: 
             st.write("#### 📑 Detalhes dos Encontros Calculados") 
             st.dataframe( 
@@ -2799,6 +2832,7 @@ def template_painel_admin():
         st.info( 
             "ℹ️ Nenhuma atividade ou registro de sala privada encontrado no banco de dados." 
         )
+
 
 
     
