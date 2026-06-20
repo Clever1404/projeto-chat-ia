@@ -1819,6 +1819,10 @@ def renderizar_listas_sidebar_e_acoes():
         except Exception as e:
             st.error(f"Erro ao carregar dados do banco: {e}")
 
+        # 🔄 SALVANDO CORRETAMENTE NA SESSÃO GLOBAL:
+        st.session_state["tipo_plano"] = tipo_plano
+        st.session_state["saldo_moedas"] = saldo_moedas
+
         # Exibe na tela com as variáveis atualizadas e corretas
         st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
 
@@ -2016,9 +2020,12 @@ def template_gerenciar_conexoes_completo():
     aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
     meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
 
-    # 🔴 CORREÇÃO DA REGRA DE NEGÓCIO:
-    plano_atual = str(st.session_state.get("tipo_plano", "Grátis")).strip()
-    bloquear_botoes = "Grátis" in plano_atual or "grátis" in plano_atual
+    # 🔴 REGRA DE NEGÓCIO ATUALIZADA
+    plano_atual = str(st.session_state.get("tipo_plano", "Grátis")).strip().lower()
+    
+    # Bloqueia APENAS se o plano for "grátis" ou "gratis".
+    # Usuários "vip" ou "plano crédito de moedas" vão passar direto!
+    bloquear_botoes = "grat" in plano_atual
 
     with aba_m:
         st.markdown("### 👥 Suas Afinidades")
