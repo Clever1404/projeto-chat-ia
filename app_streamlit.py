@@ -2674,46 +2674,42 @@ def template_painel_admin():
             st.info("ℹ️ Nenhuma atividade de recarga de moedas registrada nos últimos 7 dias.")
 
     with g2:
-        import plotly.express as px
+        # 1. Busca os dados no Supabase
+        salas_query = supabase.table("usuarios").select("id", "tipo_plano", "moedas").execute()
 
-        salas_query = (
-        supabase.table("usuarios")
-        .select("id", "tipo_plano", "ultima_recarga", "moedas")
-        .execute()
-        )
-
-
-        total_vip, total_Plano_Crédito_de_Moedas, total_Grátis = 0, 0, 0
-
-        # Limpeza segura de tipos para evitar falhas de tuplas
-        val_vip = int(total_vip) if isinstance(total_vip, tuple) else int(total_vip) # ✅ Agora não dará NameError!
-        val_Plano_Crédito_de_Moedas = int(total_Plano_Crédito_de_Moedas) if isinstance(total_Plano_Crédito_de_Moedas, tuple) else int(total_Plano_Crédito_de_Moedas)
-        val_Grátis = int(total_Grátis) if isinstance(total_Grátis, tuple) else int(total_Grátis)
-
-        df_pizza = pd.DataFrame(
-            {
+        if salas_query.data:
+            # 2. Cria o DataFrame dos usuários
+            df_usuarios = pd.DataFrame(salas_query.data)
+            
+            # 3. Conta os planos automaticamente
+            contagem_planos = df_usuarios["tipo_plano"].value_counts()
+            
+            # 4. Monta os totais para a pizza
+            df_pizza = pd.DataFrame({
                 "Categoria": ["vip", "Plano Crédito de moedas", "Grátis"],
-                "Total": [val_vip, val_Plano_Crédito_de_Moedas, val_Grátis],
-            }
-        )
-        
-        if df_pizza["Total"].sum() > 0:
-            # Adicionada uma cor roxa (#6f42c1) para representar a categoria VIP
-            cores_pizza = ["#28a745", "#6f42c1", "#007bff", "#6e7681"]
-            fig_pizza = px.pie(
-                df_pizza,
-                values="Total",
-                names="Categoria",
-                title="Distribuição de Perfis de Usuários",
-                color_discrete_sequence=cores_pizza,
-            )
-            fig_pizza.update_layout(
-                template="plotly_dark",
-                paper_bgcolor="#161b22",
-            )
-            st.plotly_chart(fig_pizza, use_container_width=True)
+                "Total": [
+                    int(contagem_planos.get("vip", 0)),
+                    int(contagem_planos.get("Plano Crédito de moedas", 0)),
+                    int(contagem_planos.get("Grátis", 0))
+                ]
+            })
+            
+            # 5. Gera o gráfico de pizza
+            if df_pizza["Total"].sum() > 0:
+                cores_pizza = ["#6f42c1", "#28a745", "#007bff"]
+                fig_pizza = px.pie(
+                    df_pizza, values="Total", names="Categoria",
+                    title="Distribuição de Perfis de Usuários",
+                    color_discrete_sequence=cores_pizza
+                )
+                fig_pizza.update_layout(template="plotly_dark", paper_bgcolor="#161b22")
+                st.plotly_chart(fig_pizza, use_container_width=True)
+            else:
+                st.info("ℹ️ Nenhum dado de perfil disponível para gerar a distribuição.")
         else:
-            st.info("ℹ️ Nenhum dado de perfil disponível para gerar a distribuição.")    
+            st.warning("⚠️ Não foi possível recuperar dados do banco.")
+
+
 
     st.markdown("---")
 
