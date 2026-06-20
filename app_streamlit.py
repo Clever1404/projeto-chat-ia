@@ -1351,7 +1351,7 @@ def modal_agendamento_encontro(dados_r):
 @st.fragment(run_every=5.0)
 def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int):
     tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
-    tempo_limite_segundos = 15  # Limite inicial de 10 minutos (600 segundos)
+    tempo_limite_segundos = 600  # Limite inicial de 10 minutos (600 segundos)
     tempo_restante = tempo_limite_segundos - tempo_decorrido
 
     if tempo_restante > 0:
@@ -2388,14 +2388,14 @@ def template_painel_admin():
     )
     df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
     df_salas_real = pd.DataFrame(
-        columns=["Sala", "Tempo de Uso (Horas)"]
+        columns=["match_id", "tempo_de_uso"]
     )
     df_tempo_por_perfil = pd.DataFrame(
-        columns=["Tempo de Uso (Horas)"]
+        columns=["tempo_de_uso"]
     )
 
-    total_assinantes, total_credito, total_gratis = 0, 0, 0
-    total_vip = 0
+    total_vip, total_Plano_Credito_de_Moedas, total_Grátis = 0, 0, 0
+    
 
     dias_semana_pt = {
         "Monday": "Segunda",
@@ -2438,7 +2438,7 @@ def template_painel_admin():
         # ✅ CORREÇÃO: Removida a coluna 'tipo_usuario' que não existe nesta tabela
         salas_query = (
             supabase.table("mensagens_sala")
-            .select("nome_sala", "entrada_em", "saida_em")
+            .select("match_id", "criado_em", "saida_em")
             .execute()
         )
 
@@ -2449,8 +2449,8 @@ def template_painel_admin():
             df_raw_rooms["tipo_usuario"] = "Não Identificado"
 
             # Converte os timestamps do Supabase para formato legível de data/hora
-            df_raw_rooms["entrada_em"] = pd.to_datetime(
-                df_raw_rooms["entrada_em"], utc=True
+            df_raw_rooms["criado_em"] = pd.to_datetime(
+                df_raw_rooms["criado_em"], utc=True
             )
             df_raw_rooms["saida_em"] = pd.to_datetime(
                 df_raw_rooms["saida_em"], utc=True
@@ -2473,18 +2473,18 @@ def template_painel_admin():
             )
 
             df_salas_real = df_raw_rooms[
-                ["match_id", "tipo_plano", "tempo_de_uso (min)"]
+                ["match_id", "tipo_plano", "tempo_de_uso"]
             ].copy()
             df_salas_real.columns = [
                 "Sala",
                 "Tipo de plano",
-                "Tempo de Uso (min)",
+                "Tempo de Uso",
             ]
 
             # Agrupa dinamicamente o somatório de horas por perfil de cliente
             df_tempo_por_perfil = (
                 df_salas_real.groupby("Tipo de plano")[
-                    "Tempo de Uso (Horas)"
+                    "Tempo de Uso"
                 ]
                 .sum()
                 .reset_index()
@@ -2525,7 +2525,7 @@ def template_painel_admin():
 
             total_credito = int(
                 df_users[
-                    (df_users["tipo_plano"] == "grátis")
+                    (df_users["tipo_plano"] == "Grátis")
                     & (df_users["moedas"] > 0)
                 ].shape[0]
             )
@@ -2642,15 +2642,14 @@ def template_painel_admin():
         import plotly.express as px
 
         # Limpeza segura de tipos para evitar falhas de tuplas
-        val_assinantes = int(total_assinantes) if isinstance(total_assinantes, tuple) else int(total_assinantes)
         val_vip = int(total_vip) if isinstance(total_vip, tuple) else int(total_vip) # ✅ Agora não dará NameError!
         val_credito = int(total_credito) if isinstance(total_credito, tuple) else int(total_credito)
         val_gratis = int(total_gratis) if isinstance(total_gratis, tuple) else int(total_gratis)
 
         df_pizza = pd.DataFrame(
             {
-                "Categoria": ["Assinantes", "VIP", "Com Créditos", "Grátis"],
-                "Total": [val_assinantes, val_vip, val_credito, val_gratis],
+                "Categoria": ["vip", "Plano Crédito de moedas", "Grátis"],
+                "Total": [val_vip, val_Plano_Crédito_de_Moedas, val_Grátis],
             }
         )
         
