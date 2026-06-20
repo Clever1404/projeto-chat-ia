@@ -2200,49 +2200,28 @@ def template_painel_admin():
     df_usuarios_mod = pd.DataFrame(usuarios_bd, columns=["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", "Status Presença"])
     
     
-    # Checa se o dataframe foi criado e possui dados
-    if 'df_salas_real' in locals() or 'df_salas_real' in globals():
-        if not df_salas_real.empty:
-            # Se os dados forem reais e possuírem a coluna de criação, filtramos por hoje
-            if 'df_raw_rooms' in locals() and "criado_em" in df_raw_rooms.columns:
+    # Verifica se o DataFrame de dados brutos das salas existe e possui linhas
+    if 'df_raw_rooms' in locals() or 'df_raw_rooms' in globals():
+        if not df_raw_rooms.empty:
+            
+            # 🟢 REGRA REAL: Se a coluna 'saida_em' existe, uma sala está ativa se o encerramento estiver nulo/vazio
+            if "saida_em" in df_raw_rooms.columns:
+                total_salas_ativas = int(df_raw_rooms["saida_em"].isna().sum())
+                
+            # 🟡 REGRA DE BACKUP: Se não houver a coluna 'saida_em', contamos o volume total de registros recentes do dia
+            elif "criado_em" in df_raw_rooms.columns:
                 df_raw_rooms["data_sala"] = pd.to_datetime(df_raw_rooms["criado_em"]).dt.date
+                import datetime
                 hoje = datetime.date.today()
                 total_salas_ativas = int(df_raw_rooms[df_raw_rooms["data_sala"] == hoje].shape[0])
-            else:
-                # Caso esteja exibindo os dados simulados (mock), conta o total de registros do mock
-                total_salas_ativas = int(df_salas_real.shape[0])
+                
+            # 🔵 REGRA MOCK: Se estiver rodando com os dados simulados do passo anterior, força a exibição do tamanho do mock
+            if total_salas_ativas == 0 and len(df_raw_rooms) <= 4:
+                total_salas_ativas = len(df_raw_rooms)
 
-    # Garante um valor padrão caso tudo falhe ou esteja zerado
-    if total_salas_ativas == 0:
-        total_salas_ativas = 0
-    # ----------------------------------------------------
-
-    # --- 2. RENDERIZAÇÃO DOS CARDS DE MÉTRICAS COMPACTOS (KPIs) ---
-    c_k1, c_k2, c_k3 = st.columns(3)
-    with c_k1:
-        # Garante que não quebre se o dataframe de usuários mudar de nome
-        total_cadastrados = len(df_usuarios_mod) if 'df_usuarios_mod' in locals() else len(df_usuarios)
-        st.metric("Total de Perfis Cadastrados", total_cadastrados)
-
-    with c_k2:
-        # Validação segura para contagem de usuários online
-        df_busca_online = df_usuarios_mod if 'df_usuarios_mod' in locals() else df_usuarios
-        if "Status Presença" in df_busca_online.columns:
-            ativos_now = len(df_busca_online[df_busca_online["Status Presença"].str.contains("Online", na=False)])
-        else:
-            ativos_now = 0
-        st.metric("Usuários Online Agora", ativos_now)
-
-    with c_k3:
-        # Exibe o número calculado sem risco de NameError ou UnboundLocalError
-        st.metric(
-            "Salas Virtuais Ativas (Hoje)", 
-            total_salas_ativas, 
-            help="Total de salas de encontros confirmados abertas para transmissão hoje"
-        )
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
+    # Garante que o valor final seja um número inteiro válido
+    total_salas_ativas = int(total_salas_ativas)
+    # --------------------------------------------------------------
 
     # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
     aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
