@@ -2626,7 +2626,7 @@ def template_painel_admin():
                     )
                 )
 
-                # Configuração segura do layout
+                # Configuração segura do layout (Linhas finais do seu gráfico)
                 fig_pareto.update_layout(
                     title="Soma de Recargas e Tendência Histórica",
                     yaxis=dict(title="Quantidade de Moedas"),
@@ -2639,9 +2639,12 @@ def template_painel_admin():
                     template="plotly_dark",
                     paper_bgcolor="#161b22",
                     plot_bgcolor="#161b22",
-                    legend=dict(orient="h", y=1.1),
+                    
+                    # 🌟 CORREÇÃO AQUI: Mudado de 'orient' para 'orientation'
+                    legend=dict(orientation="h", y=1.1), 
                 )
                 st.plotly_chart(fig_pareto, use_container_width=True)
+
                     
             except Exception as erro_plotly:
                 st.warning(f"⚠️ Erro interno ao desenhar o gráfico: {erro_plotly}")
