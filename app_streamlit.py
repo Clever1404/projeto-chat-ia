@@ -2508,7 +2508,7 @@ def template_painel_admin():
     # --------------------------------------------------------------------------
     salas_query = (
         supabase.table("usuarios")
-        .select("id", "tipo_plano", "match_id", "tempo_de_uso", "ultima_recarga")
+        .select("id", "tipo_plano", "tempo_de_uso", "ultima_recarga")
         .execute()
     )
 
@@ -2557,7 +2557,7 @@ def template_painel_admin():
     
     salas_query = (
         supabase.table("usuarios")
-        .select("id", "tipo_plano", "match_id", "tempo_de_uso", "ultima_recarga")
+        .select("id", "tipo_plano", "tempo_de_uso", "ultima_recarga")
         .execute()
     )
     # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
