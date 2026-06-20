@@ -2569,66 +2569,81 @@ def template_painel_admin():
         pode_gerar_grafico = False
 
         if salas_query.data:
-            # 2. Transforma a consulta de usuários no DataFrame correto (df_creditos)
             df_dados_brutos = pd.DataFrame(salas_query.data)
             
-            # 3. Tratamento dos dados para o gráfico de linhas/pareto
             if "ultima_recarga" in df_dados_brutos.columns and "moedas" in df_dados_brutos.columns:
-                # Remove registros onde a data de recarga está vazia/nula
                 df_filtrado = df_dados_brutos.dropna(subset=["ultima_recarga"]).copy()
                 
                 if not df_filtrado.empty:
-                    # Converte a coluna de texto para formato de Data real (ignora horas)
+                    # Converte para data real
                     df_filtrado["data"] = pd.to_datetime(df_filtrado["ultima_recarga"]).dt.date
                     
-                    # Agrupa as moedas somando por dia para gerar o histórico
+                    # Agrupa moedas por dia
                     df_creditos = (
                         df_filtrado.groupby("data")["moedas"]
                         .sum()
                         .reset_index(name="quantidade_creditos")
                     )
                     
-                    # Ordena por data para a linha do tempo fazer sentido cronológico
+                    # Ordena por data antes de calcular o dia da semana
                     df_creditos = df_creditos.sort_values("data")
                     
-                    # Valida se a soma de moedas é maior que zero
+                    # --- TRATAMENTO DOS DIAS DA SEMANA EM PORTUGUÊS ---
+                    # Converte a coluna agrupada para datetime para extrair o nome do dia
+                    df_creditos["data_dt"] = pd.to_datetime(df_creditos["data"])
+                    
+                    # Mapeamento de inglês (padrão do pandas) para português
+                    dias_pt = {
+                        "Monday": "Segunda",
+                        "Tuesday": "Terça",
+                        "Wednesday": "Quarta",
+                        "Thursday": "Quinta",
+                        "Friday": "Sexta",
+                        "Saturday": "Sábado",
+                        "Sunday": "Domingo"
+                    }
+                    
+                    # Cria a nova coluna com os nomes em português
+                    df_creditos["dia_semana"] = df_creditos["data_dt"].dt.day_name().map(dias_pt)
+                    # --------------------------------------------------
+
                     if df_creditos["quantidade_creditos"].sum() > 0:
                         pode_gerar_grafico = True
 
         if pode_gerar_grafico:
             try:
-                # 4. Cálculos do acumulado (Pareto)
-                df_creditos["cum_sum"] = df_creditos["quantidade_credits"].cumsum() if "quantidade_credits" in df_creditos else df_creditos["quantidade_creditos"].cumsum()
+                # Cálculos do acumulado da semana
+                df_creditos["cum_sum"] = df_creditos["quantidade_creditos"].cumsum()
                 df_creditos["cum_percentage"] = (
                     df_creditos["cum_sum"] / df_creditos["quantidade_creditos"].sum()
                 ) * 100
 
                 fig_pareto = go.Figure()
                     
-                # Barras de volume individual
+                # Barras de volume individual usando 'dia_semana' no eixo X
                 fig_pareto.add_trace(
                     go.Bar(
-                        x=df_creditos["data"],
+                        x=df_creditos["dia_semana"],
                         y=df_creditos["quantidade_creditos"],
                         name="Recargas no Dia",
                         marker_color="#007bff",
                     )
                 )
                     
-                # Linha de tendência acumulada
+                # Linha de tendência acumulada usando 'dia_semana' no eixo X
                 fig_pareto.add_trace(
                     go.Scatter(
-                        x=df_creditos["data"],
+                        x=df_creditos["dia_semana"],
                         y=df_creditos["cum_percentage"],
-                        name="% Acumulada",
+                        name="% Acumulada da Semana",
                         yaxis="y2",
                         line=dict(color="#28a745", width=3),
                     )
                 )
 
-                # Configuração segura do layout (Linhas finais do seu gráfico)
+                # Configuração segura do layout
                 fig_pareto.update_layout(
-                    title="Soma de Recargas e Tendência Histórica",
+                    title="Soma de Recargas e Tendência Acumulada Semanal",
                     yaxis=dict(title="Quantidade de Moedas"),
                     yaxis2=dict(
                         title="Percentual Acumulado (%)",
@@ -2639,17 +2654,14 @@ def template_painel_admin():
                     template="plotly_dark",
                     paper_bgcolor="#161b22",
                     plot_bgcolor="#161b22",
-                    
-                    # 🌟 CORREÇÃO AQUI: Mudado de 'orient' para 'orientation'
                     legend=dict(orientation="h", y=1.1), 
                 )
                 st.plotly_chart(fig_pareto, use_container_width=True)
-
                     
             except Exception as erro_plotly:
                 st.warning(f"⚠️ Erro interno ao desenhar o gráfico: {erro_plotly}")
         else:
-            st.info("ℹ️ Nenhuma atividade de recarga de moedas registrada ou dados insuficientes.")
+            st.info("ℹ️ Nenhuma atividade de recarga registrada para esta semana.")
 
 
     with g2:
