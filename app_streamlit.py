@@ -2020,12 +2020,16 @@ def template_gerenciar_conexoes_completo():
     aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
     meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
 
-    # 🔴 REGRA DE NEGÓCIO ATUALIZADA
-    plano_atual = str(st.session_state.get("tipo_plano", "Grátis")).strip().lower()
-    
-    # Bloqueia APENAS se o plano for "grátis" ou "gratis".
-    # Usuários "vip" ou "plano crédito de moedas" vão passar direto!
-    bloquear_botoes = "grat" in plano_atual
+   # 🔴 NOVA REGRA ULTRA SEGURA:
+    # Captura o plano, remove espaços e coloca tudo em letras minúsculas
+    plano_atual = str(st.session_state.get("tipo_plano", "grátis")).strip().lower()
+
+    # Verifica se o usuário possui um dos planos válidos para acesso
+    usuario_tem_acesso = (plano_atual == "vip") or ("crédito" in plano_atual) or ("credito" in plano_atual)
+
+    # O botão será bloqueado SE o usuário NÃO tiver acesso
+    bloquear_botoes = not usuario_tem_acesso
+
 
     with aba_m:
         st.markdown("### 👥 Suas Afinidades")
