@@ -2472,30 +2472,30 @@ def template_painel_admin():
         )
             
    
-            df_raw_rooms["tipo_plano"] = (
-                df_raw_rooms["tipo_plano"]
-                .astype(str)
-                .str.replace("vip", "VIP")
-                .str.replace("Plano_Crédito_de_Moedas", "Plano_Crédito_de_Moeda")
-            )
+        df_raw_rooms["tipo_plano"] = (
+            df_raw_rooms["tipo_plano"]
+            .stype(str)
+            .str.replace("vip", "VIP")
+            .str.replace("Plano_Crédito_de_Moedas", "Plano_Crédito_de_Moeda")
+        )
 
-            df_salas_real = df_raw_rooms[
-                ["match_id", "tipo_plano", "tempo_de_uso"]
-            ].copy()
-            df_salas_real.columns = [
-                "Sala",
-                "Tipo de plano",
-                "Tempo de Uso",
+        df_salas_real = df_raw_rooms[
+            ["match_id", "tipo_plano", "tempo_de_uso"]
+        ].copy()
+        df_salas_real.columns = [
+            "Sala",
+            "Tipo de plano",
+            "Tempo de Uso",
+        ]
+
+        # Agrupa dinamicamente o somatório de horas por perfil de cliente
+        df_tempo_por_perfil = (
+            df_salas_real.groupby("Tipo de plano")[
+                "Tempo de Uso"
             ]
-
-            # Agrupa dinamicamente o somatório de horas por perfil de cliente
-            df_tempo_por_perfil = (
-                df_salas_real.groupby("Tipo de plano")[
-                    "Tempo de Uso"
-                ]
-                .sum()
-                .reset_index()
-            )
+            .sum()
+            .reset_index()
+        )
 
     except Exception as e:
         st.warning(
@@ -2560,40 +2560,40 @@ def template_painel_admin():
         .select("id", "tipo_plano", "match_id", "tempo_de_uso", "ultima_recarga")
         .execute()
     )
-            # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
-            if "ultima_recarga" in df_users.columns:
-                # Remove linhas com datas nulas antes de agrupar
-                df_users_filtrado = df_users.dropna(subset=["ultima_recarga"])
+    # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
+    if "ultima_recarga" in df_users.columns:
+        # Remove linhas com datas nulas antes de agrupar
+        df_users_filtrado = df_users.dropna(subset=["ultima_recarga"])
                     
-                df_agrupado = (
-                    df_users_filtrado.groupby(df_users_filtrado["ultima_recarga"].dt.date)["moedas"]
-                    .sum()
-                    .reset_index()
-                )
-                df_agrupado.columns = ["data", "quantidade_creditos"]
-                df_agrupado["data"] = pd.to_datetime(df_agrupado["data"])
+        df_agrupado = (
+            df_users_filtrado.groupby(df_users_filtrado["ultima_recarga"].dt.date)["moedas"]
+            .sum()
+            .reset_index()
+        )
+        df_agrupado.columns = ["data", "quantidade_creditos"]
+        df_agrupado["data"] = pd.to_datetime(df_agrupado["data"])
 
-                # Filtra os últimos 7 dias com base na data atual
-                hoje = pd.Timestamp(datetime.now().date())
-                ha_uma_semana = hoje - pd.Timedelta(days=7)
-                df_creditos = df_agrupado[
-                    (df_agrupado["data"] >= ha_uma_semana)
-                    & (df_agrupado["data"] <= hoje)
-                ].copy()
+        # Filtra os últimos 7 dias com base na data atual
+        hoje = pd.Timestamp(datetime.now().date())
+        ha_uma_semana = hoje - pd.Timedelta(days=7)
+        df_creditos = df_agrupado[
+            (df_agrupado["data"] >= ha_uma_semana)
+            & (df_agrupado["data"] <= hoje)
+        ].copy()
 
-                if not df_creditos.empty:
-                    # Transforma a data no nome do dia da semana (ex: 'Monday' -> 'Segunda')
-                    df_creditos["dia_nome_en"] = df_creditos[
-                        "data"
-                    ].dt.day_name()
-                    df_creditos["data"] = df_creditos["dia_nome_en"].map(
-                        dias_semana_pt
-                    )
+        if not df_creditos.empty:
+            # Transforma a data no nome do dia da semana (ex: 'Monday' -> 'Segunda')
+            df_creditos["dia_nome_en"] = df_creditos[
+                "data"
+            ].dt.day_name()
+            df_creditos["data"] = df_creditos["dia_nome_en"].map(
+                    dias_semana_pt
+            )
 
-                    # Ordena os dias cronologicamente de acordo com a semana real
-                    df_creditos = df_creditos.sort_values(
+            # Ordena os dias cronologicamente de acordo com a semana real
+            df_creditos = df_creditos.sort_values(
                         by="quantidade_creditos", ascending=False
-                    )
+            )
 
     g1, g2 = st.columns(2)
 
