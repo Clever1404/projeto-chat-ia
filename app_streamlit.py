@@ -2016,6 +2016,12 @@ def template_gerenciar_conexoes_completo():
     aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
     meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
 
+    # 🔴 REGRA DE NEGÓCIO: Define se os botões devem ser desativados
+    # Altere 'plano_usuario' para a chave exata que você usa no seu session_state
+    plano_atual = st.session_state.get("tipo_plano", "Grátis")
+    bloquear_botoes = (plano_atual == "Grátis")
+
+
     with aba_m:
         st.markdown("### 👥 Suas Afinidades")
         matches_dados = []
@@ -2047,7 +2053,8 @@ def template_gerenciar_conexoes_completo():
                     st.markdown(f"<p style='font-size:15px; font-weight:bold; margin-top:5px; color:#f0f6fc;'>{str(m_nome).split('@')[0].capitalize()}</p>", unsafe_allow_html=True)
                     
                 with c_go_c:
-                    if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", use_container_width=True):
+                    if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
+                        help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
                         st.session_state.match_id_atual = m_id
                         st.session_state.opcao_menu = "🤝 Sala Privada"; st.rerun()
                         
@@ -2096,10 +2103,13 @@ def template_gerenciar_conexoes_completo():
                         st.caption(f"Status: {status.upper()}")
                     with col_b:
                         if status == 'pendente' and not eu_enviei:
-                            if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True):
+                            if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
+                                help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
                                 conn = conectar_supabase(); cursor = conn.cursor(); cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,)); conn.commit(); cursor.close(); conn.close(); st.rerun()
                         elif status == 'aceito':
-                            if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True):
+                            if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
+                                help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None
+                            ):
                                 st.session_state.match_id_atual = m_id
                                 st.session_state.opcao_menu = "🤝 Sala Privada"
                                 st.rerun()
