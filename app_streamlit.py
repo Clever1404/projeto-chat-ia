@@ -1282,7 +1282,7 @@ def modal_agendamento_encontro(dados_r):
         parceiro_registro_existe = False
         parceiro_tem_algum_horario = False
         
-       try:
+        try:
             conn_check = conectar_supabase()
             cursor_check = conn_check.cursor()
             
@@ -1316,7 +1316,7 @@ def modal_agendamento_encontro(dados_r):
         except Exception as e:
             st.error(f"Erro ao consultar disponibilidade: {e}")
 
-            
+
         # --- 3. EXECUÇÃO DAS TRAVAS E PERSISTÊNCIA COMPLETA ---
         if per_s == 'manha' and (hora_int < 6 or hora_int >= 12):
             st.error("❌ Horário inválido! Para o período da manhã, ajuste entre **06:00 e 11:59**.")
