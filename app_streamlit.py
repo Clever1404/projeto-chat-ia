@@ -2200,28 +2200,28 @@ def template_painel_admin():
     df_usuarios_mod = pd.DataFrame(usuarios_bd, columns=["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", "Status Presença"])
     
     
-    # Verifica se o DataFrame de dados brutos das salas existe e possui linhas
-    if 'df_raw_rooms' in locals() or 'df_raw_rooms' in globals():
-        if not df_raw_rooms.empty:
-            
-            # 🟢 REGRA REAL: Se a coluna 'saida_em' existe, uma sala está ativa se o encerramento estiver nulo/vazio
-            if "saida_em" in df_raw_rooms.columns:
-                total_salas_ativas = int(df_raw_rooms["saida_em"].isna().sum())
+        # Verifica se o DataFrame de dados brutos das salas existe e possui linhas
+        if 'df_raw_rooms' in locals() or 'df_raw_rooms' in globals():
+            if not df_raw_rooms.empty:
                 
-            # 🟡 REGRA DE BACKUP: Se não houver a coluna 'saida_em', contamos o volume total de registros recentes do dia
-            elif "criado_em" in df_raw_rooms.columns:
-                df_raw_rooms["data_sala"] = pd.to_datetime(df_raw_rooms["criado_em"]).dt.date
-                import datetime
-                hoje = datetime.date.today()
-                total_salas_ativas = int(df_raw_rooms[df_raw_rooms["data_sala"] == hoje].shape[0])
-                
-            # 🔵 REGRA MOCK: Se estiver rodando com os dados simulados do passo anterior, força a exibição do tamanho do mock
-            if total_salas_ativas == 0 and len(df_raw_rooms) <= 4:
-                total_salas_ativas = len(df_raw_rooms)
+                # 🟢 REGRA REAL: Se a coluna 'saida_em' existe, uma sala está ativa se o encerramento estiver nulo/vazio
+                if "saida_em" in df_raw_rooms.columns:
+                    total_salas_ativas = int(df_raw_rooms["saida_em"].isna().sum())
+                    
+                # 🟡 REGRA DE BACKUP: Se não houver a coluna 'saida_em', contamos o volume total de registros recentes do dia
+                elif "criado_em" in df_raw_rooms.columns:
+                    df_raw_rooms["data_sala"] = pd.to_datetime(df_raw_rooms["criado_em"]).dt.date
+                    import datetime
+                    hoje = datetime.date.today()
+                    total_salas_ativas = int(df_raw_rooms[df_raw_rooms["data_sala"] == hoje].shape[0])
+                    
+                # 🔵 REGRA MOCK: Se estiver rodando com os dados simulados do passo anterior, força a exibição do tamanho do mock
+                if total_salas_ativas == 0 and len(df_raw_rooms) <= 4:
+                    total_salas_ativas = len(df_raw_rooms)
 
-    # Garante que o valor final seja um número inteiro válido
-    total_salas_ativas = int(total_salas_ativas)
-    # --------------------------------------------------------------
+        # Garante que o valor final seja um número inteiro válido
+        total_salas_ativas = int(total_salas_ativas)
+        # --------------------------------------------------------------
 
     # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
     aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
