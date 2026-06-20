@@ -2176,15 +2176,16 @@ def template_painel_admin():
         
         # 2. CORREÇÃO REQUISITADA: Conta as salas reais que estão ativas na tabela do Supabase
         # Filtra registros que possuem 'match_id' válido e que a coluna de término da sala (ex: 'saida_em') esteja em branco (vazia/NULL)
+        # 2. CORREÇÃO DEFINITIVA: Removido o TRIM() da coluna Timestamp
         cursor.execute("""
             SELECT COUNT(DISTINCT match_id) 
             FROM mensagens_sala 
             WHERE match_id IS NOT NULL 
-              AND (saida_em IS NULL OR TRIM(saida_em) = '');
+              AND saida_em IS NULL;
         """)
         total_salas_ativas = cursor.fetchone()[0]
 
-        # Tratamento de segurança caso o banco retorne None
+        # Tratamento de segurança secundário
         if total_salas_ativas is None:
             total_salas_ativas = 0
 
