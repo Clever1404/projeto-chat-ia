@@ -2016,11 +2016,9 @@ def template_gerenciar_conexoes_completo():
     aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
     meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
 
-    # 🔴 REGRA DE NEGÓCIO: Define se os botões devem ser desativados
-    # Altere 'plano_usuario' para a chave exata que você usa no seu session_state
-    plano_atual = st.session_state.get("tipo_plano", "Grátis")
-    bloquear_botoes = (plano_atual == "Grátis")
-
+    # 🔴 CORREÇÃO DA REGRA DE NEGÓCIO:
+    plano_atual = str(st.session_state.get("tipo_plano", "Grátis")).strip()
+    bloquear_botoes = "Grátis" in plano_atual or "grátis" in plano_atual
 
     with aba_m:
         st.markdown("### 👥 Suas Afinidades")
