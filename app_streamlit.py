@@ -1258,12 +1258,13 @@ def modal_agendamento_encontro(dados_r):
         parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
 
         
-        # --- CÁLCULO INTELIGENTE DA DATA (CORREÇÃO DO BUG DO PASSADO) ---
+        # --- CÁLCULO INTELIGENTE DA DATA (CORREÇÃO DO BUG E DO IMPORT) ---
         dias_map = {
             'Segunda-feira': 0, 'Terça-feira': 1, 'Quarta-feira': 2,
             'Quinta-feira': 3, 'Sexta-feira': 4, 'Sábado': 5, 'Domingo': 6
         }
-        hoje = datetime.datetime.now()
+        # Substituído datetime.datetime.now() por dt_class.now()
+        hoje = dt_class.now()
         dia_alvo = dias_map[dia_s]
         dias_de_diferenca = (dia_alvo - hoje.weekday()) % 7
 
@@ -1271,7 +1272,7 @@ def modal_agendamento_encontro(dados_r):
         if dias_de_diferenca == 0 and hor_s < hoje.time():
             dias_de_diferenca = 7
 
-        # Variável gerada: guarda o formato YYYY-MM-DD da próxima data real válida
+        # Usando datetime.timedelta diretamente
         data_final = (hoje + datetime.timedelta(days=dias_de_diferenca)).date()
 
 
