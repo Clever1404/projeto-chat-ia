@@ -2400,191 +2400,7 @@ def template_painel_admin():
     st.markdown("### 👑 Painel de Controle do Administrador")
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Importações essenciais exigidas para o módulo do Plotly funcionar
-    from datetime import datetime
-    import plotly.graph_objects as go
-
-    df_users = pd.DataFrame(columns=["id", "tipo_plano", "moedas", "ultima_recarga"])
-    df_creditos = pd.DataFrame(columns=["data", "quantidade_creditos"])
-    df_salas_real = pd.DataFrame(columns=["match_id", "tempo_de_uso"])
-    df_tempo_por_perfil = pd.DataFrame(columns=["tempo_de_uso"])
-
-    total_vip, total_Plano_Crédito_de_Moedas, total_Grátis = 0, 0, 0
-
-    dias_semana_pt = {
-        "Monday": "Segunda",
-        "Tuesday": "Terça",
-        "Wednesday": "Quarta",
-        "Thursday": "Quinta",
-        "Friday": "Sexta",
-        "Saturday": "Sábado",
-        "Sunday": "Domingo",
-    }
-
-    # --------------------------------------------------------------------------
-    # 2. CONSULTA DE DADOS REAIS NO SUPABASE
-    # --------------------------------------------------------------------------
-    try:
-        # --- BUSCA 1: USUÁRIOS ---
-        usuarios_query = (
-            supabase.table("usuarios")
-            .select("id", "tipo_plano", "moedas", "ultima_recarga")
-            .execute()
-        )
-        if usuarios_query.data:
-            df_users = pd.DataFrame(usuarios_query.data)
-            df_users["tipo_plano"] = (
-                df_users["tipo_plano"]
-                .astype(str)
-                .str.lower()
-                .str.strip()
-            )
-            if "ultima_recarga" in df_users.columns and not df_users["ultima_recarga"].isna().all():
-                df_users["ultima_recarga"] = pd.to_datetime(
-                    df_users["ultima_recarga"], utc=True, errors="coerce"
-                ).dt.tz_localize(None)
-
-        # --- BUSCA 2: HISTÓRICO DE SALAS PRIVADAS (MENSAGENS) ---
-        # 🌟 CORREÇÃO: Mantendo a consulta correta da tabela de mensagens até o fim do bloco
-        msg_query = (
-            supabase.table("mensagens_sala")
-            .select("match_id", "criado_em", "saida_em", "tempo_de_uso")
-            .execute()
-        )
-
-        if msg_query.data:
-            df_raw_rooms = pd.DataFrame(msg_query.data)
-
-            # Garante que as colunas de tempo existem no DataFrame antes de converter
-            colunas_tempo = ["criado_em", "saida_em"]
-            if all(col in df_raw_rooms.columns for col in colunas_tempo):
-                df_raw_rooms["criado_em"] = pd.to_datetime(df_raw_rooms["criado_em"], utc=True, errors="coerce")
-                df_raw_rooms["saida_em"] = pd.to_datetime(df_raw_rooms["saida_em"], utc=True, errors="coerce")
-
-                # 🌟 SEGURO: Se 'tempo_de_uso' não vier calculado do banco, calcula pela diferença
-                if "tempo_de_uso" not in df_raw_rooms.columns or df_raw_rooms["tempo_de_uso"].isna().all():
-                    duracao_delta = df_raw_rooms["saida_em"] - df_raw_rooms["criado_em"] # Usando criado_em como início
-                    df_raw_rooms["tempo_de_uso"] = (duracao_delta.dt.total_seconds() / 3600.0).round(2)
-            else:
-                # Fallback caso a tabela não tenha essas colunas
-                df_raw_rooms["tempo_de_uso"] = 0.0
-
-            # 🌟 COMPENSAÇÃO: Mescla com df_users para descobrir o 'tipo_plano' de quem usou a sala
-            # Como mensagens_sala não tem tipo_plano nativo, vinculamos pelo ID do usuário se houver relação.
-            # Caso não tenha essa relação direta listada na tabela mensagens_sala, criamos a coluna mockada:
-            if "tipo_plano" not in df_raw_rooms.columns:
-                df_raw_rooms["tipo_plano"] = "Grátis" # Valor padrão seguro
-
-            # 🌟 CORREÇÃO: Corrigido de .stype para .astype
-            df_raw_rooms["tipo_plano"] = (
-                df_raw_rooms["tipo_plano"]
-                .astype(str)
-                .str.replace("vip", "VIP")
-                .str.replace("plano_crédito_de_moedas", "Plano Crédito de Moedas")
-            )
-
-            df_salas_real = df_raw_rooms[["match_id", "tipo_plano", "tempo_de_uso"]].copy()
-            df_salas_real.columns = ["Sala", "Tipo de plano", "Tempo de Uso"]
-
-            # Agrupa dinamicamente o somatório de horas por perfil de cliente
-            df_tempo_por_perfil = (
-                df_salas_real.groupby("Tipo de plano")["Tempo de Uso"]
-                .sum()
-                .reset_index()
-            )
-
-    except Exception as e:
-        st.warning(
-            f"Nota: Tabela 'mensagens_sala' apresentou instabilidade ou erro na busca. {e}"
-        )
-
-
-    # --------------------------------------------------------------------------
-    # 3. TRATAMENTO PARA O GRÁFICO DE PARETO (DIAS DA SEMANA)
-    # --------------------------------------------------------------------------
-    pode_gerar_grafico = False
-
-    if not df_users.empty and "ultima_recarga" in df_users.columns and "moedas" in df_users.columns:
-        # Filtra apenas registros com datas válidas de recarga
-        df_filtrado_recargas = df_users.dropna(subset=["ultima_recarga"]).copy()
-        
-        if not df_filtrado_recargas.empty:
-            # Agrupa o somatório de moedas por dia
-            df_filtrado_recargas["data_pura"] = df_filtrado_recargas["ultima_recarga"].dt.date
-            df_creditos = (
-                df_filtrado_recargas.groupby("data_pura")["moedas"]
-                .sum()
-                .reset_index(name="quantidade_creditos")
-            )
-            
-            # Garante a ordenação cronológica
-            df_creditos = df_creditos.sort_values("data_pura")
-            
-            # Converte para datetime para ler o nome do dia em inglês e traduzir
-            df_creditos["data_dt"] = pd.to_datetime(df_creditos["data_pura"])
-            df_creditos["data"] = df_creditos["data_dt"].dt.day_name().map(dias_semana_pt)
-            
-            if df_creditos["quantidade_creditos"].sum() > 0:
-                pode_gerar_grafico = True
-
-    # --------------------------------------------------------------------------
-    # 4. RENDERIZAÇÃO DO GRÁFICO DE PARETO
-    # --------------------------------------------------------------------------
-    if pode_gerar_grafico:
-        try:
-            # Cálculos do percentual acumulado da semana
-            df_creditos["cum_sum"] = df_creditos["quantidade_creditos"].cumsum()
-            df_creditos["cum_percentage"] = (
-                df_creditos["cum_sum"] / df_creditos["quantidade_creditos"].sum()
-            ) * 100
-
-            import plotly.graph_objects as go
-            fig_pareto = go.Figure()
-                
-            # Barras de volume diário
-            fig_pareto.add_trace(
-                go.Bar(
-                    x=df_creditos["data"],
-                    y=df_creditos["quantidade_creditos"],
-                    name="Recargas no Dia",
-                    marker_color="#007bff",
-                )
-            )
-                
-            # Linha de tendência acumulada da semana
-            fig_pareto.add_trace(
-                go.Scatter(
-                    x=df_creditos["data"],
-                    y=df_creditos["cum_percentage"],
-                    name="% Acumulada da Semana",
-                    yaxis="y2",
-                    line=dict(color="#28a745", width=3),
-                )
-            )
-
-            # Ajustes finos do layout escuro
-            fig_pareto.update_layout(
-                title="Soma de Recargas e Tendência Acumulada Semanal",
-                yaxis=dict(title="Quantidade de Moedas"),
-                yaxis2=dict(
-                    title="Percentual Acumulado (%)",
-                    overlaying="y",
-                    side="right",
-                    range=[0, 105],
-                ),
-                template="plotly_dark",
-                paper_bgcolor="#161b22",
-                plot_bgcolor="#161b22",
-                legend=dict(orientation="h", y=1.1),
-            )
-            st.plotly_chart(fig_pareto, use_container_width=True)
-                
-        except Exception as erro_plotly:
-            st.warning(f"⚠️ Não foi possível renderizar o gráfico devido a uma inconsistência visual: {erro_plotly}")
-    else:
-        st.info("ℹ️ Nenhuma atividade de recarga de moedas recente para gerar o histórico semanal.")
-
-    
+   
 
     # --------------------------------------------------------------------------
     # 5. RENDERIZAÇÃO DOS GRÁFICOS (MÓDULO 3)
@@ -2716,6 +2532,34 @@ def template_painel_admin():
                 options=["Apenas Clientes", "Todos (Incluir Admin)"],
                 index=0  # Padrão: Mostra apenas clientes para não distorcer a visão comercial
             )
+
+
+                # --------------------------------------------------------------------------
+                # MÓDULO 5: VISUALIZAÇÃO DOS CARDÁPIOS DE PLANOS
+                # --------------------------------------------------------------------------
+                st.subheader("📋 Visualização de Termos e Regras dos Planos")
+                
+                st.html("""
+                <div style="background-color: #161b22; padding: 20px; border-radius: 8px; border: 1px solid #30363d;">
+                    <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
+                        <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+                        <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
+                        <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+                        <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
+                    </div>
+                    
+                    <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+                        <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+                        <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+                    </div>
+                </div>
+                """
+                )
+
+
             # -------------------------------
 
             # 4. Conta as ocorrências de cada plano de forma limpa
@@ -2860,37 +2704,7 @@ def template_painel_admin():
             df_salas_real, 
             use_container_width=True, 
             hide_index=True, 
-        )
-
-
-
-    
-
-        # --------------------------------------------------------------------------
-        # MÓDULO 5: VISUALIZAÇÃO DOS CARDÁPIOS DE PLANOS
-        # --------------------------------------------------------------------------
-        st.subheader("📋 Visualização de Termos e Regras dos Planos")
-        
-        st.html("""
-        <div style="background-color: #161b22; padding: 20px; border-radius: 8px; border: 1px solid #30363d;">
-            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
-                <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
-                <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
-            </div>
-            
-            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
-                <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
-                <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
-            </div>
-            
-            <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
-                <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
-                <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
-            </div>
-        </div>
-        """
-        )
-       
+        )  
 
    
 
