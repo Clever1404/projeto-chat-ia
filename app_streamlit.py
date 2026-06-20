@@ -2465,6 +2465,13 @@ def template_painel_admin():
             ).round(2)
 
             # Padroniza nomes de colunas e textos para exibição visual limpa
+        salas_query = (
+            supabase.table("usuarios")
+            .select("id", "tipo_plano", "match_id", "tempo_de_uso", "ultima_recarga")
+            .execute()
+        )
+            
+   
             df_raw_rooms["tipo_plano"] = (
                 df_raw_rooms["tipo_plano"]
                 .astype(str)
@@ -2495,9 +2502,16 @@ def template_painel_admin():
             f"Nota: Tabela 'mensagens_sala' apresentou instabilidade ou erro na busca. {e}"
         )
 
-    # --------------------------------------------------------------------------
+
+   # --------------------------------------------------------------------------
     # 3. PROCESSAMENTO E AGREGAÇÃO DOS DADOS DE USUÁRIOS
     # --------------------------------------------------------------------------
+    salas_query = (
+        supabase.table("usuarios")
+        .select("id", "tipo_plano", "match_id", "tempo_de_uso", "ultima_recarga")
+        .execute()
+    )
+
     try:
         if not df_users.empty:
             # --- CÁLCULO DO GRÁFICO DE PIZZA ---
@@ -2531,6 +2545,21 @@ def template_painel_admin():
             )
 
 
+
+    except Exception as e:
+        st.error(f"Erro ao processar métricas reais: {e}")
+
+    # --------------------------------------------------------------------------
+    # 5. RENDERIZAÇÃO DOS GRÁFICOS (MÓDULO 3)
+    # --------------------------------------------------------------------------
+    st.subheader("📊 Análise de Créditos e Assinaturas")
+    
+    
+    salas_query = (
+        supabase.table("usuarios")
+        .select("id", "tipo_plano", "match_id", "tempo_de_uso", "ultima_recarga")
+        .execute()
+    )
             # --- CÁLCULO DO GRÁFICO DE PARETO (Agrupado por Dia da Semana) ---
             if "ultima_recarga" in df_users.columns:
                 # Remove linhas com datas nulas antes de agrupar
@@ -2566,13 +2595,6 @@ def template_painel_admin():
                         by="quantidade_creditos", ascending=False
                     )
 
-    except Exception as e:
-        st.error(f"Erro ao processar métricas reais: {e}")
-
-    # --------------------------------------------------------------------------
-    # 5. RENDERIZAÇÃO DOS GRÁFICOS (MÓDULO 3)
-    # --------------------------------------------------------------------------
-    st.subheader("📊 Análise de Créditos e Assinaturas")
     g1, g2 = st.columns(2)
 
     with g1:
@@ -2679,6 +2701,15 @@ def template_painel_admin():
     # 6. EXIBIÇÃO DO MONITORAMENTO REAL DE SALAS PRIVADAS
     # --------------------------------------------------------------------------
     st.subheader("🟢 Monitoramento de Salas Privadas")
+       
+       
+    salas_query = (
+        supabase.table("mensagens_sala")
+        .select("match_id", "tempo_de_uso", "criado_em")
+        .execute()
+    )
+
+
 
     if not df_salas_real.empty:
         c1, c2 = st.columns(2)
@@ -2687,10 +2718,10 @@ def template_painel_admin():
             st.write("#### ⏱️ Tempo Total Acumulado por Perfil")
             fig_tempo = px.bar(
                 df_tempo_por_perfil,
-                x="Tipo de Usuário",
-                y="Tempo de Uso (Horas)",
-                color="Tipo de Usuário",
-                title="Horas Consumidas em Encontros (Real)",
+                x="match_id",
+                y="tempo_de_uso",
+                color="matcho_id",
+                title="Tempo Consumidas em Encontros (Real)",
                 color_discrete_map={
                     "Assinantes": "#28a745",
                     "Usuários com Crédito": "#007bff",
