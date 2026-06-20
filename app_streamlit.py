@@ -2170,18 +2170,23 @@ def template_painel_admin():
         conn = conectar_supabase()
         cursor = conn.cursor()
         
-        # Busca a lista completa de moderação de usuários
+        # 1. Busca a lista completa de moderação de usuários
         cursor.execute("SELECT id, username, email, genero, idade, procura_por, status FROM usuarios ORDER BY id ASC;")
         usuarios_bd = cursor.fetchall()
         
-        # Contador Real de Salas Virtuais Online Simultâneas (Encontros confirmados ocorrendo HOJE)
-        # 🌟 Agora 'dia_atual_servidor' existe e vai passar o parâmetro correto (ex: 'sábado') para o %s
+        # 2. CORREÇÃO REQUISITADA: Conta as salas reais que estão ativas na tabela do Supabase
+        # Filtra registros que possuem 'match_id' válido e que a coluna de término da sala (ex: 'saida_em') esteja em branco (vazia/NULL)
         cursor.execute("""
-            SELECT COUNT(DISTINCT match_id) FROM agendamentos_virtuais 
-            WHERE status_convite = 'aceito' 
-              AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s));
-        """, (dia_atual_servidor,))
+            SELECT COUNT(DISTINCT match_id) 
+            FROM mensagens_sala 
+            WHERE match_id IS NOT NULL 
+              AND (saida_em IS NULL OR TRIM(saida_em) = '');
+        """)
         total_salas_ativas = cursor.fetchone()[0]
+
+        # Tratamento de segurança caso o banco retorne None
+        if total_salas_ativas is None:
+            total_salas_ativas = 0
 
         # Estatísticas Semanais por Dia para o Gráfico de Pareto
         cursor.execute("SELECT TRIM(LOWER(dia_semana)), COUNT(*) FROM agendamentos_virtuais GROUP BY 1;")
@@ -2227,7 +2232,7 @@ def template_painel_admin():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    
+
 
     # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
     aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
