@@ -2675,38 +2675,52 @@ def template_painel_admin():
 
     with g2:
         # 1. Busca os dados no Supabase
-        # Se der erro de NameError em 'supabase', lembre de iniciá-lo antes: supabase = create_client(url, key)
+        # 1. Busca os dados no Supabase
+        # Certifique-se de que a variável 'supabase' está devidamente inicializada antes deste bloco
         salas_query = supabase.table("usuarios").select("id", "tipo_plano", "moedas").execute()
 
         if salas_query.data:
             # 2. Cria o DataFrame dos usuários
             df_usuarios = pd.DataFrame(salas_query.data)
             
-            # 3. PADRONIZAÇÃO: Remove espaços extras e transforma tudo em minúsculo
+            # 3. PADRONIZAÇÃO COMPLETA: Remove espaços extras e força letras minúsculas para a busca
             df_usuarios["tipo_plano"] = df_usuarios["tipo_plano"].astype(str).str.strip().str.lower()
             
-            # 4. Conta os planos automaticamente com base no texto padronizado
+            # 4. Conta a ocorrência de cada plano de forma limpa
             contagem_planos = df_usuarios["tipo_plano"].value_counts()
             
-            # Opcional: Descomente a linha abaixo para ver no terminal exatamente como o banco está retornando os nomes
-            # print(contagem_planos)
-            
-            # 5. Monta os totais para a pizza (buscando pelos termos em minúsculo)
-            # Aqui tratamos todas as variações possíveis de escrita do banco
+            # 5. Monta os totais buscando estritamente pelos termos normalizados em minúsculo
             val_vip = int(contagem_planos.get("vip", 0))
-            val_credito = int(contagem_planos.get("plano crédito de moedas", 0)) + int(contagem_planos.get("plano credito de moedas", 0))
-            val_gratis = int(contagem_planos.get("grátis", 0)) + int(contagem_planos.get("gratis", 0))
+            val_admin = int(contagem_planos.get("admin", 0))  # 🌟 Buscando em minúsculo devido ao .str.lower()
             
+            val_credito = (
+                int(contagem_planos.get("plano crédito de moedas", 0)) + 
+                int(contagem_planos.get("plano credito de moedas", 0)) +
+                int(contagem_planos.get("credito de moedas", 0))
+            )
+            
+            val_gratis = (
+                int(contagem_planos.get("grátis", 0)) + 
+                int(contagem_planos.get("gratis", 0)) +
+                int(contagem_planos.get("none", 0)) +
+                int(contagem_planos.get("nan", 0))
+            )
+            
+            # 6. Estrutura o DataFrame final com os nomes bonitos para exibição no gráfico
             df_pizza = pd.DataFrame({
-                "Categoria": ["VIP", "Plano Crédito de Moedas", "Grátis"],
-                "Total": [val_vip, val_credito, val_gratis]
+                "Categoria": ["VIP", "Admin", "Plano Crédito de Moedas", "Grátis"],
+                "Total": [val_vip, val_admin, val_credito, val_gratis]
             })
             
-            # 6. Gera o gráfico de pizza
+            # 7. Gera o gráfico de pizza se houver pelo menos 1 usuário
             if df_pizza["Total"].sum() > 0:
-                cores_pizza = ["#6f42c1", "#28a745", "#007bff"]
+                # Quatro cores para mapear perfeitamente as quatro categorias acima
+                cores_pizza = ["#6f42c1", "#ffc107", "#28a745", "#007bff"] 
+                
                 fig_pizza = px.pie(
-                    df_pizza, values="Total", names="Categoria",
+                    df_pizza, 
+                    values="Total", 
+                    names="Categoria",
                     title="Distribuição de Perfis de Usuários",
                     color_discrete_sequence=cores_pizza
                 )
