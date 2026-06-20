@@ -2213,7 +2213,7 @@ def template_painel_admin():
     st.markdown("<br>", unsafe_allow_html=True)
 
     # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
-    aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas","👑 Painel de Controle"])
+    aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
 
     # ==============================================================================
     # ABA 1: COMPUTAÇÃO GRÁFICA AVANÇADA, PARETO EM LINHA E PIZZAS DEMOGRÁFICAS
