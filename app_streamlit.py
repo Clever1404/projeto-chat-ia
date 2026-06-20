@@ -2534,30 +2534,30 @@ def template_painel_admin():
             )
 
 
-                # --------------------------------------------------------------------------
-                # MÓDULO 5: VISUALIZAÇÃO DOS CARDÁPIOS DE PLANOS
-                # --------------------------------------------------------------------------
-                st.subheader("📋 Visualização de Termos e Regras dos Planos")
+            # --------------------------------------------------------------------------
+            # MÓDULO 5: VISUALIZAÇÃO DOS CARDÁPIOS DE PLANOS
+            # --------------------------------------------------------------------------
+            st.subheader("📋 Visualização de Termos e Regras dos Planos")
                 
-                st.html("""
-                <div style="background-color: #161b22; padding: 20px; border-radius: 8px; border: 1px solid #30363d;">
-                    <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
-                        <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
-                        <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
-                    </div>
-                    
-                    <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
-                        <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
-                        <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
-                    </div>
-                    
-                    <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
-                        <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
-                        <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
-                    </div>
+            st.html("""
+            <div style="background-color: #161b22; padding: 20px; border-radius: 8px; border: 1px solid #30363d;">
+                <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
+                    <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+                    <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
                 </div>
-                """
-                )
+                    
+                <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
+                    <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+                    <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
+                </div>
+                    
+                <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+                    <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+                    <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+                </div>
+            </div>
+            """
+            )
 
 
             # -------------------------------
