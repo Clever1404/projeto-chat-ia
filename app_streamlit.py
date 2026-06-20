@@ -2473,38 +2473,37 @@ def template_painel_admin():
                 # 1. Cabeçalho principal da barra lateral
                 st.sidebar.subheader("⚙️ Configurações do Painel")
 
-                # 2. SEU NOVO ELEMENTO (Agora posicionado logo abaixo do cabeçalho)
-                st.sidebar.markdown("### 📋 Visualização de Termos e Regras dos Planos")
-                # Nota: Você também pode usar st.sidebar.subheader() se preferir o estilo padrão
-
-                    st.html("""
-                        <div style="background-color: #161b22; padding: 20px; border-radius: 8px; border: 1px solid #30363d;">
-                            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
-                                <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
-                                <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
-                            </div>
-                                
-                            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
-                                <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
-                                <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
-                            </div>
-                                
-                            <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
-                                <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
-                                <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
-                            </div>
-                        </div>
-                    """
-                    )
-
-
-                # 3. Restante dos elementos (como o selectbox)
+                # 2. Caixa de seleção (Selectbox)
                 visao_perfil = st.sidebar.selectbox(
                     "Visualizar no gráfico:",
                     options=["Apenas Clientes", "Todos (Incluir Admin)"],
                     index=0 # Padrão: Mostra apenas clientes para não distorcer a visão comercial
                 )
-                
+
+                # 3. Título dos Termos (na barra lateral)
+                st.sidebar.markdown("### 📋 Visualização de Termos e Regras dos Planos")
+
+                # 4. Bloco HTML dos planos (AGORA NA BARRA LATERAL)
+                st.sidebar.html("""
+                    <div style="background-color: #161b22; padding: 15px; border-radius: 8px; border: 1px solid #30363d;">
+                        <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
+                            <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+                            <span style="color: #c9d1d9; font-size: 0.9em;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
+                        </div>
+                                
+                        <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
+                            <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+                            <span style="color: #c9d1d9; font-size: 0.9em;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
+                        </div>
+                                
+                        <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+                            <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+                            <span style="color: #c9d1d9; font-size: 0.9em;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+                        </div>
+                    </div>
+                """)
+
+
                 # -------------------------------
 
                 # 4. Conta as ocorrências de cada plano de forma limpa
