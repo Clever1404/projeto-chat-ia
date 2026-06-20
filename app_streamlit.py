@@ -1217,8 +1217,8 @@ def processar_match_lucy(dados_m):
 
 @st.dialog("📅 Reserva de Encontro")
 def modal_agendamento_encontro(dados_r):
-    import datetime
-    
+    from datetime import datetime, timedelta
+
     st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
     st.caption("A Lucy cruzará sua grade horária com a do seu par antes de validar o convite.")
     
