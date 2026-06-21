@@ -2582,64 +2582,107 @@ def template_painel_admin():
         # --------------------------------------------------------------------------
         # 6. EXIBIÇÃO DO MONITORAMENTO REAL DE SALAS PRIVADAS
         # --------------------------------------------------------------------------
-        st.subheader("🟢 Monitoramento de Salas Privadas")
+       st.subheader("🟢 Monitoramento de Salas Privadas")
 
-        # 1. Busca os dados REAIS no Supabase (trazendo as colunas cronológicas do chat)
+        # 1. COLETA INTEGRADA DOS DADOS DO SUPABASE
         try:
-            salas_query = (
+            # Busca A: Mensagens com o remetente_id real
+            msg_query = (
                 supabase.table("mensagens_sala")
-                .select("match_id", "criado_em", "saida_em")
+                .select("id", "match_id", "remetente_id", "criado_em", "saida_em")
                 .execute()
             )
-            dados_retornados = salas_query.data
-        except Exception as e:
-            st.error(f"Erro na conexão com a tabela 'mensagens_sala': {e}")
-            dados_retornados = None
+            dados_mensagens = msg_query.data if msg_query.data else []
 
-        # 2. SE EXISTIREM DADOS REAIS, PROCESSAMOS AGROPANDO POR CHAT ÚNICO
-        if dados_retornados and len(dados_retornados) > 0:
-            df_mensagens = pd.DataFrame(dados_retornados)
+            # Busca B: Usuarios para puxar o plano e moedas reais
+            user_query = (
+                supabase.table("usuarios")
+                .select("id", "tipo_plano", "moedas")
+                .execute()
+            )
+            dados_usuarios = user_query.data if user_query.data else []
+
+        except Exception as e:
+            st.error(f"Erro na conexão integrada do banco de dados: {e}")
+            dados_mensagens = []
+            dados_usuarios = []
+
+        # 2. PROCESSAMENTO E JUNCÃO REAL VIA PANDAS
+        if dados_mensagens and dados_usuarios:
+            df_msg = pd.DataFrame(dados_mensagens)
+            df_usr = pd.DataFrame(dados_usuarios)
             
-            # Converte os timestamps para o formato correto de data/hora
-            df_mensagens["criado_em"] = pd.to_datetime(df_mensagens["criado_em"], errors="coerce")
-            df_mensagens["saida_em"] = pd.to_datetime(df_mensagens["saida_em"], errors="coerce")
-            
-            # 🌟 O SEGREDO DO CHAT: Agrupa por 'match_id' para colapsar as mensagens duplicadas em uma sala única
-            df_salas_unicas = df_mensagens.groupby("match_id").agg(
-                criado_em=("criado_em", "min"),  # Primeira mensagem enviada (Início do encontro)
-                saida_em=("saida_em", "max")      # Último registro de saída detectado
+            # 🌟 PASSO 1: Agrupa por match_id primeiro para colapsar o chat duplicado
+            # Capturamos o primeiro remetente_id encontrado na sala para identificar o perfil do encontro
+            df_salas_unicas = df_msg.groupby("match_id").agg(
+                inicio_chat=("criado_em", "min"),
+                ultima_msg=("criado_em", "max"),
+                saida_gravada=("saida_em", "max"),
+                remetente_id=("remetente_id", "first") 
             ).reset_index()
             
-            # Se a saída não foi registrada no banco (null), define provisoriamente como agora para calcular o tempo corrido
-            df_salas_unicas["saida_em_tratada"] = df_salas_unicas["saida_em"].fillna(pd.Timestamp.now(tz=df_salas_unicas["criado_em"].dt.tz))
+            # Trata as datas e calcula o tempo de uso em horas decimais
+            df_salas_unicas["inicio_chat"] = pd.to_datetime(df_salas_unicas["inicio_chat"], errors="coerce").dt.tz_localize(None)
+            df_salas_unicas["fim_calculado"] = pd.to_datetime(df_salas_unicas["saida_gravada"], errors="coerce").dt.tz_localize(None)
+            df_salas_unicas["fim_calculado"] = df_salas_unicas["fim_calculado"].fillna(
+                pd.to_datetime(df_salas_unicas["ultima_msg"], errors="coerce").dt.tz_localize(None)
+            )
             
-            # CALCULA O TEMPO REAL: Diferença entre a última atividade/saída e o início em Horas decimais
-            duracao_delta = df_salas_unicas["saida_em_tratada"] - df_salas_unicas["criado_em"]
+            duracao_delta = df_salas_unicas["fim_calculado"] - df_salas_unicas["inicio_chat"]
             df_salas_unicas["tempo_de_uso"] = (duracao_delta.dt.total_seconds() / 3600.0).round(2)
-            
-            # Garante um tempo mínimo de 0.01 horas para não zerar chats rápidos
-            df_salas_unicas["tempo_de_uso"] = df_salas_unicas["tempo_de_uso"].apply(lambda x: max(x, 0.01))
+            df_salas_unicas["tempo_de_uso"] = df_salas_unicas["tempo_de_uso"].apply(lambda x: max(x, 0.05))
 
-            # Adiciona uma coluna de plano fictícia/padrão (já que a tabela de mensagens não guarda planos diretamente)
-            # Nota: Se você precisar do plano real aqui, teremos que fazer um merge com o df_usuarios posteriormente.
-            df_salas_unicas["tipo_plano"] = "Usuários com Crédito"
+            # 🌟 PASSO 2: CRUZA AS TABELAS USANDO O REMETENTE_ID
+            # Garante que os IDs estão no mesmo formato de texto/string para não falhar o merge
+            df_salas_unicas["remetente_id"] = df_salas_unicas["remetente_id"].astype(str)
+            df_usr["id"] = df_usr["id"].astype(str)
             
-            # Estrutura final para alimentar os componentes visuais
-            df_salas_real = df_salas_unicas[["match_id", "tipo_plano", "tempo_de_uso"]].copy()
-            df_salas_real.columns = ["Sala", "Tipo de plano", "Tempo de Uso"]
+            # Mescla os dados trazendo as colunas 'tipo_plano' e 'moedas' reais do usuário para dentro da sala
+            df_salas_completas = pd.merge(
+                df_salas_unicas, 
+                df_usr[["id", "tipo_plano", "moedas"]], 
+                left_on="remetente_id", 
+                right_on="id", 
+                how="left"
+            )
             
-            # Agrupa o somatório de horas por perfil para o gráfico de barras
+            # Padroniza strings dos planos coletados do merge
+            df_salas_completas["tipo_plano"] = df_salas_completas["tipo_plano"].astype(str).str.strip().str.lower()
+            df_salas_completas["moedas"] = df_salas_completas["moedas"].fillna(0).astype(int)
+
+            # 🌟 PASSO 3: Classifica as categorias baseado na mesma regra de negócio da pizza
+            def classificar_perfil_real(row):
+                plano = str(row["tipo_plano"])
+                moedas = row["moedas"]
+                
+                if "vip" in plano or "admin" in plano:
+                    return "VIP"
+                elif "grátis" in plano or "gratis" in plano:
+                    if moedas > 0:
+                        return "Plano Crédito de Moedas"
+                    else:
+                        return "Grátis"
+                else:
+                    return "Plano Crédito de Moedas"
+
+            df_salas_completas["Tipo de plano"] = df_salas_completas.apply(classificar_perfil_real, axis=1)
+
+            # Organiza o DataFrame final ordenando as salas mais longas no topo
+            df_salas_real = df_salas_completas[["match_id", "Tipo de plano", "tempo_de_uso"]].copy()
+            df_salas_real.columns = ["Sala", "Tipo de plano", "Tempo de Uso (Horas)"]
+            df_salas_real = df_salas_real.sort_values(by="Tempo de Uso (Horas)", ascending=False)
+            
+            # Agrupa o somatório total de horas reais por perfil para o gráfico
             df_tempo_por_perfil = (
-                df_salas_real.groupby("Tipo de plano")["Tempo de Uso"]
+                df_salas_real.groupby("Tipo de plano")["Tempo de Uso (Horas)"]
                 .sum()
                 .reset_index()
             )
         else:
-            # Se o banco estiver de fato vazio, mantém os dataframes vazios para exibir o aviso correto
             df_salas_real = pd.DataFrame()
             df_tempo_por_perfil = pd.DataFrame()
 
-        # 3. RENDERIZAÇÃO VISUAL (Gráfico e Tabela Lado a Lado baseados nos dados REAIS)
+        # 3. RENDERIZAÇÃO DOS GRÁFICOS COM DADOS 100% REAIS E CROSS-TABELA
         if not df_salas_real.empty:
             c1, c2 = st.columns(2)
 
@@ -2648,13 +2691,13 @@ def template_painel_admin():
                 fig_tempo = px.bar(
                     df_tempo_por_perfil,
                     x="Tipo de plano",
-                    y="Tempo de Uso",
+                    y="Tempo de Uso (Horas)",
                     color="Tipo de plano",
-                    title="Tempo Consumido em Encontros (Horas Reais)",
+                    title="Volume de Horas Consumidas no Chat (Dados Reais)",
                     color_discrete_map={
                         "VIP": "#6f42c1",
-                        "Usuários com Crédito": "#007bff",
-                        "Grátis": "#6e7681"
+                        "Plano Crédito de Moedas": "#28a745",
+                        "Grátis": "#007bff"
                     },
                 )
                 fig_tempo.update_layout(
@@ -2673,7 +2716,8 @@ def template_painel_admin():
                     hide_index=True, 
                 ) 
         else: 
-            st.info("ℹ️ Nenhuma atividade ou registro de mensagem em sala privada localizado no banco de dados.")
+            st.info("ℹ️ Nenhuma atividade ou registro de mensagem localizado na tabela 'mensagens_sala' do banco de dados.")
+
 
 
 
