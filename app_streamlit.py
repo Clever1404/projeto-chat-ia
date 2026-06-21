@@ -2432,13 +2432,12 @@ def template_painel_admin():
         # --------------------------------------------------------------------------
         st.subheader("📊 Análise de Créditos e Assinaturas")
         
-        # 1. Busca os dados no Supabase
-        salas_query = (
-            supabase.table("usuarios")
-            .select("id", "tipo_plano", "ultima_recarga", "moedas")
-            .execute()
-        )
-    
+        @st.cache_data(ttl=300) # 🌟 Guarda os dados em memória por 5 minutos (300 segundos)
+        def buscar_usuarios_cache():
+        # Coloque apenas a consulta de usuários aqui dentro
+        query = supabase.table("usuarios").select("id", "tipo_plano", "moedas", "ultima_recarga").execute()
+        return query.data if query.data else []
+         
         g1, g2 = st.columns(2)
 
         with g1:
