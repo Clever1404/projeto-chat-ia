@@ -1532,36 +1532,36 @@ def template_sala_privada():
     
 
     # --- ADICIONE ESTE BLOCO NO TOPO DO TEMPLATE DA SALA PRIVADA ---
-    id_match_atual = st.session_state.get("match_id_atual")
+   #id_match_atual = st.session_state.get("match_id_atual")
 
     # 🔍 DEPURADOR DE STATUS (Temporário para descobrir o erro)
-    st.write("### 🛠️ Depurador de Conexão da Sala")
-    st.write(f"ID do Match recuperado da sessão: `{id_match_atual}`")
+   #st.write("### 🛠️ Depurador de Conexão da Sala")
+   #st.write(f"ID do Match recuperado da sessão: `{id_match_atual}`")
 
-    if id_match_atual:
-        try:
-            import datetime
-            agora_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+   #if id_match_atual:
+   #    try:
+   #        import datetime
+   #        agora_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
             
             # Executa o update e captura a resposta do banco
-            resposta_banco = supabase.table("matches")\
-                .update({
-                    "status_conexao": "online",
-                    "ultima_atividade": agora_iso
-                })\
-                .eq("id", id_match_atual)\
-                .execute()
+   #        resposta_banco = supabase.table("matches")\
+   #            .update({
+   #                "status_conexao": "online",
+   #                "ultima_atividade": agora_iso
+   #            })\
+   #            .eq("id", id_match_atual)\
+   #            .execute()
                 
             # Analisa o retorno real do Supabase
-            if resposta_banco.data and len(resposta_banco.data) > 0:
-                st.success(f"✅ Sucesso! Status da sala {id_match_atual} alterado para ONLINE no banco.")
-            else:
-                st.error(f"❌ O Supabase recebeu o comando, mas NENHUMA linha foi atualizada. Verifique se o ID {id_match_atual} existe de verdade na coluna 'id' da tabela 'matches'.")
+   #        if resposta_banco.data and len(resposta_banco.data) > 0:
+   #            st.success(f"✅ Sucesso! Status da sala {id_match_atual} alterado para ONLINE no banco.")
+   #        else:
+   #            st.error(f"❌ O Supabase recebeu o comando, mas NENHUMA linha foi atualizada. Verifique se o ID {id_match_atual} existe de verdade na coluna 'id' da tabela 'matches'.")
                 
-        except Exception as erro_critico:
-            st.error(f"🚨 Erro crítico de comunicação com a tabela matches: {erro_critico}")
-    else:
-        st.warning("⚠️ Atenção: 'match_id_atual' está vazio no st.session_state. O app não sabe qual sala atualizar.")
+   #    except Exception as erro_critico:
+   #        st.error(f"🚨 Erro crítico de comunicação com a tabela matches: {erro_critico}")
+  # else:
+  #     st.warning("⚠️ Atenção: 'match_id_atual' está vazio no st.session_state. O app não sabe qual sala atualizar.")
 
 
 
@@ -1718,34 +1718,34 @@ def template_sala_privada():
         
         if st.button("🚪 Sair da Sala Privada", type="primary", use_container_width=True):
             # 🌟 Captura correta das variáveis da sessão
-            id_sala_atual = st.session_state.get("match_id_atual")  # Este é o 332 (ID do Match)
-            id_usuario_atual = st.session_state.get("user_id_atual") # Este é o ID do Usuário (um dos 7 cadastrados)
+           #id_sala_atual = st.session_state.get("match_id_atual")  # Este é o 332 (ID do Match)
+          # id_usuario_atual = st.session_state.get("user_id_atual") # Este é o ID do Usuário (um dos 7 cadastrados)
 
-            if id_sala_atual:
-                try:
-                    import datetime
-                    horario_saida = datetime.datetime.now(datetime.timezone.utc).isoformat()
+           #if id_sala_atual:
+           #    try:
+           #        import datetime
+           #        horario_saida = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     
                     # PASSO 1: Tenta dar UPDATE nas linhas que já possuem esse match_id
-                    resposta_update = supabase.table("mensagens_sala")\
-                        .update({"saida_em": horario_saida})\
-                        .eq("match_id", id_sala_atual)\
-                        .execute()
+           #        resposta_update = supabase.table("mensagens_sala")\
+           #            .update({"saida_em": horario_saida})\
+           #            .eq("match_id", id_sala_atual)\
+           #            .execute()
                         
                     # PASSO 2: Se não havia mensagens na sala ainda, fazemos o INSERT de fechamento
-                    if not resposta_update.data:
+            #       if not resposta_update.data:
                         # 🌟 CORREÇÃO DE INVERSÃO AQUI: Cada ID na sua respectiva coluna correta
-                        supabase.table("mensagens_sala").insert({
-                            "match_id": id_sala_atual,         # Recebe o 332 (ID da sala)
-                            "remetente_id": id_usuario_atual,  # Recebe o ID do Usuário logado
-                            "saida_em": horario_saida,
-                            "criado_em": horario_saida 
-                        }).execute()
+           #            supabase.table("mensagens_sala").insert({
+            ##              "match_id": id_sala_atual,         # Recebe o 332 (ID da sala)
+            #               "remetente_id": id_usuario_atual,  # Recebe o ID do Usuário logado
+            #               "saida_em": horario_saida,
+            #               "criado_em": horario_saida 
+            #           }).execute()
                         
-                    st.success("Sala encerrada e registrada com sucesso!")
+             #      st.success("Sala encerrada e registrada com sucesso!")
                     
-                except Exception as erro_banco:
-                    st.error(f"Erro ao registrar saída no Supabase: {erro_banco}")
+            #   except Exception as erro_banco:
+            #       st.error(f"Erro ao registrar saída no Supabase: {erro_banco}")
                 
             # 3. Limpa o estado da sessão e redireciona o usuário no menu
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
