@@ -2615,7 +2615,7 @@ def template_painel_admin():
                 # 5. Monta o DataFrame final da pizza com os nomes bonitos para a legenda
                 df_pizza = pd.DataFrame({
                     "Categoria": ["VIP", "Plano Crédito de Moedas", "Grátis"],
-                    "Total": [val_vip, val_admin, val_credito, val_gratis]
+                    "Total": [val_vip, val_credito, val_gratis]
                 })
                 
                 # 6. Monta a estrutura de dados baseada na escolha do filtro lateral
@@ -2628,7 +2628,7 @@ def template_painel_admin():
                 else:
                     df_pizza = pd.DataFrame({
                         "Categoria": ["VIP", "Admin", "Plano Crédito de Moedas", "Grátis"],
-                        "Total": [val_vip, val_credito, val_gratis]
+                        "Total": [val_vip, val_admin, val_credito, val_gratis]
                     })
                     cores_pizza = ["#6f42c1", "#ffc107", "#28a745", "#007bff"]  # Roxo, Amarelo, Verde, Azul
                 
