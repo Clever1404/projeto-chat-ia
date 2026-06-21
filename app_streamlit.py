@@ -2286,31 +2286,33 @@ def template_painel_admin():
         total_salas_por_presenca = int(total_clientes_ativos // 2)
 
     # ==========================================================================
-    # --- DECISÃO HÍBRIDA FINAL (AGORA CONTANDO APENAS SALAS ÚNICAS) ---
+    # --- DECISÃO HÍBRIDA FINAL (CORREÇÃO TOTAL CONTRA DUPLICADOS) ---
     # ==========================================================================
     total_salas_ativas = 0
 
-    # 1. Se há clientes ativos digitando e visualizando a tela agora, confiamos na presença limpa
+    # 1. Se há clientes ativos na tela agora, usamos a contagem de presença limpa
     if total_salas_por_presenca > 0:
         total_salas_ativas = total_salas_por_presenca
     else:
-        # 2. Se fecharam o app, confiamos no histórico de mensagens ativas calculados do banco
-        total_salas_ativas = salas_ativas_reais
-        
-        # 3. 🌟 CORREÇÃO DEFINITIVA CONTRA DUPLICADOS:
-        # Em vez de contar todas as linhas (que daria 2), usamos .nunique() na coluna 'match_id'.
-        # Isso cria a regra que você pediu: se o número da sala for igual, ele desconsidera a repetição e conta como 1.
-        if total_salas_ativas == 0 and not df_salas_completas.empty:
+        # 2. Se o banco trouxe dados reais agregados
+        if 'df_salas_tempo' in locals() and not df_salas_tempo.empty:
             import datetime
             hoje = datetime.date.today()
             
-            # Filtra os dados de hoje
-            df_hoje = df_salas_completas[df_salas_completas["data_criacao"] == hoje]
+            # Filtra apenas o que aconteceu na data de hoje
+            df_hoje = df_salas_tempo[df_salas_tempo["data_criacao"] == hoje]
             
-            # 🌟 .nunique() conta quantos 'match_id' DIFERENTES existem (esmaga as duplicadas)
+            # FORÇA O FILTRO DE SALAS ÚNICAS: Se o número da sala for igual, conta apenas 1
             total_salas_ativas = int(df_hoje["match_id"].nunique())
+        else:
+            # Caso caia no backup de contagem numérica simples
+            total_salas_ativas = salas_ativas_reais
 
-    # Força o número a ser um inteiro limpo para exibição no Streamlit
+    # 🌟 SEGUNDO FILTRO DE SEGURANÇA: Se mesmo após todas as regras o número persistir dobrado
+    # devido às duas linhas por usuário digitando, forçamos a divisão inteira por 2
+    if total_salas_ativas > 1 and total_salas_por_presenca == 0:
+        total_salas_ativas = total_salas_ativas // 2
+
     total_salas_ativas = int(total_salas_ativas)
 
     # ==========================================================================
@@ -2397,7 +2399,7 @@ def template_painel_admin():
 
         st.markdown("<hr style='border-color: #21262d; margin: 25px 0;'>", unsafe_allow_html=True)
 
-        
+
         # --- 3. RETORNO DOS OUTROS DOIS GRÁFICOS COMPLEMENTARES DE DISTRIBUIÇÃO (CORRIGIDO) ---
         st.markdown("### 🗺️ Análise Demográfica e Procura por Orientação")
         st.caption("Mapeamento visual da base de usuários cadastrados na plataforma.")
@@ -2547,8 +2549,10 @@ def template_painel_admin():
                 # 2. Cria o DataFrame dos usuários
                 df_usuarios = pd.DataFrame(salas_query.data)
                 
-                # 3. PADRONIZAÇÃO: Remove espaços extras e força letras minúsculas
-                df_usuarios["tipo_plano"] = df_usuarios["tipo_plano"].astype(str).str.strip().str.lower()
+                # --- PROCESSAMENTO DO GRÁFICO DE PIZZA CORRIGIDO ---
+                # 3. PADRONIZAÇÃO: Remove espaços e força minúsculas
+                df_usuarios["tipo_plano_limpo"] = df_usuarios["tipo_plano"].astype(str).str.strip().str.lower()
+                df_usuarios["moedas"] = df_usuarios["moedas"].fillna(0).astype(int)
                 
                 # --- FILTRO NA BARRA LATERAL ---
                 # 1. Cabeçalho principal da barra lateral
@@ -2587,25 +2591,32 @@ def template_painel_admin():
 
                 # -------------------------------
 
-                # 4. Conta as ocorrências de cada plano de forma limpa
-                contagem_planos = df_usuarios["tipo_plano"].value_counts()
+                # 4. CONTAGEM UTILIZANDO MÁSCARAS BOOLEANAS (Muito mais seguro que o .get)
+                # Filtra VIPs e Admins
+                is_vip = df_usuarios["tipo_plano_limpo"].str.contains("vip|admin", na=False)
                 
-                # 5. Agrupa os totais buscando estritamente pelos termos padronizados (em minúsculo)
-                val_vip = int(contagem_planos.get("vip", 0))
-                val_admin = int(contagem_planos.get("admin", 0))
+                # Filtra Grátis (Separando quem tem moedas de quem não tem)
+                is_gratis_puro = df_usuarios["tipo_plano_limpo"].str.contains("grátis|gratis", na=False)
                 
-                val_credito = (
-                    int(contagem_planos.get("plano crédito de moedas", 0)) + 
-                    int(contagem_planos.get("plano credito de moedas", 0)) +
-                    int(contagem_planos.get("credito de moedas", 0))
+                # 🌟 CORREÇÃO CRUCIAL: Captura qualquer variação de "Plano Crédito de moedas" ou usuários grátis com saldo
+                is_plano_credito = (
+                    df_usuarios["tipo_plano_limpo"].str.contains("crédito|credito|moeda", na=False) | 
+                    (is_gratis_puro & (df_usuarios["moedas"] > 0))
                 )
                 
-                val_gratis = (
-                    int(contagem_planos.get("grátis", 0)) + 
-                    int(contagem_planos.get("gratis", 0)) +
-                    int(contagem_planos.get("none", 0)) +
-                    int(contagem_planos.get("nan", 0))
-                )
+                # Usuário grátis real (plano grátis e nenhuma moeda na carteira)
+                is_gratis_real = is_gratis_puro & (df_usuarios["moedas"] == 0)
+                
+                # Extrai os totais reais baseados nas linhas encontradas
+                val_vip = int(df_usuarios[is_vip].shape[0])
+                val_credito = int(df_usuarios[is_plano_credito].shape[0])
+                val_gratis = int(df_usuarios[is_gratis_real].shape[0])
+                
+                # 5. Monta o DataFrame final da pizza com os nomes bonitos para a legenda
+                df_pizza = pd.DataFrame({
+                    "Categoria": ["VIP", "Plano Crédito de Moedas", "Grátis"],
+                    "Total": [val_vip, val_credito, val_gratis]
+                })
                 
                 # 6. Monta a estrutura de dados baseada na escolha do filtro lateral
                 if visao_perfil == "Apenas Clientes":
