@@ -605,8 +605,9 @@ if "abrir_reserva_fluxo" not in st.session_state: st.session_state.abrir_reserva
 if "form_seed" not in st.session_state: st.session_state.form_seed = 42
 
 dias_semana_map = {0: 'Segunda-feira', 1: 'Terça-feira', 2: 'Quarta-feira', 3: 'Quinta-feira', 4: 'Sexta-feira', 5: 'Sábado', 6: 'Domingo'}
-dia_atual_servidor = dias_semana_map[datetime.now().weekday()]
 
+# 🌟 CORREÇÃO: Adicionado .datetime. antes do .now()
+dia_atual_servidor = dias_semana_map[datetime.datetime.now().weekday()]
 
 # ==============================================================================
 # 2. INTERCEPTADOR DE TELAS PÚBLICAS (COLOQUE EXATAMENTE AQUI)
