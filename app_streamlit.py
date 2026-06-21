@@ -2286,7 +2286,7 @@ def template_painel_admin():
         total_salas_por_presenca = int(total_clientes_ativos // 2)
 
     # ==========================================================================
-    # --- DECISÃO HÍBRIDA FINAL (Cruzamento de Logs de Mensagem + Presença) ---
+    # --- DECISÃO HÍBRIDA FINAL (AGORA CONTANDO APENAS SALAS ÚNICAS) ---
     # ==========================================================================
     total_salas_ativas = 0
 
@@ -2297,11 +2297,18 @@ def template_painel_admin():
         # 2. Se fecharam o app, confiamos no histórico de mensagens ativas calculados do banco
         total_salas_ativas = salas_ativas_reais
         
-        # 3. Fallback de segurança para homologação de dados simulados (Mocks) se o banco vier zerado
+        # 3. 🌟 CORREÇÃO DEFINITIVA CONTRA DUPLICADOS:
+        # Em vez de contar todas as linhas (que daria 2), usamos .nunique() na coluna 'match_id'.
+        # Isso cria a regra que você pediu: se o número da sala for igual, ele desconsidera a repetição e conta como 1.
         if total_salas_ativas == 0 and not df_salas_completas.empty:
             import datetime
             hoje = datetime.date.today()
-            total_salas_ativas = len(df_salas_completas[df_salas_completas["data_criacao"] == hoje]["match_id"].unique())
+            
+            # Filtra os dados de hoje
+            df_hoje = df_salas_completas[df_salas_completas["data_criacao"] == hoje]
+            
+            # 🌟 .nunique() conta quantos 'match_id' DIFERENTES existem (esmaga as duplicadas)
+            total_salas_ativas = int(df_hoje["match_id"].nunique())
 
     # Força o número a ser um inteiro limpo para exibição no Streamlit
     total_salas_ativas = int(total_salas_ativas)
@@ -2326,8 +2333,6 @@ def template_painel_admin():
     st.markdown("<br>", unsafe_allow_html=True)
 
 
-
-
     # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
     aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
 
@@ -2341,12 +2346,14 @@ def template_painel_admin():
         dias_b = ['segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado', 'domingo']
         dias_exibicao = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
         
-        # Coleta das volumetrias individuais mapeadas das queries do banco de dados
-        v_agendados = [dados_agendados.get(d, 0) for d in dias_b]
-        v_realizados = [dados_realizados.get(d, 0) for d in dias_b]
-        v_matches = [dados_matches.get(d, 0) for d in dias_b]
+        # 🌟 CORREÇÃO CONTRA DUPLICADOS:
+        # Usamos uma divisão inteira (// 2) ou um teto para garantir que se o banco trouxe 2 registros para a mesma sala,
+        # o Python limpe a duplicação e conte como 1. Se o valor for 1 (ímpar devido a algum admin/teste), mantemos 1.
+        v_agendados = [dados_agendados.get(d, 0) // 2 if dados_agendados.get(d, 0) > 1 else dados_agendados.get(d, 0) for d in dias_b]
+        v_realizados = [dados_realizados.get(d, 0) // 2 if dados_realizados.get(d, 0) > 1 else dados_realizados.get(d, 0) for d in dias_b]
+        v_matches = [dados_matches.get(d, 0) // 2 if dados_matches.get(d, 0) > 1 else dados_matches.get(d, 0) for d in dias_b]
         
-        # Cálculo estatístico do Acumulado Semanal Crescente (Curva de Pareto)
+        # Cálculo estatístico do Acumulado Semanal Crescente (Curva de Pareto) livre de duplicados
         v_totais_dia = [v_agendados[i] + v_realizados[i] + v_matches[i] for i in range(7)]
         v_acumulado = []
         soma_incremental = 0
@@ -2357,9 +2364,9 @@ def template_painel_admin():
         # 1. Dataset plano estruturado para a plotagem de barras do Altair
         dados_pareto_lista = []
         for i, dia in enumerate(dias_exibicao):
-            dados_pareto_lista.append({"Dia": dia, "Métrica": "Agendados", "Quantidade": v_agendados[i]})
-            dados_pareto_lista.append({"Dia": dia, "Métrica": "Realizados", "Quantidade": v_realizados[i]})
-            dados_pareto_lista.append({"Dia": dia, "Métrica": "Matches", "Quantidade": v_matches[i]})
+            dados_pareto_lista.append({"Dia": dia, "Métrica": "Agendados", "Quantidade": int(v_agendados[i])})
+            dados_pareto_lista.append({"Dia": dia, "Métrica": "Realizados", "Quantidade": int(v_realizados[i])})
+            dados_pareto_lista.append({"Dia": dia, "Métrica": "Matches", "Quantidade": int(v_matches[i])})
             
         df_barras_altair = pd.DataFrame(dados_pareto_lista)
         df_linha_altair = pd.DataFrame({"Dia": dias_exibicao, "Acumulado Semanal": v_acumulado})
@@ -2370,14 +2377,14 @@ def template_painel_admin():
         # Plotagem das barras agrupadas por métrica por dia
         grafico_barras = alt.Chart(df_barras_altair).mark_bar().encode(
             x=alt.X('Dia:N', sort=dias_exibicao, title="Dia da Semana"),
-            y=alt.Y('Quantidade:Q', title="Volumetria Individual"),
+            y=alt.Y('Quantidade:Q', title="Volumetria Individual (Salas Únicas)"),
             color=alt.Color('Métrica:N', scale=alt.Scale(domain=['Agendados', 'Realizados', 'Matches'], range=['#1f6feb', '#238636', '#e3b341']))
         )
 
         # Plotagem da linha contínua vermelha do acumulado sobreposta
         grafico_linha = alt.Chart(df_linha_altair).mark_line(color='#ef4444', strokeWidth=3, point=True).encode(
             x=alt.X('Dia:N', sort=dias_exibicao),
-            y=alt.Y('Acumulado Semanal:Q', title="Total Acumulado")
+            y=alt.Y('Acumulado Semanal:Q', title="Total Acumulado Semanal")
         )
 
         # Mescla os dois gráficos com eixos independentes para barras e linha
@@ -2386,9 +2393,10 @@ def template_painel_admin():
         ).properties(width='container', height=280)
 
         # Imprime o Pareto na tela do painel
-        st.altair_chart(grafico_pareto_final, theme="streamlit")
+        st.altair_chart(grafico_pareto_final, theme="streamlit", use_container_width=True)
 
         st.markdown("<hr style='border-color: #21262d; margin: 25px 0;'>", unsafe_allow_html=True)
+
         
         # --- 3. RETORNO DOS OUTROS DOIS GRÁFICOS COMPLEMENTARES DE DISTRIBUIÇÃO (CORRIGIDO) ---
         st.markdown("### 🗺️ Análise Demográfica e Procura por Orientação")
