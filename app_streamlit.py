@@ -50,15 +50,7 @@ if "tela_atual" not in st.session_state:
 
 # Configuração que controla o comportamento visual da barra lateral
 st.set_page_config(initial_sidebar_state=st.session_state.sidebar_state)
- 
-# ==============================================================================
-# 1. INICIALIZAÇÃO CORRETA (No topo do arquivo, abaixo dos imports)
-# ==============================================================================
-if "opcao_menu" not in st.session_state:
-    st.session_state.opcao_menu = "home"  # Usamos texto simples minúsculo para evitar erros
 
-if "usuario_id" not in st.session_state:
-    st.session_state.usuario_id = None
 
 
 UPLOAD_FOLDER = "uploads"
@@ -144,7 +136,15 @@ def template_home():
             </style>
         """, unsafe_allow_html=True)
 
-       
+    # ==============================================================================
+    # 1. INICIALIZAÇÃO CORRETA (No topo do arquivo, abaixo dos imports)
+    # ==============================================================================
+    if "opcao_menu" not in st.session_state:
+        st.session_state.opcao_menu = "home"  # Usamos texto simples minúsculo para evitar erros
+
+    if "usuario_id" not in st.session_state:
+        st.session_state.usuario_id = None
+    
     
     # Título centralizado
     st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
@@ -337,7 +337,8 @@ def template_login():
             modal_recuperar_senha()
 
                       
-   
+
+    
 # ==============================================================================
 # 2. DEFINIÇÃO DOS TEMPLATES (FUNÇÕES)
 # ==============================================================================
@@ -2855,7 +2856,6 @@ if not modal_ativa:
         # Se estiver logado, processa as telas internas normalmente
         if st.session_state.opcao_menu == "Plataforma de Planos IA":
             template_planos()
-            st.rerun()
 
        # 🔍 REPOSICIONAMENTO CRÍTICO: Só busca e exibe a notificação se o menu NÃO for a Sala Privada
         if st.session_state.opcao_menu != "🤝 Sala Privada":
@@ -2871,12 +2871,12 @@ if not modal_ativa:
                 total_hoje = cursor_notif.fetchone()[0]
                 cursor_notif.close()
                 conn_notif.close()
-                
+
                 if total_hoje > 0:
                     st.info(f"🔔 **Aviso da Lucy:** Você possui **{total_hoje} encontro(s)** agendado(s) para hoje ({dia_atual_servidor})!")
             except Exception:
                 pass 
-            st.rerun()
+
 
     # --- RENDERIZAÇÃO DOS MENUS INTERNOS (MUTUAMENTE EXCLUSIVOS) ---
         if st.session_state.opcao_menu == "🤝 Sala Privada":
