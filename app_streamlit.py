@@ -1529,7 +1529,28 @@ def limpar_historico_sala(match_id):
 def template_sala_privada():
     match_id = st.session_state.match_id_atual
     meu_id = st.session_state.usuario_id
-    
+ # Recupera o ID do match atual guardado na sessão
+    meu_id = st.session_state.get("match_id_atual")
+        
+    if meu_id:
+        try:
+            import datetime
+            agora_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                
+            # 🟢 SINAL DE ENTRADA / PULSAÇÃO (Heartbeat)
+            # Toda vez que a tela carrega ou atualiza, carimba o match como ONLINE no banco
+            supabase.table("matches")\
+                .update({
+                    "status_conexao": "online",
+                    "ultima_atividade": agora_iso
+                })\
+                .eq("id", meu_id)\
+                .execute()
+                    
+        except Exception as e:
+            # Falha silenciosa para não travar a experiência de chat do usuário
+            pass
+   
     # 1. CSS AVANÇADO PARA FIXAR ELEMENTOS E ESTILIZAR ESTILO WHATSAPP
     st.markdown(
         """
@@ -1726,27 +1747,6 @@ def template_sala_privada():
     with col_chat:
         # Título Fixo no Topo do Chat
         st.markdown(f"### 💬 Sala Privada com {parceiro_nome}")
-        # Recupera o ID do match atual guardado na sessão
-        meu_id = st.session_state.get("match_id_atual")
-        
-        if meu_id:
-            try:
-                import datetime
-                agora_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
-                
-                # 🟢 SINAL DE ENTRADA / PULSAÇÃO (Heartbeat)
-                # Toda vez que a tela carrega ou atualiza, carimba o match como ONLINE no banco
-                supabase.table("matches")\
-                    .update({
-                        "status_conexao": "online",
-                        "ultima_atividade": agora_iso
-                    })\
-                    .eq("id", meu_id)\
-                    .execute()
-                    
-            except Exception as e:
-                # Falha silenciosa para não travar a experiência de chat do usuário
-                pass
         st.divider()
 
         # Funcionalidade de Videochamada fixa 
@@ -2610,195 +2610,195 @@ def template_painel_admin():
         # --------------------------------------------------------------------------
         # 6. EXIBIÇÃO DO MONITORAMENTO REAL DE SALAS PRIVADAS
         # --------------------------------------------------------------------------
-        st.subheader("🟢 Monitoramento de Salas Privadas")
+#       st.subheader("🟢 Monitoramento de Salas Privadas")
 
         # 1. COLETA INTEGRADA DOS DADOS DO SUPABASE (COM DIAGNÓSTICO INTEGRADO)
-        try:
-            # Busca A: Mensagens com tratamento de propriedades do objeto
-            msg_response = (
-                supabase.table("mensagens_sala")
-                .select("id", "match_id", "remetente_id", "criado_em", "saida_em")
-                .execute()
-            )
+#       try:
+#           # Busca A: Mensagens com tratamento de propriedades do objeto
+#           msg_response = (
+#               supabase.table("mensagens_sala")
+#               .select("id", "match_id", "remetente_id", "criado_em", "saida_em")
+#               .execute()
+#           )
             
-            # Validação dupla de extração do objeto de resposta
-            if hasattr(msg_response, "data"):
-                dados_mensagens = msg_response.data
-            else:
-                dados_mensagens = msg_response if isinstance(msg_response, list) else []
-
+#           # Validação dupla de extração do objeto de resposta
+#           if hasattr(msg_response, "data"):
+#               dados_mensagens = msg_response.data
+#           else:
+#               dados_mensagens = msg_response if isinstance(msg_response, list) else []
+#
             # Busca B: Usuários para puxar o plano e moedas reais
-            user_response = (
-                supabase.table("usuarios")
-                .select("id", "tipo_plano", "moedas")
-                .execute()
-            )
-            
-            if hasattr(user_response, "data"):
-                dados_usuarios = user_response.data
-            else:
-                dados_usuarios = user_response if isinstance(user_response, list) else []
+#           user_response = (
+#               supabase.table("usuarios")
+#               .select("id", "tipo_plano", "moedas")
+#               .execute()
+#           )
+#           
+#           if hasattr(user_response, "data"):
+#               dados_usuarios = user_response.data
+#           else:
+#               dados_usuarios = user_response if isinstance(user_response, list) else []
 
-            # 🔍 PRINT DE DIAGNÓSTICO VISUAL NO SEU APP STREAMLIT
-            st.sidebar.write("### 🚨 Depuração de Tabelas")
-            st.sidebar.write(f"Linhas em 'mensagens_sala': {len(dados_mensagens) if dados_mensagens else 0}")
-            st.sidebar.write(f"Linhas em 'usuarios': {len(dados_usuarios) if dados_usuarios else 0}")
 
-        except Exception as e:
-            st.error(f"Erro na conexão integrada do banco de dados: {e}")
-            dados_mensagens = []
-            dados_usuarios = []
+#           # 🔍 PRINT DE DIAGNÓSTICO VISUAL NO SEU APP STREAMLIT
+#           st.sidebar.write("### 🚨 Depuração de Tabelas")
+#           st.sidebar.write(f"Linhas em 'mensagens_sala': {len(dados_mensagens) if dados_mensagens else 0}")
+#          st.sidebar.write(f"Linhas em 'usuarios': {len(dados_usuarios) if dados_usuarios else 0}")
+#
+#       except Exception as e:
+#           st.error(f"Erro na conexão integrada do banco de dados: {e}")
+#           dados_mensagens = []
+#           dados_usuarios = []
 
       
         # 2. PROCESSAMENTO E JUNÇÃO REAL VIA PANDAS (CÓDIGO PRINCIPAL REVISADO)
-        if dados_usuarios:
-            df_usr = pd.DataFrame(dados_usuarios)
-            
-            # Se a liberação do RLS no painel do Supabase foi feita, dados_mensagens trará as linhas reais
-            if dados_mensagens and len(dados_mensagens) > 0:
-                df_msg = pd.DataFrame(dados_mensagens)
-            else:
-                # Camada de segurança temporária caso o RLS ainda esteja bloqueando o acesso
-                ids_reais_usuarios = df_usr["id"].tolist()
-                id1 = str(ids_reais_usuarios[0]) if len(ids_reais_usuarios) > 0 else "1"
-                id2 = str(ids_reais_usuarios[1]) if len(ids_reais_usuarios) > 1 else "2"
-                
-                dados_mock_mensagens = [
-                    {"match_id": "sala_alfa_2026", "remetente_id": id1, "criado_em": "2026-06-20 20:00:00", "saida_em": None},
-                    {"match_id": "sala_alfa_2026", "remetente_id": id2, "criado_em": "2026-06-20 20:05:00", "saida_em": None},
-                    {"match_id": "sala_beta_2026", "remetente_id": id1, "criado_em": "2026-06-20 21:00:00", "saida_em": "2026-06-20 22:30:00"}
-                ]
-                df_msg = pd.DataFrame(dados_mock_mensagens)
-                st.caption("💡 *Nota: Exibindo dados simulados. Remova o bloqueio de RLS na tabela 'mensagens_sala' no console do Supabase para puxar a produção.*")
+#       if dados_usuarios:
+#           df_usr = pd.DataFrame(dados_usuarios)
+#           
+#           # Se a liberação do RLS no painel do Supabase foi feita, dados_mensagens trará as linhas reais
+#           if dados_mensagens and len(dados_mensagens) > 0:
+#               df_msg = pd.DataFrame(dados_mensagens)
+#           else:
+#               # Camada de segurança temporária caso o RLS ainda esteja bloqueando o acesso
+#               ids_reais_usuarios = df_usr["id"].tolist()
+#               id1 = str(ids_reais_usuarios[0]) if len(ids_reais_usuarios) > 0 else "1"
+#               id2 = str(ids_reais_usuarios[1]) if len(ids_reais_usuarios) > 1 else "2"
+#               
+#               dados_mock_mensagens = [
+#                   {"match_id": "sala_alfa_2026", "remetente_id": id1, "criado_em": "2026-06-20 20:00:00", "saida_em": None},
+#                   {"match_id": "sala_alfa_2026", "remetente_id": id2, "criado_em": "2026-06-20 20:05:00", "saida_em": None},
+#                   {"match_id": "sala_beta_2026", "remetente_id": id1, "criado_em": "2026-06-20 21:00:00", "saida_em": "2026-06-20 22:30:00"}
+#               ]
+#               df_msg = pd.DataFrame(dados_mock_mensagens)
+#               st.caption("💡 *Nota: Exibindo dados simulados. Remova o bloqueio de RLS na tabela 'mensagens_sala' no console do Supabase para puxar a produção.*")
 
             # --- PROCESSAMENTO CRONOLÓGICO DO CHAT ---
             # Agrupa por match_id para eliminar a duplicação das mensagens enviadas
-            df_salas_unicas = df_msg.groupby("match_id").agg(
-                inicio_chat=("criado_em", "min"),
-                ultima_msg=("criado_em", "max"),
-                saida_gravada=("saida_em", "max"),
-                remetente_id=("remetente_id", "first")  # Captura o ID do usuário que interagiu
-            ).reset_index()
+#           df_salas_unicas = df_msg.groupby("match_id").agg(
+#               inicio_chat=("criado_em", "min"),
+#               ultima_msg=("criado_em", "max"),
+#               saida_gravada=("saida_em", "max"),
+#               remetente_id=("remetente_id", "first")  # Captura o ID do usuário que interagiu
+#           ).reset_index()
             
-            # Trata as datas e calcula o tempo de uso em horas decimais
-            df_salas_unicas["inicio_chat"] = pd.to_datetime(df_salas_unicas["inicio_chat"], errors="coerce").dt.tz_localize(None)
-            df_salas_unicas["fim_calculado"] = pd.to_datetime(df_salas_unicas["saida_gravada"], errors="coerce").dt.tz_localize(None)
-            df_salas_unicas["fim_calculado"] = df_salas_unicas["fim_calculado"].fillna(
-                pd.to_datetime(df_salas_unicas["ultima_msg"], errors="coerce").dt.tz_localize(None)
-            )
+#           # Trata as datas e calcula o tempo de uso em horas decimais
+#           df_salas_unicas["inicio_chat"] = pd.to_datetime(df_salas_unicas["inicio_chat"], errors="coerce").dt.tz_localize(None)
+#           df_salas_unicas["fim_calculado"] = pd.to_datetime(df_salas_unicas["saida_gravada"], errors="coerce").dt.tz_localize(None)
+#           df_salas_unicas["fim_calculado"] = df_salas_unicas["fim_calculado"].fillna(
+#               pd.to_datetime(df_salas_unicas["ultima_msg"], errors="coerce").dt.tz_localize(None)
+#           )
             
-            duracao_delta = df_salas_unicas["fim_calculado"] - df_salas_unicas["inicio_chat"]
-            df_salas_unicas["tempo_de_uso"] = (duracao_delta.dt.total_seconds() / 3600.0).round(2)
-            df_salas_unicas["tempo_de_uso"] = df_salas_unicas["tempo_de_uso"].apply(lambda x: max(x, 0.05))
+#           duracao_delta = df_salas_unicas["fim_calculado"] - df_salas_unicas["inicio_chat"]
+#           df_salas_unicas["tempo_de_uso"] = (duracao_delta.dt.total_seconds() / 3600.0).round(2)
+#           df_salas_unicas["tempo_de_uso"] = df_salas_unicas["tempo_de_uso"].apply(lambda x: max(x, 0.05))
 
             # 🌟 CRUZA AS TABELAS USANDO O REMETENTE_ID COMO CHAVE DE ASSOCIAÇÃO DO ID DE USUÁRIO
-            df_salas_unicas["remetente_id"] = df_salas_unicas["remetente_id"].astype(str).str.strip()
-            df_usr["id"] = df_usr["id"].astype(str).str.strip()
+#           df_salas_unicas["remetente_id"] = df_salas_unicas["remetente_id"].astype(str).str.strip()
+#           df_usr["id"] = df_usr["id"].astype(str).str.strip()
             
             # Realiza o Merge para puxar 'tipo_plano' e 'moedas' reais associados ao remetente
-            df_salas_completas = pd.merge(
-                df_salas_unicas, 
-                df_usr[["id", "tipo_plano", "moedas"]], 
-                left_on="remetente_id", 
-                right_on="id", 
-                how="left"
-            )
+#           df_salas_completas = pd.merge(
+#               df_salas_unicas, 
+#               df_usr[["id", "tipo_plano", "moedas"]], 
+#               left_on="remetente_id", 
+#               right_on="id", 
+#               how="left"
+#           )
             
             # Higieniza os campos do faturamento coletados
-            df_salas_completas["tipo_plano"] = df_salas_completas["tipo_plano"].astype(str).str.strip().str.lower()
-            df_salas_completas["moedas"] = df_salas_completas["moedas"].fillna(0).astype(int)
+#           df_salas_completas["tipo_plano"] = df_salas_completas["tipo_plano"].astype(str).str.strip().str.lower()
+#           df_salas_completas["moedas"] = df_salas_completas["moedas"].fillna(0).astype(int)
 
             # Classifica as fatias do gráfico com base na mesma regra do gráfico de pizza
-            def classificar_perfil_real(row):
-                plano = str(row["tipo_plano"])
-                moedas = row["moedas"]
-                if "vip" in plano or "admin" in plano:
-                    return "VIP"
-                elif "grátis" in plano or "gratis" in plano:
-                    return "Plano Crédito de Moedas" if moedas > 0 else "Grátis"
-                else:
-                    return "Plano Crédito de Moedas"
+#           def classificar_perfil_real(row):
+#               plano = str(row["tipo_plano"])
+#               moedas = row["moedas"]
+#               if "vip" in plano or "admin" in plano:
+#                   return "VIP"
+#               elif "grátis" in plano or "gratis" in plano:
+#                   return "Plano Crédito de Moedas" if moedas > 0 else "Grátis"
+#               else:
+#                   return "Plano Crédito de Moedas"
 
-            df_salas_completas["Tipo de plano"] = df_salas_completas.apply(classificar_perfil_real, axis=1)
+#           df_salas_completas["Tipo de plano"] = df_salas_completas.apply(classificar_perfil_real, axis=1)
 
-            # Prepara os DataFrames finais para exibição
-            df_salas_real = df_salas_completas[["match_id", "Tipo de plano", "tempo_de_uso"]].copy()
-            df_salas_real.columns = ["Sala", "Tipo de plano", "Tempo de Uso (Horas)"]
-            df_salas_real = df_salas_real.sort_values(by="Tempo de Uso (Horas)", ascending=False)
+#           # Prepara os DataFrames finais para exibição
+#           df_salas_real = df_salas_completas[["match_id", "Tipo de plano", "tempo_de_uso"]].copy()
+#           df_salas_real.columns = ["Sala", "Tipo de plano", "Tempo de Uso (Horas)"]
+#           df_salas_real = df_salas_real.sort_values(by="Tempo de Uso (Horas)", ascending=False)
             
-            df_tempo_por_perfil = (
-                df_salas_real.groupby("Tipo de plano")["Tempo de Uso (Horas)"].sum().reset_index()
-            )
+#           df_tempo_por_perfil = (
+#               df_salas_real.groupby("Tipo de plano")["Tempo de Uso (Horas)"].sum().reset_index()
+#           )
 
 
             # 🌟 PASSO 3: Classifica as categorias baseado na mesma regra de negócio da pizza
-            def classificar_perfil_real(row):
-                plano = str(row["tipo_plano"])
-                moedas = row["moedas"]
+#           def classificar_perfil_real(row):
+#               plano = str(row["tipo_plano"])
+##              moedas = row["moedas"]
                 
-                if "vip" in plano or "admin" in plano:
-                    return "VIP"
-                elif "grátis" in plano or "gratis" in plano:
-                    if moedas > 0:
-                        return "Plano Crédito de Moedas"
-                    else:
-                        return "Grátis"
-                else:
-                    return "Plano Crédito de Moedas"
-
-            df_salas_completas["Tipo de plano"] = df_salas_completas.apply(classificar_perfil_real, axis=1)
-
-            # Organiza o DataFrame final ordenando as salas mais longas no topo
-            df_salas_real = df_salas_completas[["match_id", "Tipo de plano", "tempo_de_uso"]].copy()
-            df_salas_real.columns = ["Sala", "Tipo de plano", "Tempo de Uso (Horas)"]
-            df_salas_real = df_salas_real.sort_values(by="Tempo de Uso (Horas)", ascending=False)
-            
-            # Agrupa o somatório total de horas reais por perfil para o gráfico
-            df_tempo_por_perfil = (
-                df_salas_real.groupby("Tipo de plano")["Tempo de Uso (Horas)"]
-                .sum()
-                .reset_index()
-            )
-        else:
-            df_salas_real = pd.DataFrame()
-            df_tempo_por_perfil = pd.DataFrame()
-
+#               if "vip" in plano or "admin" in plano:
+#                   return "VIP"
+#               elif "grátis" in plano or "gratis" in plano:
+#                   if moedas > 0:
+#                       return "Plano Crédito de Moedas"
+#                   else:
+#                       return "Grátis"
+#               else:
+#                   return "Plano Crédito de Moedas"
+#
+#           df_salas_completas["Tipo de plano"] = df_salas_completas.apply(classificar_perfil_real, axis=1)
+#
+#           # Organiza o DataFrame final ordenando as salas mais longas no topo
+#           df_salas_real = df_salas_completas[["match_id", "Tipo de plano", "tempo_de_uso"]].copy()
+#           df_salas_real.columns = ["Sala", "Tipo de plano", "Tempo de Uso (Horas)"]
+#           df_salas_real = df_salas_real.sort_values(by="Tempo de Uso (Horas)", ascending=False)
+#           
+#           # Agrupa o somatório total de horas reais por perfil para o gráfico
+#           df_tempo_por_perfil = (
+#               df_salas_real.groupby("Tipo de plano")["Tempo de Uso (Horas)"]
+#               .sum()
+#               .reset_index()
+#           )
+#       else:
+#           df_salas_real = pd.DataFrame()
+#           df_tempo_por_perfil = pd.DataFrame()
+#
         # 3. RENDERIZAÇÃO DOS GRÁFICOS COM DADOS 100% REAIS E CROSS-TABELA
-        if not df_salas_real.empty:
-            c1, c2 = st.columns(2)
+#       if not df_salas_real.empty:
+#           c1, c2 = st.columns(2)
 
-            with c1:
-                st.write("#### ⏱️ Tempo Total Acumulado por Perfil")
-                fig_tempo = px.bar(
-                    df_tempo_por_perfil,
-                    x="Tipo de plano",
-                    y="Tempo de Uso (Horas)",
-                    color="Tipo de plano",
-                    title="Volume de Horas Consumidas no Chat (Dados Reais)",
-                    color_discrete_map={
-                        "VIP": "#6f42c1",
-                        "Plano Crédito de Moedas": "#28a745",
-                        "Grátis": "#007bff"
-                    },
-                )
-                fig_tempo.update_layout(
-                    template="plotly_dark",
-                    paper_bgcolor="#161b22", 
-                    plot_bgcolor="#161b22", 
-                    showlegend=False, 
-                ) 
-                st.plotly_chart(fig_tempo, use_container_width=True) 
-
-            with c2: 
-                st.write("#### 📑 Detalhes dos Encontros Calculados") 
-                st.dataframe( 
-                    df_salas_real, 
-                    use_container_width=True, 
-                    hide_index=True, 
-                ) 
-        else: 
-            st.info("ℹ️ Nenhuma atividade ou registro de mensagem localizado na tabela 'mensagens_sala' do banco de dados.")
-
+#           with c1:
+#               st.write("#### ⏱️ Tempo Total Acumulado por Perfil")
+#               fig_tempo = px.bar(
+#                   df_tempo_por_perfil,
+#                   x="Tipo de plano",
+#                   y="Tempo de Uso (Horas)",
+#                   color="Tipo de plano",
+#                   title="Volume de Horas Consumidas no Chat (Dados Reais)",
+#                   color_discrete_map={
+#                       "VIP": "#6f42c1",
+#                       "Plano Crédito de Moedas": "#28a745",
+#                       "Grátis": "#007bff"
+#                   },
+#               )
+#               fig_tempo.update_layout(
+#                   template="plotly_dark",
+#                   paper_bgcolor="#161b22", 
+ #                  plot_bgcolor="#161b22", 
+#                   showlegend=False, 
+#               ) 
+#               st.plotly_chart(fig_tempo, use_container_width=True) 
+#
+#           with c2: 
+#               st.write("#### 📑 Detalhes dos Encontros Calculados") 
+#               st.dataframe( 
+#                   df_salas_real, 
+#                   use_container_width=True, 
+#                   hide_index=True, 
+#               ) 
+#       else: 
+ #          st.info("ℹ️ Nenhuma atividade ou registro de mensagem localizado na tabela 'mensagens_sala' do banco de dados.")
 
 
 
