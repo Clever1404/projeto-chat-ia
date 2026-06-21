@@ -2584,28 +2584,42 @@ def template_painel_admin():
         # --------------------------------------------------------------------------
         st.subheader("🟢 Monitoramento de Salas Privadas")
 
-        # 1. COLETA INTEGRADA DOS DADOS DO SUPABASE
+        # 1. COLETA INTEGRADA DOS DADOS DO SUPABASE (COM DIAGNÓSTICO INTEGRADO)
         try:
-            # Busca A: Mensagens com o remetente_id real
-            msg_query = (
+            # Busca A: Mensagens com tratamento de propriedades do objeto
+            msg_response = (
                 supabase.table("mensagens_sala")
                 .select("id", "match_id", "remetente_id", "criado_em", "saida_em")
                 .execute()
             )
-            dados_mensagens = msg_query.data if msg_query.data else []
+            
+            # Validação dupla de extração do objeto de resposta
+            if hasattr(msg_response, "data"):
+                dados_mensagens = msg_response.data
+            else:
+                dados_mensagens = msg_response if isinstance(msg_response, list) else []
 
-            # Busca B: Usuarios para puxar o plano e moedas reais
-            user_query = (
+            # Busca B: Usuários para puxar o plano e moedas reais
+            user_response = (
                 supabase.table("usuarios")
                 .select("id", "tipo_plano", "moedas")
                 .execute()
             )
-            dados_usuarios = user_query.data if user_query.data else []
+            
+            if hasattr(user_response, "data"):
+                dados_usuarios = user_response.data
+            else:
+                dados_usuarios = user_response if isinstance(user_response, list) else []
 
-        except Exception as e:
-            st.error(f"Erro na conexão integrada do banco de dados: {e}")
-            dados_mensagens = []
-            dados_usuarios = []
+    # 🔍 PRINT DE DIAGNÓSTICO VISUAL NO SEU APP STREAMLIT
+    st.sidebar.write("### 🚨 Depuração de Tabelas")
+    st.sidebar.write(f"Linhas em 'mensagens_sala': {len(dados_mensagens) if dados_mensagens else 0}")
+    st.sidebar.write(f"Linhas em 'usuarios': {len(dados_usuarios) if dados_usuarios else 0}")
+
+except Exception as e:
+    st.error(f"Erro na conexão integrada do banco de dados: {e}")
+    dados_mensagens = []
+    dados_usuarios = []
 
         # 2. PROCESSAMENTO E JUNCÃO REAL VIA PANDAS
         if dados_mensagens and dados_usuarios:
