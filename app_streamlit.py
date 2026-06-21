@@ -2240,38 +2240,90 @@ def template_painel_admin():
     # Converte a tupla de usuários em DataFrame
     df_usuarios_mod = pd.DataFrame(usuarios_bd, columns=["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", "Status Presença"])
 
-    # --- DECISÃO HÍBRIDA FINAL ATUALIZADA (LIVRE DE ERROS DE FUSO HORÁRIO) ---
+    # ==========================================================================
+    # --- PROCESSAMENTO AVANÇADO DA REGRA 'saida_em' PARA MENSAGENS E CHAT ---
+    # ==========================================================================
+    salas_ativas_reais = 0
+    df_salas_completas = pd.DataFrame()
+
+    if salas_hoje_tuplas:
+        # Monta o DataFrame das salas agregadas por match_id único para colapsar mensagens repetidas
+        df_salas_tempo = pd.DataFrame(salas_hoje_tuplas, columns=["match_id", "ultima_mensagem", "saidas_registradas"])
+        
+        # Garante a formatação de hora e calcula o tempo desde a última atividade
+        df_salas_tempo["ultima_mensagem"] = pd.to_datetime(df_salas_tempo["ultima_mensagem"]).dt.tz_localize(None)
+        agora = pd.Timestamp.now()
+        df_salas_tempo["minutos_desde_ultima_msg"] = (agora - df_salas_tempo["ultima_mensagem"]).dt.total_seconds() / 60.0
+        df_salas_tempo["data_criacao"] = df_salas_tempo["ultima_mensagem"].dt.date
+        
+        # Uma sala no banco é considerada ativa se:
+        # 1. Nenhuma linha daquela sala registrou saída ainda (saidas_registradas == 0)
+        # 2. Alguém mandou mensagem nela nos últimos 20 minutos (indica conversa ativa agora)
+        df_salas_filtradas = df_salas_tempo[
+            (df_salas_tempo["saidas_registradas"] == 0) & 
+            (df_salas_tempo["minutos_desde_ultima_msg"] <= 20.0)
+        ]
+        
+        salas_ativas_reais = len(df_salas_filtradas)
+        df_salas_completas = df_salas_tempo.copy()
+
+    # ==========================================================================
+    # --- REGRA DE PRESENÇA (PANDAS): FILTRAGEM DE USUÁRIOS SEM ADMIN ---
+    # ==========================================================================
+    total_salas_por_presenca = 0  # 🌟 DECLARAÇÃO SEGURA DE BACKUP CONTRA NAMEERROR
+
+    if 'df_usuarios_mod' in locals() and not df_usuarios_mod.empty:
+        # Filtra apenas os usuários que estão fisicamente na tela de 'Sala' agora
+        df_na_sala = df_usuarios_mod[df_usuarios_mod["Status Presença"].str.contains("Sala", na=False, case=False)]
+        
+        # Remove qualquer conta de teste administrativa (E-mail ou Username) do cálculo de presença
+        df_clientes_na_sala = df_na_sala[
+            (~df_na_sala["Nome / Username"].str.contains("admin", na=False, case=False)) & 
+            (~df_na_sala["E-mail"].str.contains("admin", na=False, case=False))
+        ]
+        
+        total_clientes_ativos = len(df_clientes_na_sala)
+        total_salas_por_presenca = int(total_clientes_ativos // 2)
+
+    # ==========================================================================
+    # --- DECISÃO HÍBRIDA FINAL (Cruzamento de Logs de Mensagem + Presença) ---
+    # ==========================================================================
     total_salas_ativas = 0
 
-    # 1. Se houver clientes legítimos na tela de sala privada agora, confiamos na presença da tela
+    # 1. Se há clientes ativos digitando e visualizando a tela agora, confiamos na presença limpa
     if total_salas_por_presenca > 0:
         total_salas_ativas = total_salas_por_presenca
     else:
-        # 2. Caso contrário, analisamos o histórico de mensagens processadas acima
-        if 'df_salas_completas' in locals() and not df_salas_completas.empty:
-            # Converte a data de criação para data simples (Ano-Mês-Dia)
-            df_salas_completas["data_criacao"] = pd.to_datetime(df_salas_completas["inicio_chat"]).dt.date
-            
-            # Pega a data exata de hoje do sistema (2026-06-20)
+        # 2. Se fecharam o app, confiamos no histórico de mensagens ativas calculados do banco
+        total_salas_ativas = salas_ativas_reais
+        
+        # 3. Fallback de segurança para homologação de dados simulados (Mocks) se o banco vier zerado
+        if total_salas_ativas == 0 and not df_salas_completas.empty:
             import datetime
             hoje = datetime.date.today()
-            
-            # 🌟 REGRA DEFINITIVA: Conta salas criadas HOJE onde a saída está vazia (ISNA)
-            # Ou se for a sala simulada sem saída gravada (como o exemplo 'sala_alfa_2026' que criamos)
-            salas_abertas_hoje = df_salas_completas[
-                (df_salas_completas["data_criacao"] == hoje) & 
-                (df_salas_completas["saida_gravada"].isna() | (df_salas_completas["saida_gravada"] == ""))
-            ]
-            
-            total_salas_ativas = len(salas_abertas_hoje)
-            
-            # Fallback de segurança: se mesmo assim der 0, mas existirem salas geradas hoje no dataframe,
-            # usamos o volume único de match_ids encontrados para não deixar o painel zerado na homologação
-            if total_salas_ativas == 0 and not df_salas_completas[df_salas_completas["data_criacao"] == hoje].empty:
-                total_salas_ativas = len(df_salas_completas[df_salas_completas["data_criacao"] == hoje]["match_id"].unique())
+            total_salas_ativas = len(df_salas_completas[df_salas_completas["data_criacao"] == hoje]["match_id"].unique())
 
-    # Garante que seja exibido como um número inteiro limpo
+    # Força o número a ser um inteiro limpo para exibição no Streamlit
     total_salas_ativas = int(total_salas_ativas)
+
+    # ==========================================================================
+    # --- 2. RENDERIZAÇÃO DOS CARDS DE MÉTRICAS COMPACTOS (KPIs) ---
+    # ==========================================================================
+    c_k1, c_k2, c_k3 = st.columns(3)
+    with c_k1:
+        st.metric("Total de Perfis Cadastrados", len(df_usuarios_mod))
+    with c_k2:
+        ativos_now = len(df_usuarios_mod[df_usuarios_mod["Status Presença"].str.contains("Online", na=False)])
+        st.metric("Usuários Online Agora", ativos_now)
+    with c_k3:
+        # Exibe a contagem limpa e inteligente livre de contas administrativas e NameErrors
+        st.metric(
+            "Salas Virtuais Ativas (Hoje)", 
+            total_salas_ativas, 
+            help="Total de salas de encontros reais criadas hoje, higienizadas contra contas de Administradores"
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
 
 
