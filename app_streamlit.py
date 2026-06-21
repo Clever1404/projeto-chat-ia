@@ -2611,15 +2611,20 @@ def template_painel_admin():
             else:
                 dados_usuarios = user_response if isinstance(user_response, list) else []
 
-    # 🔍 PRINT DE DIAGNÓSTICO VISUAL NO SEU APP STREAMLIT
-    st.sidebar.write("### 🚨 Depuração de Tabelas")
-    st.sidebar.write(f"Linhas em 'mensagens_sala': {len(dados_mensagens) if dados_mensagens else 0}")
-    st.sidebar.write(f"Linhas em 'usuarios': {len(dados_usuarios) if dados_usuarios else 0}")
+            # 🔍 PRINT DE DIAGNÓSTICO VISUAL NO SEU APP STREAMLIT
+            st.sidebar.write("### 🚨 Depuração de Tabelas")
+            st.sidebar.write(f"Linhas em 'mensagens_sala': {len(dados_mensagens) if dados_mensagens else 0}")
+            st.sidebar.write(f"Linhas em 'usuarios': {len(dados_usuarios) if dados_usuarios else 0}")
 
 except Exception as e:
     st.error(f"Erro na conexão integrada do banco de dados: {e}")
     dados_mensagens = []
     dados_usuarios = []
+
+        except Exception as e:
+            st.error(f"Erro na conexão integrada do banco de dados: {e}")
+            dados_mensagens = []
+            dados_usuarios = []
 
         # 2. PROCESSAMENTO E JUNCÃO REAL VIA PANDAS
         if dados_mensagens and dados_usuarios:
