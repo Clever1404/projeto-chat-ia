@@ -2562,7 +2562,7 @@ def template_painel_admin():
         # --------------------------------------------------------------------------
         # 6. EXIBIÇÃO DO MONITORAMENTO REAL DE SALAS PRIVADAS
         # --------------------------------------------------------------------------
-       st.subheader("🟢 Monitoramento de Salas Privadas")
+        st.subheader("🟢 Monitoramento de Salas Privadas")
 
         # 1. Busca os dados REAIS no Supabase (trazendo as colunas cronológicas do chat)
         try:
