@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import plotly.express as px
 import streamlit as bar
-
+import datetime
 
 
 
@@ -50,8 +50,6 @@ if "tela_atual" not in st.session_state:
 
 # Configuração que controla o comportamento visual da barra lateral
 st.set_page_config(initial_sidebar_state=st.session_state.sidebar_state)
-
-
 
 
 
@@ -1773,23 +1771,27 @@ def template_sala_privada():
                 st.rerun() # Atualiza a tela uma única vez para mostrar a nova mensagem
     
 
-def renderizar_listas_sidebar_e_acoes(): 
+ddef renderizar_listas_sidebar_e_acoes(): 
     with st.sidebar: 
-        # --- PERFIL DO USUÁRIO ---
+        # ==========================================================================
+        # --- PERFIL DO USUÁRIO & AVATAR HTML ---
+        # ==========================================================================
         avatar_html = ""
-        caminho_minha_foto = str(st.session_state.foto_perfil).strip().lstrip('/')
-        if st.session_state.foto_perfil and os.path.exists(caminho_minha_foto):
+        caminho_minha_foto = str(st.session_state.get("foto_perfil", "")).strip().lstrip('/')
+        
+        if caminho_minha_foto and os.path.exists(caminho_minha_foto):
             try:
                 with open(caminho_minha_foto, "rb") as image_file:
                     encoded_string = base64.b64encode(image_file.read()).decode()
                 avatar_html = f'<img src="data:image/jpeg;base64,{encoded_string}" style="width:65px; height:65px; border-radius:50%; object-fit:cover; border:2px solid #30363d; margin:0 auto 10px auto; display:block;">'
             except Exception:
-                avatar_html = f'<div style="font-size: 35px; text-align:center;">👩</div>'
+                avatar_html = '<div style="font-size: 35px; text-align:center;">👩</div>'
         else:
-            avatar_html = f'<div style="font-size: 35px; text-align:center;">👩</div>'
+            avatar_html = '<div style="font-size: 35px; text-align:center;">👩</div>'
 
-        # --- CORREÇÃO DA LINHA 480 (EXTRAÇÃO DO ÍNDICE [0] DA STRING SPLIT) ---
-        nome_usuario_puro = str(st.session_state.username).split('@')[0].capitalize()
+        # Extração limpa do nome do usuário antes do '@'
+        username_atual = st.session_state.get("username", "Usuário")
+        nome_usuario_puro = str(username_atual).split('@')[0].capitalize()
 
         st.markdown(f"""
             <div class="box-perfil-fixo" style="background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 15px;">
@@ -1799,80 +1801,78 @@ def renderizar_listas_sidebar_e_acoes():
             </div>
         """, unsafe_allow_html=True)
 
-       # 1. Define os valores padrões caso a busca no banco falhe
+        # ==========================================================================
+        # --- CONSULTA 1: PLANO E SALDO DE MOEDAS REAL (SUPABASE) ---
+        # ==========================================================================
         tipo_plano = "Grátis"
         saldo_moedas = 0
+        id_usuario_logado = st.session_state.get("usuario_id")
 
-        try:
-            # Captura com segurança o ID do usuário logado
-            id_usuario_logado = st.session_state.get("usuario_id")
-            
-            # CORREÇÃO: Alterado de 'NULL' para 'None' (sintaxe correta do Python)
-            if id_usuario_logado is not None:
-                # Faz a busca no Supabase convertendo o ID para inteiro
+        if id_usuario_logado is not None:
+            try:
                 user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
-                
-                # Verifica se a lista contém dados e extrai do primeiro elemento [0]
                 if user_data.data and len(user_data.data) > 0:
                     tipo_plano = user_data.data[0].get("tipo_plano", "Grátis")
                     saldo_moedas = user_data.data[0].get("moedas", 0)
-            else:
-                st.warning("⚠️ Usuário não identificado na sessão.")
+            except Exception as e:
+                st.error(f"Erro ao carregar saldo do banco: {e}")
+        else:
+            st.warning("⚠️ Usuário não identificado na sessão.")
 
-        except Exception as e:
-            st.error(f"Erro ao carregar dados do banco: {e}")
-
-        # 🔄 SALVANDO CORRETAMENTE NA SESSÃO GLOBAL:
+        # Atualiza a sessão global de forma segura
         st.session_state["tipo_plano"] = tipo_plano
         st.session_state["saldo_moedas"] = saldo_moedas
 
-        # Exibe na tela com as variáveis atualizadas e corretas
         st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
 
+        # ==========================================================================
+        # --- COMPONENTE: ALTERAR FOTO DE PERFIL ---
+        # ==========================================================================
         st.caption("📷 Enviar nova foto de perfil:")
         f_nova = st.file_uploader("Alterar Foto", type=["png","jpg","jpeg"], key="side_f_up", label_visibility="collapsed") 
-        if f_nova: 
-            if not os.path.exists(UPLOAD_FOLDER): os.makedirs(UPLOAD_FOLDER, exist_ok=True) 
-            c_completo = os.path.join(UPLOAD_FOLDER, f"user_{st.session_state.usuario_id}.jpg") 
-            with open(c_completo, "wb") as f: f.write(f_nova.getbuffer()) 
-            conn = conectar_supabase(); cursor = conn.cursor() 
-            cursor.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s", (f"/{c_completo}", int(st.session_state.usuario_id))) 
-            conn.commit(); cursor.close(); conn.close() 
-            st.session_state.foto_perfil = f"/{c_completo}"; st.rerun() 
+        if f_nova and id_usuario_logado: 
+            if not os.path.exists(UPLOAD_FOLDER): 
+                os.makedirs(UPLOAD_FOLDER, exist_ok=True) 
+            c_completo = os.path.join(UPLOAD_FOLDER, f"user_{id_usuario_logado}.jpg") 
+            with open(c_completo, "wb") as f: 
+                f.write(f_nova.getbuffer()) 
+            
+            try:
+                conn = conectar_supabase(); cursor = conn.cursor() 
+                cursor.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s", (f"/{c_completo}", int(id_usuario_logado))) 
+                conn.commit(); cursor.close(); conn.close() 
+                st.session_state.foto_perfil = f"/{c_completo}"
+                st.rerun() 
+            except Exception as e:
+                st.error(f"Erro ao salvar foto: {e}")
 
         st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)    
         
-              
-        # 🔍 MOTOR DE BUSCA DA NOTIFICAÇÃO DA BARRA LATERAL (BOLINHA VERMELHA)
+        # ==========================================================================
+        # --- CONSULTA 2: MOTOR DE BUSCA DA NOTIFICAÇÃO (MANTIDA APENAS UMA VEZ) ---
+        # ==========================================================================
         possui_convite_pendente = False
-        try:
-            meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
-            conn_b = conectar_supabase(); cursor_b = conn_b.cursor()
-            cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
-            if cursor_b.fetchone() > 0: possui_convite_pendente = True
-            cursor_b.close(); conn_b.close()
-        except Exception: pass
+        if id_usuario_logado:
+            try:
+                # Resolve tuplas/listas indesejadas no ID
+                if isinstance(id_usuario_logado, (tuple, list)):
+                    meu_id_limpo = int(id_usuario_logado[0])
+                else:
+                    meu_id_limpo = int(id_usuario_logado)
+                
+                conn_b = conectar_supabase()
+                cursor_b = conn_b.cursor()
+                cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
+                count_res = cursor_b.fetchone()
+                if count_res and count_res[0] > 0: 
+                    possui_convite_pendente = True
+                cursor_b.close()
+                conn_b.close()
+            except Exception as e: 
+                print(f"Erro ao checar notificações: {e}")
 
-        # --- BLOCO 3: BOTÕES DE NAVEGAÇÃO INTERNA COM NOTIFICAÇÃO DINÂMICA ---
-        # 🔍 MOTOR DE BUSCA DA NOTIFICAÇÃO DA BARRA LATERAL (BOLINHA VERMELHA)
-        possui_convite_pendente = False
-        try:
-            meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
-            conn_b = conectar_supabase()
-            cursor_b = conn_b.cursor()
-            # Conta se existem convites com status 'pendente' onde VOCÊ é o destinatário
-            cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
-            count_res = cursor_b.fetchone()
-            if count_res and count_res[0] > 0: 
-                possui_convite_pendente = True
-            cursor_b.close()
-            conn_b.close()
-        except Exception as e: 
-            print(f"Erro ao checar notificações: {e}")
-
-        # Configura o rótulo do botão dinamicamente com base na presença de convites
+        # Configura o rótulo do botão baseado na presença de convites
         if possui_convite_pendente:
-            # Rótulo ganha o emoji de alerta visual vermelho piscante
             label_gestao = "🤝 ABRIR GESTÃO 🔴"
             st.markdown("""
                 <div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'>
@@ -1882,78 +1882,113 @@ def renderizar_listas_sidebar_e_acoes():
         else:
             label_gestao = "🤝 ABRIR GESTÃO"
 
-        # Renderiza o botão com o rótulo atualizado
+        # ==========================================================================
+        # --- BOTÕES DE NAVEGAÇÃO INTERNA ---
+        # ==========================================================================
         if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel"):
             st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
             st.rerun()
-        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True): 
-            st.session_state.opcao_menu = "📅 Disponibilidade"
             
-       # No seu menu lateral padrão:
-        if st.sidebar.button("Ir para a Loja 🛒", type="secondary", use_container_width=True):
+        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria"): 
+            st.session_state.opcao_menu = "📅 Disponibilidade"
+            st.rerun()
+            
+        if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_ir_loja"):
             st.session_state.abrir_popup_loja = True
             st.rerun()
                
-        if st.session_state.eh_admin or st.session_state.username in ['admin', 'Clever1404']:
-            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True):
-                st.session_state.opcao_menu = "🛠️ Painel Admin"; st.rerun()     
+        # Validação segura de perfil administrador
+        eh_admin = st.session_state.get("eh_admin", False)
+        if eh_admin or username_atual in ['admin', 'Clever1404']:
+            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm"):
+                st.session_state.opcao_menu = "🛠️ Painel Admin"
+                st.rerun()     
 
-        if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True):
-            try:
-                conn = conectar_supabase(); cursor = conn.cursor()
-                cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(st.session_state.usuario_id),))
-                conn.commit(); cursor.close(); conn.close(); st.toast("Histórico limpo!"); st.rerun()
-            except Exception as e: st.error(f"Erro: {e}")
+        if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True, key="btn_limpar_ia"):
+            if id_usuario_logado:
+                try:
+                    conn = conectar_supabase(); cursor = conn.cursor()
+                    cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(id_usuario_logado),))
+                    conn.commit(); cursor.close(); conn.close()
+                    st.toast("Histórico limpo!")
+                    st.rerun()
+                except Exception as e: 
+                    st.error(f"Erro: {e}")
 
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
-        if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True):
-            try:
-                conn_logout = conectar_supabase(); cursor_logout = conn_logout.cursor()
-                cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (int(st.session_state.usuario_id),))
-                conn_logout.commit(); cursor_logout.close(); conn_logout.close()
-            except Exception: pass
-            st.session_state.usuario_id = None; st.session_state.username = None; st.session_state.opcao_menu = "login"; st.rerun()
+        
+        # ==========================================================================
+        # --- BOTÃO: ENCERRAR SESSÃO (LOGOUT INTEGRADO) ---
+        # ==========================================================================
+        if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema"):
+            if id_usuario_logado:
+                try:
+                    conn_logout = conectar_supabase(); cursor_logout = conn_logout.cursor()
+                    cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (int(id_usuario_logado),))
+                    conn_logout.commit(); cursor_logout.close(); conn_logout.close()
+                except Exception: 
+                    pass
+            
+            # Limpeza completa e segura dos estados de sessão
+            st.session_state.usuario_id = None
+            st.session_state.username = None
+            st.session_state.opcao_menu = "login"
+            st.rerun()
 
+
+# 🌟 OTIMIZAÇÃO 1: Função isolada com Cache para buscar os horários salvos sem travar a tela
+@st.cache_data(ttl=60)  # Limpa o cache automaticamente após 1 minuto
+def buscar_disponibilidade_banco(usuario_id):
+    horarios = set()
+    try:
+        conn = conectar_supabase()
+        cursor = conn.cursor()
+        cursor.execute("SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", (usuario_id,))
+        for d_sem, per_id in cursor.fetchall():
+            horarios.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
+        cursor.close()
+        conn.close()
+    except Exception:
+        pass
+    return horarios
 
 def template_disponibilidade(): 
     st.subheader("📅 Sua Grade de Disponibilidade") 
-    st.caption("Marque os dias da semana em que você está disponível. Seus matches verão apenas os dias da semanas que você está disponível.")
+    st.caption("Marque os dias da semana em que você está disponível. Seus matches verão apenas os dias da semana que você está disponível.")
 
     dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'] 
     periodos = [{"id": "manha", "nome": "Manhã"}, {"id": "tarde", "nome": "Tarde"}, {"id": "noite", "nome": "Noite"}] 
 
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
-    horarios_salvos = set()
     
-    try:
-        conn = conectar_supabase()
-        cursor = conn.cursor()
-        cursor.execute("SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
-        for d_sem, per_id in cursor.fetchall():
-            horarios_salvos.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
-        cursor.close()
-        conn.close()
-    except Exception:
-        pass
+    # Chama a função otimizada com cache
+    horarios_salvos = buscar_disponibilidade_banco(meu_id_limpo)
 
-    matriz = [] 
-    for per in periodos: 
-        linha = {"Período": per["nome"]} 
-        for d in dias: 
-            linha[d] = f"{d}_{per['id']}" in horarios_salvos
-        matriz.append(linha) 
+    # 🌟 OTIMIZAÇÃO 2: Constrói a matriz na memória usando Session State para evitar repetições
+    if "df_grade_memoria" not in st.session_state:
+        matriz = [] 
+        for per in periodos: 
+            linha = {"Período": per["nome"]} 
+            for d in dias: 
+                linha[d] = f"{d}_{per['id']}" in horarios_salvos
+            matriz.append(linha) 
+        st.session_state["df_grade_memoria"] = pd.DataFrame(matriz)
 
-    df_grade = pd.DataFrame(matriz) 
-    
     config_c = {"Período": st.column_config.TextColumn(disabled=True)} 
     for d in dias: 
         config_c[d] = st.column_config.CheckboxColumn(default=False) 
 
     # --- 1. ESCOPO DO FORMULÁRIO EXCLUSIVO PARA O SALVAMENTO DA PLANILHA ---
     with st.form("container_formulario_grade_horaria", clear_on_submit=False):
-        grade_editada = st.data_editor(df_grade, column_config=config_c, use_container_width=True, hide_index=True, key="grade_horaria_editor") 
+        # O editor lê e modifica diretamente a memória ultra-rápida do session_state
+        grade_editada = st.data_editor(
+            st.session_state["df_grade_memoria"], 
+            column_config=config_c, 
+            use_container_width=True, 
+            hide_index=True, 
+            key="grade_horaria_editor"
+        ) 
         
-        # O único botão dentro do form deve ser o submit de gravação
         botao_salvar_ativo = st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True)
         
         if botao_salvar_ativo: 
@@ -1971,43 +2006,46 @@ def template_disponibilidade():
                                 VALUES (%s, %s, %s);
                             """, (meu_id_limpo, str(d), str(p_id))) 
                 
-                # ... CÓDIGO DA SUA QUERY DE INSERT CONTINUA IGUAL ...
                 conn.commit()
                 cursor.close()
                 conn.close() 
                 
-                # 🔍 CORREÇÃO: Alerta flutuante que persiste mesmo com o st.rerun() imediato
+                # 🌟 OTIMIZAÇÃO 3: Limpa o cache e a memória para forçar o reload do banco no próximo clique
+                st.cache_data.clear()
+                if "df_grade_memoria" in st.session_state:
+                    del st.session_state["df_grade_memoria"]
+                
                 st.toast("🎉 Sua grade horária foi salva com sucesso no banco de dados!")
-                
-                # Importa e segura o ciclo por 1 segundo para o usuário ler o aviso na tela
-                import time
                 time.sleep(1)
-                
                 st.rerun() 
             except Exception as e:
                 st.error(f"Erro crítico ao salvar no banco: {e}")
 
-    # --- 2. ÁREA EXTERNA AO FORMULÁRIO (RESOLVE O STREAMLITAPIEXCEPTION) ---
-    # Os botões comuns abaixo agora nascem fora do container do form, operando livremente
+    # --- 2. ÁREA EXTERNA AO FORMULÁRIO ---
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     col_l, col_v = st.columns(2)
     
     with col_l:
-        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True):
+        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True, key="btn_limpar_grade_real"):
             try:
                 conn = conectar_supabase(); cursor = conn.cursor()
                 cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
                 conn.commit(); cursor.close(); conn.close()
+                
+                # Limpa estados locais pós-exclusão
+                st.cache_data.clear()
+                if "df_grade_memoria" in st.session_state:
+                    del st.session_state["df_grade_memoria"]
+                    
                 st.toast("Toda a sua grade horária foi limpa!")
                 st.rerun()
             except Exception as e: 
                 st.error(f"Erro: {e}")
             
     with col_v: 
-        if st.button("Voltar ao Chat", use_container_width=True): 
+        if st.button("Voltar ao Chat", use_container_width=True, key="btn_voltar_chat_grade"): 
             st.session_state.opcao_menu = "💬 Conversar com Lucy" 
             st.rerun()
-
 
 # ==============================================================================
 # 7. TELA DE GESTÃO DE RELACIONAMENTOS (RESTAURAÇÃO COMPLETA DA LISTA DE MATCHES)
@@ -2015,37 +2053,51 @@ def template_disponibilidade():
 
 def template_gerenciar_conexoes_completo(): 
     st.title("🤝 Gestão de Relacionamentos") 
-    if st.button("← Voltar para o Chat da Lucy", type="secondary"):
+    
+    if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
         st.session_state.opcao_menu = "💬 Conversar com Lucy"
         st.rerun()
         
     aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
     meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
 
-   # 🔴 NOVA REGRA ULTRA SEGURA:
-    # Captura o plano, remove espaços e coloca tudo em letras minúsculas
+    # 🔴 REGRA DE PLANO ATUALIZADA COMPACTA
     plano_atual = str(st.session_state.get("tipo_plano", "grátis")).strip().lower()
-
-    # Verifica se o usuário possui um dos planos válidos para acesso
     usuario_tem_acesso = (plano_atual == "vip") or ("crédito" in plano_atual) or ("credito" in plano_atual)
-
-    # O botão será bloqueado SE o usuário NÃO tiver acesso
     bloquear_botoes = not usuario_tem_acesso
 
+    # 🌟 CORREÇÃO 1: Captura dinamicamente o dia da semana atual do servidor para o filtro de ativos
+    dia_ingles = datetime.datetime.now().strftime("%A")
+    mapeamento_dias = {
+        "Monday": "segunda-feira", "Tuesday": "terça-feira", "Wednesday": "quarta-feira",
+        "Thursday": "quinta-feira", "Friday": "sexta-feira", "Saturday": "sábado", "Sunday": "domingo"
+    }
+    dia_atual_servidor = mapeamento_dias.get(dia_ingles, "segunda-feira")
 
+    # ==========================================================================
+    # --- ABA 1: MEUS MATCHES (AFINIDADES) ---
+    # ==========================================================================
     with aba_m:
         st.markdown("### 👥 Suas Afinidades")
         matches_dados = []
         try:
             conn = conectar_supabase(); cursor = conn.cursor()
-            cursor.execute('SELECT m.id, u.username, u.foto_perfil, u.genero, u.id FROM matches m JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;', (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-            matches_dados = cursor.fetchall(); cursor.close(); conn.close()
-        except Exception: pass
+            cursor.execute("""
+                SELECT m.id, u.username, u.foto_perfil, u.genero, u.id 
+                FROM matches m 
+                JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) 
+                WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;
+            """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
+            matches_dados = cursor.fetchall()
+            cursor.close(); conn.close()
+        except Exception: 
+            pass
 
-        if not matches_dados: st.info("Nenhum par localizado.")
+        if not matches_dados: 
+            st.info("Nenhum par localizado.")
+            
         for m_id, m_nome, m_foto, m_gen, par_id in matches_dados:
             with st.container(border=True):
-                # Estrutura em colunas equilibradas para reduzir o tamanho do retângulo
                 c_av_c, c_nm_c, c_go_c, c_del_c = st.columns([0.6, 2, 1, 1])
                 
                 with c_av_c:
@@ -2054,88 +2106,103 @@ def template_gerenciar_conexoes_completo():
                         try:
                             with open(caminho_par_img, "rb") as image_file:
                                 enc_str = base64.b64encode(image_file.read()).decode()
-                            st.markdown(f'<img src="data:image/jpeg;base64,{enc_str}" class="foto-match-central">', unsafe_allow_html=True)
-                        except Exception: st.write("👩" if m_gen == 'F' else "👨")
+                            st.markdown(f'<img src="data:image/jpeg;base64,{enc_str}" class="foto-match-central" style="width:50px; height:50px; border-radius:50%; object-fit:cover;">', unsafe_allow_html=True)
+                        except Exception: 
+                            st.write("👩" if m_gen == 'F' else "👨")
                     else:
                         st.subheader("👩" if m_gen == 'F' else "👨")
                         
                 with c_nm_c:
-                    # Fonte aumentada para 15px e em negrito igual ao botão entrar
-                    st.markdown(f"<p style='font-size:15px; font-weight:bold; margin-top:5px; color:#f0f6fc;'>{str(m_nome).split('@')[0].capitalize()}</p>", unsafe_allow_html=True)
+                    nome_limpo_exibicao = str(m_nome).split('@')[0].capitalize()
+                    st.markdown(f"<p style='font-size:15px; font-weight:bold; margin-top:12px; color:#f0f6fc;'>{nome_limpo_exibicao}</p>", unsafe_allow_html=True)
                     
                 with c_go_c:
+                    # O botão ganhará a propriedade disabled se o usuário for do plano Grátis sem moedas
                     if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                        help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
+                        help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
                         st.session_state.match_id_atual = m_id
-                        st.session_state.opcao_menu = "🤝 Sala Privada"; st.rerun()
+                        st.session_state.opcao_menu = "🤝 Sala Privada"
+                        st.rerun()
                         
                 with c_del_c:
-                    # RESTAURADO: Botão cinza para excluir afinidades indesejadas do banco
                     if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", use_container_width=True):
                         try:
                             conn = conectar_supabase(); cursor = conn.cursor()
-                            cursor.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(m_id),))
+                            cursor.execute("DELETE FROM mensagens_sala WHERE match_id = %s;", (int(m_id),))
                             cursor.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
                             cursor.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
                             conn.commit(); cursor.close(); conn.close()
-                            st.toast("Match removido!")
+                            st.toast("Match removido com sucesso!")
                             st.rerun()
-                        except Exception as e: st.error(f"Erro: {e}")
+                        except Exception as e: 
+                            st.error(f"Erro ao remover: {e}")
 
-
+    # ==========================================================================
+    # --- ABA 2: GESTÃO DE CONVITES E HISTÓRICO ---
+    # ==========================================================================
     with aba_e:
         st.markdown("### 📩 Convites Ativos da Semana")
         try:
             conn = conectar_supabase(); cursor = conn.cursor()
             cursor.execute("""
                 SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
-                CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
-                FROM agendamentos_virtuais a JOIN matches m ON m.id = a.match_id JOIN usuarios u1 ON u1.id = m.usuario_1_id JOIN usuarios u2 ON u2.id = m.usuario_2_id
-                WHERE a.remetente_id = %s OR a.destinatario_id = %s ORDER BY a.id DESC;
+                       CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
+                FROM agendamentos_virtuais a 
+                JOIN matches m ON m.id = a.match_id 
+                JOIN usuarios u1 ON u1.id = m.usuario_1_id 
+                JOIN usuarios u2 ON u2.id = m.usuario_2_id
+                WHERE a.remetente_id = %s OR a.destinatario_id = %s 
+                ORDER BY a.id DESC;
             """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-            encontros = cursor.fetchall(); cursor.close(); conn.close()
+            encontros = cursor.fetchall()
+            cursor.close(); conn.close()
             
-            # Separa registros Ativos e Passados baseado no dia do servidor
-            encontros_ativos = [e for e in encontros if str(e[1]).lower() == str(dia_atual_servidor).lower() or str(e[4]).lower() == 'pendente']
-            encontros_passados = [e for e in encontros if str(e[1]).lower() != str(dia_atual_servidor).lower() and str(e[4]).lower() == 'aceito']
+            # 🌟 CORREÇÃO DO NAMEERROR: Utilizando a nova variável de data 'dia_atual_servidor'
+            encontros_ativos = [e for e in encontros if str(e[1]).lower().strip() == str(dia_atual_servidor).lower().strip() or str(e[4]).lower() == 'pendente']
+            encontros_passados = [e for e in encontros if str(e[1]).lower().strip() != str(dia_atual_servidor).lower().strip() and str(e[4]).lower() == 'aceito']
             
             if not encontros_ativos:
                 st.caption("Nenhum convite pendente ou encontro ativo para hoje.")
                 
             for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_ativos:
                 eu_enviei = (int(rem_id) == meu_id_limpo)
-                # 🔍 CORREÇÃO 2: Adicionado [0] no split do parceiro ativo
                 parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize()
                 
                 with st.container(border=True):
                     col_i, col_b = st.columns([3, 1])
                     with col_i:
                         st.write(f"📅 **Encontro com {parceiro_limpo}:** {dia} às {str(hora)[:5]}")
-                        st.caption(f"Status: {status.upper()}")
+                        st.caption(f"Status do Convite: {status.upper()}")
                     with col_b:
                         if status == 'pendente' and not eu_enviei:
                             if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                                help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                                conn = conectar_supabase(); cursor = conn.cursor(); cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,)); conn.commit(); cursor.close(); conn.close(); st.rerun()
+                                help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
+                                conn = conectar_supabase(); cursor = conn.cursor()
+                                cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,))
+                                conn.commit(); cursor.close(); conn.close()
+                                st.toast("Convite aceito!")
+                                st.rerun()
                         elif status == 'aceito':
                             if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                                help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None
-                            ):
+                                help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
                                 st.session_state.match_id_atual = m_id
                                 st.session_state.opcao_menu = "🤝 Sala Privada"
                                 st.rerun()
             
-            # --- COMPONENTE: HISTÓRICO DE ENCONTROS PASSADOS ---
+            # --- HISTÓRICO DE ENCONTROS PASSADOS ---
             st.markdown("<br><hr style='border-color: #21262d;'>", unsafe_allow_html=True)
             st.markdown("### 📚 Histórico de Encontros Concluídos")
+            
             if not encontros_passados:
                 st.caption("Nenhum registro antigo arquivado.")
+                
             for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados:
-                # 🔍 CORREÇÃO 3: Adicionado [0] no split do parceiro no histórico antigo
                 parceiro_antigo_limpo = str(parceiro_nome).split('@')[0].capitalize()
                 st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
                 
-        except Exception as e: st.error(f"Erro: {e}")     
+        except Exception as e: 
+            st.error(f"Erro crítico no processamento de convites: {e}")
+
 
 # ==============================================================================
 # 9. CORREÇÃO DO PAINEL ADMIN (REATIVAÇÃO DO PARETO E COLUNAS IDADE/GENERO/EMAIL)
