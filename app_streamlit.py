@@ -1529,28 +1529,7 @@ def limpar_historico_sala(match_id):
 def template_sala_privada():
     match_id = st.session_state.match_id_atual
     meu_id = st.session_state.usuario_id
- # Recupera o ID do match atual guardado na sessão
-    meu_id = st.session_state.get("match_id_atual")
-        
-    if meu_id:
-        try:
-            import datetime
-            agora_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
-                
-            # 🟢 SINAL DE ENTRADA / PULSAÇÃO (Heartbeat)
-            # Toda vez que a tela carrega ou atualiza, carimba o match como ONLINE no banco
-            supabase.table("matches")\
-                .update({
-                    "status_conexao": "online",
-                    "ultima_atividade": agora_iso
-                })\
-                .eq("id", meu_id)\
-                .execute()
-                    
-        except Exception as e:
-            # Falha silenciosa para não travar a experiência de chat do usuário
-            pass
-   
+    
     # 1. CSS AVANÇADO PARA FIXAR ELEMENTOS E ESTILIZAR ESTILO WHATSAPP
     st.markdown(
         """
@@ -1702,29 +1681,35 @@ def template_sala_privada():
         """, unsafe_allow_html=True)
         
         if st.button("🚪 Sair da Sala Privada", type="primary", use_container_width=True):
-            if meu_id:
+            # 🌟 Captura correta das variáveis da sessão
+            id_sala_atual = st.session_state.get("match_id_atual")  # Este é o 332 (ID do Match)
+            id_usuario_atual = st.session_state.get("user_id_atual") # Este é o ID do Usuário (um dos 7 cadastrados)
+
+            if id_sala_atual:
                 try:
                     import datetime
                     horario_saida = datetime.datetime.now(datetime.timezone.utc).isoformat()
-                
-                    # 1. Atualiza o status do encontro para OFFLINE imediatamente no banco
-                    supabase.table("matches")\
-                        .update({
-                            "status_conexao": "offline",
-                            "ultima_atividade": horario_saida
-                        })\
-                        .eq("id", meu_id)\
-                        .execute()
-                
-                    # 2. Carimba o encerramento na tabela de mensagens conforme seu fluxo atual
-                    supabase.table("mensagens_sala")\
-                        .update({"saida_em": horario_saida})\
-                        .eq("match_id", meu_id)\
-                        .execute()
                     
-                    st.success("Você saiu da sala com sucesso!")
-                except Exception as erro_saida:
-                    st.error(f"Erro ao desconectar: {erro_saida}")
+                    # PASSO 1: Tenta dar UPDATE nas linhas que já possuem esse match_id
+                    resposta_update = supabase.table("mensagens_sala")\
+                        .update({"saida_em": horario_saida})\
+                        .eq("match_id", id_sala_atual)\
+                        .execute()
+                        
+                    # PASSO 2: Se não havia mensagens na sala ainda, fazemos o INSERT de fechamento
+                    if not resposta_update.data:
+                        # 🌟 CORREÇÃO DE INVERSÃO AQUI: Cada ID na sua respectiva coluna correta
+                        supabase.table("mensagens_sala").insert({
+                            "match_id": id_sala_atual,         # Recebe o 332 (ID da sala)
+                            "remetente_id": id_usuario_atual,  # Recebe o ID do Usuário logado
+                            "saida_em": horario_saida,
+                            "criado_em": horario_saida 
+                        }).execute()
+                        
+                    st.success("Sala encerrada e registrada com sucesso!")
+                    
+                except Exception as erro_banco:
+                    st.error(f"Erro ao registrar saída no Supabase: {erro_banco}")
                 
             # 3. Limpa o estado da sessão e redireciona o usuário no menu
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
@@ -1747,6 +1732,27 @@ def template_sala_privada():
     with col_chat:
         # Título Fixo no Topo do Chat
         st.markdown(f"### 💬 Sala Privada com {parceiro_nome}")
+        # Recupera o ID do match atual guardado na sessão
+        id_match_atual = st.session_state.get("match_id_atual")
+        
+        if id_match_atual:
+            try:
+                import datetime
+                agora_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                
+                # 🟢 SINAL DE ENTRADA / PULSAÇÃO (Heartbeat)
+                # Toda vez que a tela carrega ou atualiza, carimba o match como ONLINE no banco
+                supabase.table("matches")\
+                    .update({
+                        "status_conexao": "online",
+                        "ultima_atividade": agora_iso
+                    })\
+                    .eq("id", id_match_atual)\
+                    .execute()
+                    
+            except Exception as e:
+                # Falha silenciosa para não travar a experiência de chat do usuário
+                pass
         st.divider()
 
         # Funcionalidade de Videochamada fixa 
