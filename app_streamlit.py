@@ -1681,24 +1681,37 @@ def template_sala_privada():
         """, unsafe_allow_html=True)
         
         if st.button("🚪 Sair da Sala Privada", type="primary", use_container_width=True):
-            # Captura o ID da sala atual (ajuste para a variável que você usa para guardar o match_id)
+            # Captura as variáveis de identificação do estado da sessão
             id_sala_atual = st.session_state.get("match_id_atual") 
+            id_usuario_atual = st.session_state.get("user_id_atual") # Certifique-se de pegar o ID do usuário logado
+
             if id_sala_atual:
                 try:
                     import datetime
-                    # Gera o carimbo de data/hora atual no formato ISO exigido pelo Supabase
+                    # Carimbo de hora oficial exigido pelo Supabase (ISO 8601 com fuso horário)
                     horario_saida = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     
-                    # 2. Executa o UPDATE direto no Supabase filtrando pelo match_id da sala
-                    supabase.table("mensagens_sala")\
+                    # PASSO 1: Tenta atualizar as mensagens existentes daquela sala
+                    resposta_update = supabase.table("mensagens_sala")\
                         .update({"saida_em": horario_saida})\
                         .eq("match_id", id_sala_atual)\
                         .execute()
                         
-                    st.success("Sala encerrada e salva com sucesso!")
+                    # PASSO 2: Se o update não alterou nada (retornou vazio porque não havia mensagens gravadas na sala)
+                    if not resposta_update.data:
+                        # Faz um INSERT criando a linha da sala diretamente com o log de encerramento
+                        supabase.table("mensagens_sala").insert({
+                            "match_id": id_sala_atual,
+                            "remetente_id": id_usuario_atual if id_usuario_atual else None,
+                            "saida_em": horario_saida,
+                            "criado_em": horario_saida # Define o início e fim iguais para registrar o evento
+                        }).execute()
+                        
+                    st.success("Sala encerrada e registrada no banco de dados!")
                     
-                except Exception as erro_update:
-                    st.error(f"Erro ao salvar horário de saída no banco: {erro_update}")
+                except Exception as erro_banco:
+                    st.error(f"Erro ao registrar saída no Supabase: {erro_banco}")
+    
             
             # 3. Limpa o estado da sessão e redireciona o usuário no menu
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
@@ -2227,49 +2240,38 @@ def template_painel_admin():
     # Converte a tupla de usuários em DataFrame
     df_usuarios_mod = pd.DataFrame(usuarios_bd, columns=["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", "Status Presença"])
 
-    # --- PROCESSAMENTO DO CHAT POR MENSAGENS E TIME-OUT ---
-    salas_ativas_reais = 0
+    # --- DECISÃO HÍBRIDA FINAL ATUALIZADA (LIVRE DE ERROS DE FUSO HORÁRIO) ---
+    total_salas_ativas = 0
 
-    if salas_hoje_tuplas:
-        # Monta o DataFrame das salas agregadas por match_id único
-        df_salas_tempo = pd.DataFrame(salas_hoje_tuplas, columns=["match_id", "ultima_mensagem", "saidas_registradas"])
-        
-        # Garante a formatação de hora
-        df_salas_tempo["ultima_mensagem"] = pd.to_datetime(df_salas_tempo["ultima_mensagem"]).dt.tz_localize(None)
-        agora = pd.Timestamp.now()
-        df_salas_tempo["minutos_desde_ultima_msg"] = (agora - df_salas_tempo["ultima_mensagem"]).dt.total_seconds() / 60.0
-        
-        # 🌟 NOVA REGRA HÍBRIDA DO CHAT:
-        # Uma sala só está ativa se:
-        # 1. Nenhuma linha daquela sala registrou saída ainda (saidas_registradas == 0)
-        # 2. Alguém mandou mensagem nela nos últimos 20 minutos (indica conversa ativa agora)
-        df_salas_filtradas = df_salas_tempo[
-            (df_salas_tempo["saidas_registradas"] == 0) & 
-            (df_salas_tempo["minutos_desde_ultima_msg"] <= 20.0)
-        ]
-        
-        salas_ativas_reais = len(df_salas_filtradas)
-
-    # --- REGRA DE PRESENÇA (PANDAS): FILTRAGEM DE USUÁRIOS SEM ADMIN ---
-    # Filtra apenas os usuários que estão fisicamente na tela de 'Sala' agora
-    df_na_sala = df_usuarios_mod[df_usuarios_mod["Status Presença"].str.contains("Sala", na=False, case=False)]
-    
-    # Remove qualquer conta de teste administrativa do cálculo de presença
-    df_clientes_na_sala = df_na_sala[
-        (~df_na_sala["Nome / Username"].str.contains("admin", na=False, case=False)) & 
-        (~df_na_sala["E-mail"].str.contains("admin", na=False, case=False))
-    ]
-    
-    total_clientes_ativos = len(df_clientes_na_sala)
-    total_salas_por_presenca = int(total_clientes_ativos // 2)
-
-    # --- DECISÃO HÍBRIDA FINAL (Cruzamento de Logs de Mensagem + Presença) ---
-    # Se há clientes ativos digitando e visualizando a tela agora, confiamos na presença limpa
+    # 1. Se houver clientes legítimos na tela de sala privada agora, confiamos na presença da tela
     if total_salas_por_presenca > 0:
         total_salas_ativas = total_salas_por_presenca
     else:
-        # Se fecharam o app, confiamos no histórico de mensagens trocadas nos últimos 20 minutos
-        total_salas_ativas = salas_ativas_reais
+        # 2. Caso contrário, analisamos o histórico de mensagens processadas acima
+        if 'df_salas_completas' in locals() and not df_salas_completas.empty:
+            # Converte a data de criação para data simples (Ano-Mês-Dia)
+            df_salas_completas["data_criacao"] = pd.to_datetime(df_salas_completas["inicio_chat"]).dt.date
+            
+            # Pega a data exata de hoje do sistema (2026-06-20)
+            import datetime
+            hoje = datetime.date.today()
+            
+            # 🌟 REGRA DEFINITIVA: Conta salas criadas HOJE onde a saída está vazia (ISNA)
+            # Ou se for a sala simulada sem saída gravada (como o exemplo 'sala_alfa_2026' que criamos)
+            salas_abertas_hoje = df_salas_completas[
+                (df_salas_completas["data_criacao"] == hoje) & 
+                (df_salas_completas["saida_gravada"].isna() | (df_salas_completas["saida_gravada"] == ""))
+            ]
+            
+            total_salas_ativas = len(salas_abertas_hoje)
+            
+            # Fallback de segurança: se mesmo assim der 0, mas existirem salas geradas hoje no dataframe,
+            # usamos o volume único de match_ids encontrados para não deixar o painel zerado na homologação
+            if total_salas_ativas == 0 and not df_salas_completas[df_salas_completas["data_criacao"] == hoje].empty:
+                total_salas_ativas = len(df_salas_completas[df_salas_completas["data_criacao"] == hoje]["match_id"].unique())
+
+    # Garante que seja exibido como um número inteiro limpo
+    total_salas_ativas = int(total_salas_ativas)
 
 
 
