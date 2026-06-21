@@ -2591,32 +2591,31 @@ def template_painel_admin():
 
                 # -------------------------------
 
-                # 4. CONTAGEM UTILIZANDO MÁSCARAS BOOLEANAS (Muito mais seguro que o .get)
-                # Filtra VIPs e Admins
-                is_vip = df_usuarios["tipo_plano_limpo"].str.contains("vip|admin", na=False)
-                
-                # Filtra Grátis (Separando quem tem moedas de quem não tem)
+               # 4. CONTAGEM SEPARANDO O ADMIN DO VIP
+                is_admin = df_usuarios["tipo_plano_limpo"].str.contains("admin", na=False)
+                is_vip = df_usuarios["tipo_plano_limpo"].str.contains("vip", na=False) & (~is_admin) # VIP puro (sem admin)
                 is_gratis_puro = df_usuarios["tipo_plano_limpo"].str.contains("grátis|gratis", na=False)
                 
-                # 🌟 CORREÇÃO CRUCIAL: Captura qualquer variação de "Plano Crédito de moedas" ou usuários grátis com saldo
                 is_plano_credito = (
                     df_usuarios["tipo_plano_limpo"].str.contains("crédito|credito|moeda", na=False) | 
                     (is_gratis_puro & (df_usuarios["moedas"] > 0))
                 )
-                
-                # Usuário grátis real (plano grátis e nenhuma moeda na carteira)
                 is_gratis_real = is_gratis_puro & (df_usuarios["moedas"] == 0)
                 
-                # Extrai os totais reais baseados nas linhas encontradas
+                # Criação das 4 variáveis para evitar o NameError
                 val_vip = int(df_usuarios[is_vip].shape[0])
+                val_admin = int(df_usuarios[is_admin].shape[0]) # 🌟 Criada a variável que faltava!
                 val_credito = int(df_usuarios[is_plano_credito].shape[0])
                 val_gratis = int(df_usuarios[is_gratis_real].shape[0])
                 
-                # 5. Monta o DataFrame final da pizza com os nomes bonitos para a legenda
+                # 5. Monta o DataFrame final da pizza com as 4 categorias livres de erros
                 df_pizza = pd.DataFrame({
-                    "Categoria": ["VIP", "Plano Crédito de Moedas", "Grátis"],
-                    "Total": [val_vip, val_credito, val_gratis]
+                    "Categoria": ["VIP", "Admin", "Plano Crédito de Moedas", "Grátis"],
+                    "Total": [val_vip, val_admin, val_credito, val_gratis]
                 })
+                
+                # Quatro cores para mapear as quatro fatias (Amarelo adicionado para o Admin)
+                cores_pizza = ["#6f42c1", "#ffc107", "#28a745", "#007bff"]
                 
                 # 6. Monta a estrutura de dados baseada na escolha do filtro lateral
                 if visao_perfil == "Apenas Clientes":
