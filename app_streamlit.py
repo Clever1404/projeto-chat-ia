@@ -210,7 +210,6 @@ def template_home():
 def template_login():
     # 🟢 CORREÇÃO: Alterado de '==' para '=' para de fato definir o estado
     st.session_state.opcao_menu = "login"
-    st.rerun()
     st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
             
     with st.form("form_login"):
