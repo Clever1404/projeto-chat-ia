@@ -2166,6 +2166,8 @@ def template_painel_admin():
     # --- 1. COLETA E PREPARAÇÃO DOS DADOS DO POSTGRESQL ---
     usuarios_bd = []
     dados_agendados = {}
+    dados_realizados = {}  # 🌟 GARANTA QUE ESTÁ DECLARADA AQUI NO TOPO
+    dados_matches = {}
     total_salas_ativas = 0
 
     try:
@@ -2176,8 +2178,7 @@ def template_painel_admin():
         cursor.execute("SELECT id, username, email, genero, idade, procura_por, status FROM usuarios ORDER BY id ASC;")
         usuarios_bd = cursor.fetchall()
         
-        # 2. REGRA AJUSTADA PARA CHAT DUPLICADO (SQL): Agrupa por match_id para colapsar as mensagens repetidas
-        # Traz o ID da sala, a hora da última mensagem enviada e checa se alguma linha recebeu o 'saida_em'
+        # 2. Busca a lista de match_id e tempos do chat de hoje
         cursor.execute("""
             SELECT 
                 match_id, 
@@ -2190,15 +2191,34 @@ def template_painel_admin():
         """)
         salas_hoje_tuplas = cursor.fetchall()
 
-        # Estatísticas Semanais por Dia para o Gráfico de Pareto
+        # 3. Estatísticas Semanais por Dia para o Gráfico de Pareto
         cursor.execute("SELECT TRIM(LOWER(dia_semana)), COUNT(*) FROM agendamentos_virtuais GROUP BY 1;")
         dados_agendados = dict(cursor.fetchall())
         
+        # 🌟 RECOLOQUE ESTA QUERY AQUI DENTRO DO TRY PARA ALIMENTAR A VARIÁVEL
+        cursor.execute("""
+            SELECT TRIM(LOWER(a.dia_semana)), COUNT(DISTINCT mc.id) 
+            FROM agendamentos_virtuais a 
+            JOIN mensagens_sala mc ON mc.match_id = a.match_id 
+            GROUP BY 1;
+        """)
+        dados_realizados = dict(cursor.fetchall())
+        
+        # Opcional: query de matches para segurança de outros gráficos
+        cursor.execute("""
+            SELECT TRIM(LOWER(a.dia_semana)), COUNT(DISTINCT m.id) 
+            FROM agendamentos_virtuais a 
+            JOIN matches m ON m.id = a.match_id 
+            GROUP BY 1;
+        """)
+        dados_matches = dict(cursor.fetchall())
+
         cursor.close()
         conn.close()
     except Exception as e:
         st.error(f"Erro na varredura analítica do banco: {e}")
         salas_hoje_tuplas = []
+        dados_realizados = {} # Evita NameError caso o banco caia no Exception
 
     if not usuarios_bd:
         st.warning("Nenhum dado de usuário localizado para gerar o painel.")
