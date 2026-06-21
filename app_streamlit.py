@@ -2628,7 +2628,7 @@ def template_painel_admin():
                 else:
                     df_pizza = pd.DataFrame({
                         "Categoria": ["VIP", "Admin", "Plano Crédito de Moedas", "Grátis"],
-                        "Total": [val_vip, val_admin, val_credito, val_gratis]
+                        "Total": [val_vip, val_credito, val_gratis]
                     })
                     cores_pizza = ["#6f42c1", "#ffc107", "#28a745", "#007bff"]  # Roxo, Amarelo, Verde, Azul
                 
