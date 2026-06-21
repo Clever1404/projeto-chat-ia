@@ -1682,28 +1682,28 @@ def template_sala_privada():
         
         if st.button("🚪 Sair da Sala Privada", type="primary", use_container_width=True):
             if meu_id:
-            try:
-                import datetime
-                horario_saida = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                try:
+                    import datetime
+                    horario_saida = datetime.datetime.now(datetime.timezone.utc).isoformat()
                 
-                # 1. Atualiza o status do encontro para OFFLINE imediatamente no banco
-                supabase.table("matches")\
-                    .update({
-                        "status_conexao": "offline",
-                        "ultima_atividade": horario_saida
-                    })\
-                    .eq("id", meu_id)\
-                    .execute()
+                    # 1. Atualiza o status do encontro para OFFLINE imediatamente no banco
+                    supabase.table("matches")\
+                        .update({
+                            "status_conexao": "offline",
+                            "ultima_atividade": horario_saida
+                        })\
+                        .eq("id", meu_id)\
+                        .execute()
                 
-                # 2. Carimba o encerramento na tabela de mensagens conforme seu fluxo atual
-                supabase.table("mensagens_sala")\
-                    .update({"saida_em": horario_saida})\
-                    .eq("match_id", meu_id)\
-                    .execute()
+                    # 2. Carimba o encerramento na tabela de mensagens conforme seu fluxo atual
+                    supabase.table("mensagens_sala")\
+                        .update({"saida_em": horario_saida})\
+                        .eq("match_id", meu_id)\
+                        .execute()
                     
-                st.success("Você saiu da sala com sucesso!")
-            except Exception as erro_saida:
-                st.error(f"Erro ao desconectar: {erro_saida}")
+                    st.success("Você saiu da sala com sucesso!")
+                except Exception as erro_saida:
+                    st.error(f"Erro ao desconectar: {erro_saida}")
                 
             # 3. Limpa o estado da sessão e redireciona o usuário no menu
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
