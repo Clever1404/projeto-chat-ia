@@ -2166,8 +2166,6 @@ def template_painel_admin():
     # --- 1. COLETA E PREPARAÇÃO DOS DADOS DO POSTGRESQL ---
     usuarios_bd = []
     dados_agendados = {}
-    dados_realizados = {}
-    dados_matches = {}
     total_salas_ativas = 0
 
     try:
@@ -2178,12 +2176,17 @@ def template_painel_admin():
         cursor.execute("SELECT id, username, email, genero, idade, procura_por, status FROM usuarios ORDER BY id ASC;")
         usuarios_bd = cursor.fetchall()
         
-        # 2. REGRA DO BANCO DE DADOS: Busca as colunas necessárias criadas hoje, incluindo o 'saida_em' recém-criado
+        # 2. REGRA AJUSTADA PARA CHAT DUPLICADO (SQL): Agrupa por match_id para colapsar as mensagens repetidas
+        # Traz o ID da sala, a hora da última mensagem enviada e checa se alguma linha recebeu o 'saida_em'
         cursor.execute("""
-            SELECT DISTINCT match_id, criado_em, saida_em 
+            SELECT 
+                match_id, 
+                MAX(criado_em) as ultima_mensagem,
+                COUNT(saida_em) as saídas_registradas
             FROM mensagens_sala 
             WHERE match_id IS NOT NULL 
-              AND CAST(criado_em AS date) = CURRENT_DATE;
+              AND CAST(criado_em AS date) = CURRENT_DATE
+            GROUP BY match_id;
         """)
         salas_hoje_tuplas = cursor.fetchall()
 
@@ -2204,35 +2207,34 @@ def template_painel_admin():
     # Converte a tupla de usuários em DataFrame
     df_usuarios_mod = pd.DataFrame(usuarios_bd, columns=["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", "Status Presença"])
 
-    # --- PROCESSAMENTO AVANÇADO DA REGRA 'saida_em' + TIME-OUT ---
+    # --- PROCESSAMENTO DO CHAT POR MENSAGENS E TIME-OUT ---
     salas_ativas_reais = 0
 
     if salas_hoje_tuplas:
-        # Monta o DataFrame das salas encontradas hoje
-        df_salas_tempo = pd.DataFrame(salas_hoje_tuplas, columns=["match_id", "criado_em", "saida_em"])
+        # Monta o DataFrame das salas agregadas por match_id único
+        df_salas_tempo = pd.DataFrame(salas_hoje_tuplas, columns=["match_id", "ultima_mensagem", "saidas_registradas"])
         
-        # Garante a formatação correta de data/hora para cálculos matemáticos
-        df_salas_tempo["criado_em"] = pd.to_datetime(df_salas_tempo["criado_em"]).dt.tz_localize(None)
+        # Garante a formatação de hora
+        df_salas_tempo["ultima_mensagem"] = pd.to_datetime(df_salas_tempo["ultima_mensagem"]).dt.tz_localize(None)
         agora = pd.Timestamp.now()
-        df_salas_tempo["horas_decorridas"] = (agora - df_salas_tempo["criado_em"]).dt.total_seconds() / 3600.0
+        df_salas_tempo["minutos_desde_ultima_msg"] = (agora - df_salas_tempo["ultima_mensagem"]).dt.total_seconds() / 60.0
         
-        # APLICAÇÃO DAS REGRAS COMBINADAS:
-        # Uma sala é considerada ativa se 'saida_em' for nulo/vazio E ela tiver menos de 2 horas de vida (anti-fantasmas)
+        # 🌟 NOVA REGRA HÍBRIDA DO CHAT:
+        # Uma sala só está ativa se:
+        # 1. Nenhuma linha daquela sala registrou saída ainda (saidas_registradas == 0)
+        # 2. Alguém mandou mensagem nela nos últimos 20 minutos (indica conversa ativa agora)
         df_salas_filtradas = df_salas_tempo[
-            (df_salas_tempo["saida_em"].isna() | (df_salas_tempo["saida_em"] == "")) & 
-            (df_salas_tempo["horas_decorridas"] <= 2.0)
+            (df_salas_tempo["saidas_registradas"] == 0) & 
+            (df_salas_tempo["minutos_desde_ultima_msg"] <= 20.0)
         ]
         
-        lista_salas_validas = df_salas_filtradas["match_id"].tolist()
-        salas_ativas_reais = len(lista_salas_validas)
-    else:
-        lista_salas_validas = []
+        salas_ativas_reais = len(df_salas_filtradas)
 
     # --- REGRA DE PRESENÇA (PANDAS): FILTRAGEM DE USUÁRIOS SEM ADMIN ---
-    # 1. Filtra apenas os usuários que estão fisicamente na tela de 'Sala' agora
+    # Filtra apenas os usuários que estão fisicamente na tela de 'Sala' agora
     df_na_sala = df_usuarios_mod[df_usuarios_mod["Status Presença"].str.contains("Sala", na=False, case=False)]
     
-    # 2. REMOVE O ADMIN: Ignora qualquer conta de teste administrativa que gere números ímpares
+    # Remove qualquer conta de teste administrativa do cálculo de presença
     df_clientes_na_sala = df_na_sala[
         (~df_na_sala["Nome / Username"].str.contains("admin", na=False, case=False)) & 
         (~df_na_sala["E-mail"].str.contains("admin", na=False, case=False))
@@ -2241,31 +2243,16 @@ def template_painel_admin():
     total_clientes_ativos = len(df_clientes_na_sala)
     total_salas_por_presenca = int(total_clientes_ativos // 2)
 
-    # --- DECISÃO HÍBRIDA FINAL (Cruzamento Inteligente) ---
-    # Se há clientes ativos na tela agora, confiamos na contagem imediata da interface
+    # --- DECISÃO HÍBRIDA FINAL (Cruzamento de Logs de Mensagem + Presença) ---
+    # Se há clientes ativos digitando e visualizando a tela agora, confiamos na presença limpa
     if total_salas_por_presenca > 0:
         total_salas_ativas = total_salas_por_presenca
     else:
-        # Caso o app esteja em background ou minimizado, o contador usa as salas abertas do banco protegidas pelo corte temporal
+        # Se fecharam o app, confiamos no histórico de mensagens trocadas nos últimos 20 minutos
         total_salas_ativas = salas_ativas_reais
 
 
-    # --- 2. RENDERIZAÇÃO DOS CARDS DE MÉTRICAS COMPACTOS (KPIs) ---
-    c_k1, c_k2, c_k3 = st.columns(3)
-    with c_k1:
-        st.metric("Total de Perfis Cadastrados", len(df_usuarios_mod))
-    with c_k2:
-        ativos_now = len(df_usuarios_mod[df_usuarios_mod["Status Presença"].str.contains("Online", na=False)])
-        st.metric("Usuários Online Agora", ativos_now)
-    with c_k3:
-        # Exibe o painel limpo, higienizado contra Admins e monitorando a nova coluna 'saida_em'
-        st.metric(
-            "Salas Virtuais Ativas (Hoje)", 
-            int(total_salas_ativas), 
-            help="Total de salas de encontros confirmados abertas hoje que não possuem registro de encerramento na coluna 'saida_em'"
-        )
 
-    st.markdown("<br>", unsafe_allow_html=True)
 
     # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
     aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
@@ -2575,92 +2562,99 @@ def template_painel_admin():
         # --------------------------------------------------------------------------
         # 6. EXIBIÇÃO DO MONITORAMENTO REAL DE SALAS PRIVADAS
         # --------------------------------------------------------------------------
-        st.subheader("🟢 Monitoramento de Salas Privadas")
+       st.subheader("🟢 Monitoramento de Salas Privadas")
 
-        # 1. Tenta buscar os dados no banco de dados de forma segura
+        # 1. Busca os dados REAIS no Supabase (trazendo as colunas cronológicas do chat)
         try:
             salas_query = (
                 supabase.table("mensagens_sala")
-                .select("*")
+                .select("match_id", "criado_em", "saida_em")
                 .execute()
             )
             dados_retornados = salas_query.data
-        except Exception:
+        except Exception as e:
+            st.error(f"Erro na conexão com a tabela 'mensagens_sala': {e}")
             dados_retornados = None
 
-        # 2. SE O BANCO ESTIVER VAZIO, USAMOS DADOS SIMULADOS PARA DEIXAR O DASHBOARD PRONTO
-        if not dados_retornados or len(dados_retornados) == 0:
-            # 🌟 MOCK AUTOMÁTICO: Cria dados fictícios para o gráfico não quebrar enquanto a tabela está vazia
-            dados_processados = [
-                {"match_id": "sala_9981", "tipo_plano": "VIP", "tempo_de_uso": 2.5},
-                {"match_id": "sala_4432", "tipo_plano": "Usuários com Crédito", "tempo_de_uso": 1.2},
-                {"match_id": "sala_1029", "tipo_plano": "Grátis", "tempo_de_uso": 0.8},
-                {"match_id": "sala_8872", "tipo_plano": "VIP", "tempo_de_uso": 4.0},
-            ]
-            df_raw_rooms = pd.DataFrame(dados_processados)
-            st.caption("💡 Exibindo dados simulados de demonstração (Tabela 'mensagens_sala' vazia ou protegida por RLS no Supabase).")
-        else:
-            # Se existirem dados reais, usa os dados reais do banco
-            df_raw_rooms = pd.DataFrame(dados_retornados)
+        # 2. SE EXISTIREM DADOS REAIS, PROCESSAMOS AGROPANDO POR CHAT ÚNICO
+        if dados_retornados and len(dados_retornados) > 0:
+            df_mensagens = pd.DataFrame(dados_retornados)
+            
+            # Converte os timestamps para o formato correto de data/hora
+            df_mensagens["criado_em"] = pd.to_datetime(df_mensagens["criado_em"], errors="coerce")
+            df_mensagens["saida_em"] = pd.to_datetime(df_mensagens["saida_em"], errors="coerce")
+            
+            # 🌟 O SEGREDO DO CHAT: Agrupa por 'match_id' para colapsar as mensagens duplicadas em uma sala única
+            df_salas_unicas = df_mensagens.groupby("match_id").agg(
+                criado_em=("criado_em", "min"),  # Primeira mensagem enviada (Início do encontro)
+                saida_em=("saida_em", "max")      # Último registro de saída detectado
+            ).reset_index()
+            
+            # Se a saída não foi registrada no banco (null), define provisoriamente como agora para calcular o tempo corrido
+            df_salas_unicas["saida_em_tratada"] = df_salas_unicas["saida_em"].fillna(pd.Timestamp.now(tz=df_salas_unicas["criado_em"].dt.tz))
+            
+            # CALCULA O TEMPO REAL: Diferença entre a última atividade/saída e o início em Horas decimais
+            duracao_delta = df_salas_unicas["saida_em_tratada"] - df_salas_unicas["criado_em"]
+            df_salas_unicas["tempo_de_uso"] = (duracao_delta.dt.total_seconds() / 3600.0).round(2)
+            
+            # Garante um tempo mínimo de 0.01 horas para não zerar chats rápidos
+            df_salas_unicas["tempo_de_uso"] = df_salas_unicas["tempo_de_uso"].apply(lambda x: max(x, 0.01))
 
-        # 3. Ajuste automático de colunas e nomes de exibição
-        if "match_id" not in df_raw_rooms.columns:
-            df_raw_rooms["match_id"] = df_raw_rooms["id"] if "id" in df_raw_rooms.columns else "Sala"
-
-        if "tempo_de_uso" not in df_raw_rooms.columns:
-            df_raw_rooms["tempo_de_uso"] = 1.0
-
-        if "tipo_plano" not in df_raw_rooms.columns:
-            df_raw_rooms["tipo_plano"] = "Usuários com Crédito"
-
-        # Padroniza maiúsculas/minúsculas dos planos vindos do banco
-        df_raw_rooms["tipo_plano"] = df_raw_rooms["tipo_plano"].astype(str).str.strip()
-        df_raw_rooms["tipo_plano"] = df_raw_rooms["tipo_plano"].str.replace("vip", "VIP").str.replace("gratis", "Grátis")
-
-        # Monta o DataFrame final da tabela
-        df_salas_real = df_raw_rooms[["match_id", "tipo_plano", "tempo_de_uso"]].copy()
-        df_salas_real.columns = ["Sala", "Tipo de plano", "Tempo de Uso"]
-
-        # Monta o agrupamento do gráfico de barras
-        df_tempo_por_perfil = (
-            df_salas_real.groupby("Tipo de plano")["Tempo de Uso"]
-            .sum()
-            .reset_index()
-        )
-
-        # 4. Renderização visual das colunas na tela
-        c1, c2 = st.columns(2)
-
-        with c1:
-            st.write("#### ⏱️ Tempo Total Acumulado por Perfil")
-            fig_tempo = px.bar(
-                df_tempo_por_perfil,
-                x="Tipo de plano",
-                y="Tempo de Uso",
-                color="Tipo de plano",
-                title="Tempo Consumido em Encontros (Horas)",
-                color_discrete_map={
-                    "Assinantes": "#28a745",
-                    "VIP": "#6f42c1",
-                    "Usuários com Crédito": "#007bff",
-                    "Grátis": "#6e7681"
-                },
+            # Adiciona uma coluna de plano fictícia/padrão (já que a tabela de mensagens não guarda planos diretamente)
+            # Nota: Se você precisar do plano real aqui, teremos que fazer um merge com o df_usuarios posteriormente.
+            df_salas_unicas["tipo_plano"] = "Usuários com Crédito"
+            
+            # Estrutura final para alimentar os componentes visuais
+            df_salas_real = df_salas_unicas[["match_id", "tipo_plano", "tempo_de_uso"]].copy()
+            df_salas_real.columns = ["Sala", "Tipo de plano", "Tempo de Uso"]
+            
+            # Agrupa o somatório de horas por perfil para o gráfico de barras
+            df_tempo_por_perfil = (
+                df_salas_real.groupby("Tipo de plano")["Tempo de Uso"]
+                .sum()
+                .reset_index()
             )
-            fig_tempo.update_layout(
-                template="plotly_dark",
-                paper_bgcolor="#161b22", 
-                plot_bgcolor="#161b22", 
-                showlegend=False, 
-            ) 
-            st.plotly_chart(fig_tempo, use_container_width=True) 
+        else:
+            # Se o banco estiver de fato vazio, mantém os dataframes vazios para exibir o aviso correto
+            df_salas_real = pd.DataFrame()
+            df_tempo_por_perfil = pd.DataFrame()
 
-        with c2: 
-            st.write("#### 📑 Detalhes dos Encontros Calculados") 
-            st.dataframe( 
-                df_salas_real, 
-                use_container_width=True, 
-                hide_index=True, 
-            )  
+        # 3. RENDERIZAÇÃO VISUAL (Gráfico e Tabela Lado a Lado baseados nos dados REAIS)
+        if not df_salas_real.empty:
+            c1, c2 = st.columns(2)
+
+            with c1:
+                st.write("#### ⏱️ Tempo Total Acumulado por Perfil")
+                fig_tempo = px.bar(
+                    df_tempo_por_perfil,
+                    x="Tipo de plano",
+                    y="Tempo de Uso",
+                    color="Tipo de plano",
+                    title="Tempo Consumido em Encontros (Horas Reais)",
+                    color_discrete_map={
+                        "VIP": "#6f42c1",
+                        "Usuários com Crédito": "#007bff",
+                        "Grátis": "#6e7681"
+                    },
+                )
+                fig_tempo.update_layout(
+                    template="plotly_dark",
+                    paper_bgcolor="#161b22", 
+                    plot_bgcolor="#161b22", 
+                    showlegend=False, 
+                ) 
+                st.plotly_chart(fig_tempo, use_container_width=True) 
+
+            with c2: 
+                st.write("#### 📑 Detalhes dos Encontros Calculados") 
+                st.dataframe( 
+                    df_salas_real, 
+                    use_container_width=True, 
+                    hide_index=True, 
+                ) 
+        else: 
+            st.info("ℹ️ Nenhuma atividade ou registro de mensagem em sala privada localizado no banco de dados.")
+
 
 
 
