@@ -2174,38 +2174,28 @@ def template_painel_admin():
         conn = conectar_supabase()
         cursor = conn.cursor()
         
-        # 1. Busca a lista completa de moderação de usuários (incluindo o tipo_plano/cargo se houver para rastrear admin)
+        # 1. Busca a lista completa de moderação de usuários
         cursor.execute("SELECT id, username, email, genero, idade, procura_por, status FROM usuarios ORDER BY id ASC;")
         usuarios_bd = cursor.fetchall()
         
-        # 2. REGRA B CORRIGIDA: CAST nativo para tratar timestamptz sem quebrar o driver
+        # 2. REGRA DO BANCO DE DADOS: Busca as colunas necessárias criadas hoje, incluindo o 'saida_em' recém-criado
         cursor.execute("""
-            SELECT DISTINCT match_id, criado_em 
+            SELECT DISTINCT match_id, criado_em, saida_em 
             FROM mensagens_sala 
             WHERE match_id IS NOT NULL 
               AND CAST(criado_em AS date) = CURRENT_DATE;
         """)
         salas_hoje_tuplas = cursor.fetchall()
-        # Transforma a lista de tuplas em uma lista simples de strings/IDs de salas
-        lista_salas_hoje = [row[0] for row in salas_hoje_tuplas] if salas_hoje_tuplas else []
 
         # Estatísticas Semanais por Dia para o Gráfico de Pareto
         cursor.execute("SELECT TRIM(LOWER(dia_semana)), COUNT(*) FROM agendamentos_virtuais GROUP BY 1;")
         dados_agendados = dict(cursor.fetchall())
         
-        cursor.execute("""
-            SELECT TRIM(LOWER(a.dia_semana)), COUNT(DISTINCT mc.id) 
-            FROM agendamentos_virtuais a 
-            JOIN mensagens_chat mc ON mc.match_id = a.match_id 
-            GROUP BY 1;
-        """)
-        dados_realizados = dict(cursor.fetchall())
-        
         cursor.close()
         conn.close()
     except Exception as e:
         st.error(f"Erro na varredura analítica do banco: {e}")
-        lista_salas_hoje = []
+        salas_hoje_tuplas = []
 
     if not usuarios_bd:
         st.warning("Nenhum dado de usuário localizado para gerar o painel.")
@@ -2214,28 +2204,51 @@ def template_painel_admin():
     # Converte a tupla de usuários em DataFrame
     df_usuarios_mod = pd.DataFrame(usuarios_bd, columns=["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", "Status Presença"])
 
-    # --- REGRA A + B (HÍBRIDA EM PANDAS): FILTRAGEM SEM ADMIN ---
-    # 1. Filtra apenas os usuários que estão na tela de 'Sala' agora
+    # --- PROCESSAMENTO AVANÇADO DA REGRA 'saida_em' + TIME-OUT ---
+    salas_ativas_reais = 0
+
+    if salas_hoje_tuplas:
+        # Monta o DataFrame das salas encontradas hoje
+        df_salas_tempo = pd.DataFrame(salas_hoje_tuplas, columns=["match_id", "criado_em", "saida_em"])
+        
+        # Garante a formatação correta de data/hora para cálculos matemáticos
+        df_salas_tempo["criado_em"] = pd.to_datetime(df_salas_tempo["criado_em"]).dt.tz_localize(None)
+        agora = pd.Timestamp.now()
+        df_salas_tempo["horas_decorridas"] = (agora - df_salas_tempo["criado_em"]).dt.total_seconds() / 3600.0
+        
+        # APLICAÇÃO DAS REGRAS COMBINADAS:
+        # Uma sala é considerada ativa se 'saida_em' for nulo/vazio E ela tiver menos de 2 horas de vida (anti-fantasmas)
+        df_salas_filtradas = df_salas_tempo[
+            (df_salas_tempo["saida_em"].isna() | (df_salas_tempo["saida_em"] == "")) & 
+            (df_salas_tempo["horas_decorridas"] <= 2.0)
+        ]
+        
+        lista_salas_validas = df_salas_filtradas["match_id"].tolist()
+        salas_ativas_reais = len(lista_salas_validas)
+    else:
+        lista_salas_validas = []
+
+    # --- REGRA DE PRESENÇA (PANDAS): FILTRAGEM DE USUÁRIOS SEM ADMIN ---
+    # 1. Filtra apenas os usuários que estão fisicamente na tela de 'Sala' agora
     df_na_sala = df_usuarios_mod[df_usuarios_mod["Status Presença"].str.contains("Sala", na=False, case=False)]
     
-    # 2. REMOVE O ADMIN: Ignora qualquer usuário cujo nome ou e-mail contenha 'admin'
+    # 2. REMOVE O ADMIN: Ignora qualquer conta de teste administrativa que gere números ímpares
     df_clientes_na_sala = df_na_sala[
         (~df_na_sala["Nome / Username"].str.contains("admin", na=False, case=False)) & 
         (~df_na_sala["E-mail"].str.contains("admin", na=False, case=False))
     ]
     
-    # 3. INTERSEÇÃO: O total de salas ativas será o número de clientes na sala dividido por 2,
-    # mas limitado ou validado se houver histórico de match_id criado hoje no banco de dados.
     total_clientes_ativos = len(df_clientes_na_sala)
-    total_salas_ativas = int(total_clientes_ativos // 2)
-    
-    # Ajuste fino: se houver clientes em sala mas a divisão deu zero por número ímpar,
-    # e o banco confirma que houve salas criadas hoje, assumimos pelo menos 1 sala ativa.
-    if total_salas_ativas == 0 and total_clientes_ativos > 0 and len(lista_salas_hoje) > 0:
-        total_salas_ativas = 1
-    elif total_salas_ativas == 0 and len(lista_salas_hoje) > 0:
-        # Se não há ninguém com o status na tela agora (ex: minimizaram o app), mas o banco gerou salas hoje
-        total_salas_ativas = len(lista_salas_hoje)
+    total_salas_por_presenca = int(total_clientes_ativos // 2)
+
+    # --- DECISÃO HÍBRIDA FINAL (Cruzamento Inteligente) ---
+    # Se há clientes ativos na tela agora, confiamos na contagem imediata da interface
+    if total_salas_por_presenca > 0:
+        total_salas_ativas = total_salas_por_presenca
+    else:
+        # Caso o app esteja em background ou minimizado, o contador usa as salas abertas do banco protegidas pelo corte temporal
+        total_salas_ativas = salas_ativas_reais
+
 
     # --- 2. RENDERIZAÇÃO DOS CARDS DE MÉTRICAS COMPACTOS (KPIs) ---
     c_k1, c_k2, c_k3 = st.columns(3)
@@ -2245,15 +2258,14 @@ def template_painel_admin():
         ativos_now = len(df_usuarios_mod[df_usuarios_mod["Status Presença"].str.contains("Online", na=False)])
         st.metric("Usuários Online Agora", ativos_now)
     with c_k3:
-        # Exibe a contagem limpa e inteligente livre de contas administrativas
+        # Exibe o painel limpo, higienizado contra Admins e monitorando a nova coluna 'saida_em'
         st.metric(
             "Salas Virtuais Ativas (Hoje)", 
-            total_salas_ativas, 
-            help="Total de salas de encontros reais criadas hoje, higienizadas contra contas de Administradores"
+            int(total_salas_ativas), 
+            help="Total de salas de encontros confirmados abertas hoje que não possuem registro de encerramento na coluna 'saida_em'"
         )
 
     st.markdown("<br>", unsafe_allow_html=True)
-
 
     # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
     aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
