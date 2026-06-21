@@ -1771,7 +1771,7 @@ def template_sala_privada():
                 st.rerun() # Atualiza a tela uma única vez para mostrar a nova mensagem
     
 
-ddef renderizar_listas_sidebar_e_acoes(): 
+def renderizar_listas_sidebar_e_acoes(): 
     with st.sidebar: 
         # ==========================================================================
         # --- PERFIL DO USUÁRIO & AVATAR HTML ---
