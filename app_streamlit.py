@@ -2582,7 +2582,7 @@ def template_painel_admin():
         # --------------------------------------------------------------------------
         # 6. EXIBIÇÃO DO MONITORAMENTO REAL DE SALAS PRIVADAS
         # --------------------------------------------------------------------------
-       st.subheader("🟢 Monitoramento de Salas Privadas")
+        st.subheader("🟢 Monitoramento de Salas Privadas")
 
         # 1. COLETA INTEGRADA DOS DADOS DO SUPABASE
         try:
