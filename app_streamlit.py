@@ -2249,9 +2249,9 @@ def template_painel_admin():
         """)
         dados_matches = dict(cursor.fetchall())
 
-    # Tratamento de segurança para evitar valores nulos
-    if total_salas_ativas is None:
-        total_salas_ativas = 0
+        # Tratamento de segurança para evitar valores nulos
+        if total_salas_ativas is None:
+            total_salas_ativas = 0
 
         # Suas outras queries de estatísticas semanais (Pareto)...
         cursor.close()
