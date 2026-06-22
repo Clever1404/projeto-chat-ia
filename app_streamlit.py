@@ -998,7 +998,7 @@ elif menu_atual == "login":
                     st.error("Usuário não encontrado.")
                 cursor.close(); conn.close()
             except Exception as e: 
-                st.error(f"Erro: {e}")
+                st.error(f"Erro: {e}")       
 
     col_voltar, col_esqueceu = st.columns(2)
     with col_voltar:
@@ -1008,7 +1008,7 @@ elif menu_atual == "login":
     with col_esqueceu:
         if st.button("🔑 Esqueceu a senha?", use_container_width=True):
             modal_recuperar_senha()        
-
+            st.rerun()
 
 elif menu_atual == "cadastro":
     st.session_state.opcao_menu = "cadastro"
