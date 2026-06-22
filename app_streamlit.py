@@ -387,15 +387,21 @@ def modal_agendamento_encontro(dados_r):
                 st.success("🎉 Convite enviado!")
                 st.session_state.abrir_reserva_fluxo = None
                 st.rerun()
-        except Exception as e: 
+    except Exception as e: 
+        st.error(f"Erro ao carregar dados do banco: {e}")
+        return
+
+    exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
+
 
 # ==============================================================================
-# MODAL DA LOJA DO APP (LINHA 391)
+# MODAL DA LOJA DO APP (LINHA 395)
 # ==============================================================================
 @st.dialog("🛒 Loja do App")
 def mostrar_popup_loja(id_usuario):
     opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
-    
+
+
     if st.button("Gerar Pix de Pagamento"):
         valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (5.00, "Pacote de 10 Moedas", "moedas")
         id_limpo = id_usuario[0] if isinstance(id_usuario, (list, tuple)) else id_usuario
