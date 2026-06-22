@@ -1492,4 +1492,4 @@ elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Ger
 # --- FALLBACK DE SEGURANÇA ---
 else:
     st.session_state.opcao_menu = "home"
-        st.rerun()
+    st.rerun()
