@@ -1057,7 +1057,65 @@ elif menu_atual == "cadastro":
 
 elif menu_atual == "planos":
     st.session_state.opcao_menu = "planos"
+    # Inicializa a sub-visão caso ela não exista
+    if "sub_visao" not in st.session_state:
+        st.session_state.sub_visao = "planos"
 
+    # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
+    if st.session_state.sub_visao == "planos":
+        st.markdown('<h1 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
+        
+        # Texto descritivo dos planos centralizado
+        st.html(
+            """
+            <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
+                <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
+                
+                <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
+                    <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+                    <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
+                </div>
+                
+                <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
+                    <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+                    <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
+                </div>
+                
+                <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+                    <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+                    <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+                </div>
+            </div>
+            """        
+        )
+        
+        # Botão para ir para a loja (Troca a tela inteira)
+        if st.button("🛒 Ir para a Loja de Moedas e Assinaturas", type="primary", use_container_width=True):
+            st.session_state.sub_visao = "loja"
+            st.rerun()
+            
+        st.markdown('<br>', unsafe_allow_html=True)
+        
+        # Botão de voltar para o login
+        if st.button("← Voltar para o 🔒 Login", use_container_width=True):
+            st.session_state.opcao_menu = "login"
+            st.rerun()
+
+    # --- TELA 2: RENDERIZAÇÃO DA SUA LOJA (TELA CHEIA) ---
+    elif st.session_state.sub_visao == "loja":
+        # Botão posicionado no topo para o usuário conseguir voltar aos planos
+        if st.button("📋 Ver Descrição dos Planos", use_container_width=True):
+            st.session_state.sub_visao = "planos"
+            st.rerun()
+            
+        st.markdown('<hr style="border: 0.5px solid #30363d; margin: 15px 0;">', unsafe_allow_html=True)
+        
+        # Recupera as variáveis necessárias
+        id_usuario = st.session_state.get("id_usuario", "usuario_teste")
+        saldo_atual = st.session_state.get("saldo_moedas", 0)
+        
+        # Executa a sua loja com a tela totalmente limpa e isolada
+        renderizar_loja_app(id_usuario_atual=id_usuario, saldo_moedas=saldo_atual)
 
 
 # --- TELAS PRIVADAS (Com Barra Lateral de Usuário Logado) ---
@@ -1327,163 +1385,163 @@ elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Ger
             template_disponibilidade()
             
     elif menu_atual == "🤝 Gerenciar Conexões":
-    st.title("🤝 Gestão de Relacionamentos") 
-            
-    if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
-        st.session_state.opcao_menu = "💬 Conversar com Lucy"
-        st.rerun()
+        st.title("🤝 Gestão de Relacionamentos") 
                 
-    aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
-    meu_id_limpo = int(st.session_state.usuario_id)
-
-    # Regra de permissão por planos
-    plano_atual = str(st.session_state.get("tipo_plano", "grátis")).strip().lower()
-    usuario_tem_acesso = (plano_atual == "vip") or ("crédito" in plano_atual) or ("credito" in plano_atual)
-    bloquear_botoes = not usuario_tem_acesso
-
-    # Mapeamento do dia atual para filtros
-    dia_ingles = datetime.now().strftime("%A")
-    mapeamento_dias = {
-        "Monday": "segunda-feira", "Tuesday": "terça-feira", "Wednesday": "quarta-feira",
-        "Thursday": "quinta-feira", "Friday": "sexta-feira", "Saturday": "sábado", "Sunday": "domingo"
-    }
-    dia_atual_servidor = mapeamento_dias.get(dia_ingles, "segunda-feira")
-
-    # --- ABA 1: MEUS MATCHES (AFINIDADES) ---
-    with aba_m:
-        st.markdown("### 👥 Suas Afinidades")
-        matches_dados = []
-        try:
-            conn = conectar_supabase()
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT m.id, u.username, u.foto_perfil, u.genero, u.id 
-                FROM matches m 
-                JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) 
-                WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;
-            """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-            matches_dados = cursor.fetchall()
-            cursor.close()
-            conn.close()
-        except Exception as e: 
-            st.error(f"Erro ao buscar afinidades: {e}")
-
-        if not matches_dados: 
-            st.info("Nenhum par localizado no momento. Continue conversando com a Lucy para gerar afinidades!")
+        if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun()
                     
-        for m_id, m_nome, m_foto, m_gen, par_id in matches_dados:
-            with st.container(border=True):
-                c_av_c, c_nm_c, c_go_c, c_del_c = st.columns([0.6, 2, 1, 1])
-                        
-                with c_av_c:
-                    caminho_par_img = str(m_foto).strip().lstrip('/')
-                    if m_foto and os.path.exists(caminho_par_img):
-                        try:
-                            with open(caminho_par_img, "rb") as image_file:
-                                enc_str = base64.b64encode(image_file.read()).decode()
-                            st.markdown(f'<img src="data:image/jpeg;base64,{enc_str}" class="foto-match-central" style="width:50px; height:50px; border-radius:50%; object-fit:cover;">', unsafe_allow_html=True)
-                        except Exception: 
-                            st.write("👩" if m_gen == 'F' else "👨")
-                    else:
-                        st.subheader("👩" if m_gen == 'F' else "👨")
-                                
-                with c_nm_c:
-                    nome_limpo_exibicao = str(m_nome).split('@')[0].capitalize()
-                    st.markdown(f"<p style='font-size:15px; font-weight:bold; margin-top:12px; color:#f0f6fc;'>{nome_limpo_exibicao}</p>", unsafe_allow_html=True)
-                            
-                with c_go_c:
-                    if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                        help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                        st.session_state.match_id_atual = m_id
-                        st.session_state.opcao_menu = "🤝 Sala Privada"
-                        st.rerun()
-                                
-                with c_del_c:
-                    if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", use_container_width=True):
-                        try:
-                            conn = conectar_supabase()
-                            cursor = conn.cursor()
-                            cursor.execute("DELETE FROM mensagens_sala WHERE match_id = %s;", (int(m_id),))
-                            cursor.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
-                            cursor.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
-                            conn.commit()
-                            cursor.close()
-                            conn.close()
-                            st.toast("Match removido com sucesso!")
-                            st.rerun()
-                        except Exception as e: 
-                            st.error(f"Erro ao remover match: {e}")
+        aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
+        meu_id_limpo = int(st.session_state.usuario_id)
 
-    # --- ABA 2: GESTÃO DE CONVITES E HISTÓRICO ---
-    with aba_e:
-        st.markdown("### 📩 Convites Ativos da Semana")
-        try:
-            conn = conectar_supabase()
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
-                CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
-                FROM agendamentos_virtuais a 
-                JOIN matches m ON m.id = a.match_id 
-                JOIN usuarios u1 ON u1.id = m.usuario_1_id 
-                JOIN usuarios u2 ON u2.id = m.usuario_2_id
-                WHERE a.remetente_id = %s OR a.destinatario_id = %s 
-                ORDER BY a.id DESC;
-            """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-            encontros = cursor.fetchall()
-            cursor.close()
-            conn.close()
-                    
-            encontros_ativos = [e for e in encontros if str(e[1]).lower().strip() == str(dia_atual_servidor).lower().strip() or str(e[4]).lower() == 'pendente']
-            encontros_passados = [e for e in encontros if str(e[1]).lower().strip() != str(dia_atual_servidor).lower().strip() and str(e[4]).lower() == 'aceito']
-                    
-            if not encontros_ativos:
-                st.caption("Nenhum convite pendente ou encontro ativo para hoje.")
-                        
-            for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_ativos:
-                eu_enviei = (int(rem_id) == meu_id_limpo)
-                parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize()
-                        
-                with st.container(border=True):
-                    col_i, col_b = st.columns([3, 1])
-                    with col_i:
-                        st.write(f"📅 **Encontro com {parceiro_limpo}:** {dia} às {str(hora)[:5]}")
-                        st.caption(f"Status do Convite: {status.upper()}")
-                   with col_b:
-                            if status == 'pendente' and not eu_enviei:
-                                if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                                    help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                                    try:
-                                        conn = conectar_supabase()
-                                        cursor = conn.cursor()
-                                        cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (int(ag_id),))
-                                        conn.commit()
-                                        cursor.close()
-                                        conn.close()
-                                        st.toast("Convite aceito!")
-                                        st.rerun()
-                                    except Exception as e:
-                                        st.error(f"Erro ao aceitar: {e}")
-                            elif status == 'aceito':
-                                if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                                    help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                                    st.session_state.match_id_atual = m_id
-                                    st.session_state.opcao_menu = "🤝 Sala Privada"
-                                    st.rerun()
-                        
-                # --- HISTÓRICO DE ENCONTROS PASSADOS ---
-                st.markdown("<br><hr style='border-color: #21262d;'>", unsafe_allow_html=True)
-                st.markdown("### 📚 Histórico de Encontros Concluídos")
-                        
-                if not encontros_passados:
-                    st.caption("Nenhum registro antigo arquivado.")
-                            
-                for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados:
-                    parceiro_antigo_limpo = str(parceiro_nome).split('@')[0].capitalize()
-                    st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
-                            
+        # Regra de permissão por planos
+        plano_atual = str(st.session_state.get("tipo_plano", "grátis")).strip().lower()
+        usuario_tem_acesso = (plano_atual == "vip") or ("crédito" in plano_atual) or ("credito" in plano_atual)
+        bloquear_botoes = not usuario_tem_acesso
+
+        # Mapeamento do dia atual para filtros
+        dia_ingles = datetime.now().strftime("%A")
+        mapeamento_dias = {
+            "Monday": "segunda-feira", "Tuesday": "terça-feira", "Wednesday": "quarta-feira",
+            "Thursday": "quinta-feira", "Friday": "sexta-feira", "Saturday": "sábado", "Sunday": "domingo"
+        }
+        dia_atual_servidor = mapeamento_dias.get(dia_ingles, "segunda-feira")
+
+        # --- ABA 1: MEUS MATCHES (AFINIDADES) ---
+        with aba_m:
+            st.markdown("### 👥 Suas Afinidades")
+            matches_dados = []
+            try:
+                conn = conectar_supabase()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT m.id, u.username, u.foto_perfil, u.genero, u.id 
+                    FROM matches m 
+                    JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) 
+                    WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;
+                """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
+                matches_dados = cursor.fetchall()
+                cursor.close()
+                conn.close()
             except Exception as e: 
-                st.error(f"Erro crítico no processamento de convites: {e}")            
+                st.error(f"Erro ao buscar afinidades: {e}")
+
+            if not matches_dados: 
+                st.info("Nenhum par localizado no momento. Continue conversando com a Lucy para gerar afinidades!")
+                        
+            for m_id, m_nome, m_foto, m_gen, par_id in matches_dados:
+                with st.container(border=True):
+                    c_av_c, c_nm_c, c_go_c, c_del_c = st.columns([0.6, 2, 1, 1])
+                            
+                    with c_av_c:
+                        caminho_par_img = str(m_foto).strip().lstrip('/')
+                        if m_foto and os.path.exists(caminho_par_img):
+                            try:
+                                with open(caminho_par_img, "rb") as image_file:
+                                    enc_str = base64.b64encode(image_file.read()).decode()
+                                st.markdown(f'<img src="data:image/jpeg;base64,{enc_str}" class="foto-match-central" style="width:50px; height:50px; border-radius:50%; object-fit:cover;">', unsafe_allow_html=True)
+                            except Exception: 
+                                st.write("👩" if m_gen == 'F' else "👨")
+                        else:
+                            st.subheader("👩" if m_gen == 'F' else "👨")
+                                    
+                    with c_nm_c:
+                        nome_limpo_exibicao = str(m_nome).split('@')[0].capitalize()
+                        st.markdown(f"<p style='font-size:15px; font-weight:bold; margin-top:12px; color:#f0f6fc;'>{nome_limpo_exibicao}</p>", unsafe_allow_html=True)
+                                
+                    with c_go_c:
+                        if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
+                            help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
+                            st.session_state.match_id_atual = m_id
+                            st.session_state.opcao_menu = "🤝 Sala Privada"
+                            st.rerun()
+                                    
+                    with c_del_c:
+                        if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", use_container_width=True):
+                            try:
+                                conn = conectar_supabase()
+                                cursor = conn.cursor()
+                                cursor.execute("DELETE FROM mensagens_sala WHERE match_id = %s;", (int(m_id),))
+                                cursor.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
+                                cursor.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
+                                conn.commit()
+                                cursor.close()
+                                conn.close()
+                                st.toast("Match removido com sucesso!")
+                                st.rerun()
+                            except Exception as e: 
+                                st.error(f"Erro ao remover match: {e}")
+
+        # --- ABA 2: GESTÃO DE CONVITES E HISTÓRICO ---
+        with aba_e:
+            st.markdown("### 📩 Convites Ativos da Semana")
+            try:
+                conn = conectar_supabase()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
+                    CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
+                    FROM agendamentos_virtuais a 
+                    JOIN matches m ON m.id = a.match_id 
+                    JOIN usuarios u1 ON u1.id = m.usuario_1_id 
+                    JOIN usuarios u2 ON u2.id = m.usuario_2_id
+                    WHERE a.remetente_id = %s OR a.destinatario_id = %s 
+                    ORDER BY a.id DESC;
+                """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
+                encontros = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                        
+                encontros_ativos = [e for e in encontros if str(e[1]).lower().strip() == str(dia_atual_servidor).lower().strip() or str(e[4]).lower() == 'pendente']
+                encontros_passados = [e for e in encontros if str(e[1]).lower().strip() != str(dia_atual_servidor).lower().strip() and str(e[4]).lower() == 'aceito']
+                        
+                if not encontros_ativos:
+                    st.caption("Nenhum convite pendente ou encontro ativo para hoje.")
+                            
+                for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_ativos:
+                    eu_enviei = (int(rem_id) == meu_id_limpo)
+                    parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize()
+                            
+                    with st.container(border=True):
+                        col_i, col_b = st.columns([3, 1])
+                        with col_i:
+                            st.write(f"📅 **Encontro com {parceiro_limpo}:** {dia} às {str(hora)[:5]}")
+                            st.caption(f"Status do Convite: {status.upper()}")
+                    with col_b:
+                                if status == 'pendente' and not eu_enviei:
+                                    if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
+                                        help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
+                                        try:
+                                            conn = conectar_supabase()
+                                            cursor = conn.cursor()
+                                            cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (int(ag_id),))
+                                            conn.commit()
+                                            cursor.close()
+                                            conn.close()
+                                            st.toast("Convite aceito!")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Erro ao aceitar: {e}")
+                                elif status == 'aceito':
+                                    if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
+                                        help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
+                                        st.session_state.match_id_atual = m_id
+                                        st.session_state.opcao_menu = "🤝 Sala Privada"
+                                        st.rerun()
+                            
+                    # --- HISTÓRICO DE ENCONTROS PASSADOS ---
+                    st.markdown("<br><hr style='border-color: #21262d;'>", unsafe_allow_html=True)
+                    st.markdown("### 📚 Histórico de Encontros Concluídos")
+                            
+                    if not encontros_passados:
+                        st.caption("Nenhum registro antigo arquivado.")
+                                
+                    for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados:
+                        parceiro_antigo_limpo = str(parceiro_nome).split('@')[0].capitalize()
+                        st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
+                                
+                except Exception as e: 
+                    st.error(f"Erro crítico no processamento de convites: {e}")            
 
     elif menu_atual == "🤝 Sala Privada":
         if st.session_state.get("match_id_atual"):
