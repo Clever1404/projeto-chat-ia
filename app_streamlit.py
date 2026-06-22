@@ -1463,7 +1463,7 @@ elif menu_atual == "💬 Conversar com Lucy":
                     conn_salvar = conectar_supabase()
                     cursor_salvar = conn_salvar.cursor()
                     cursor_salvar.execute("""
-                        INSERT INTO historico_ia (usuario_id, usuario_pregunta, ia_resposta) 
+                        INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta) 
                         VALUES (%s, %s, %s);
                     """, (meu_id_limpo, prompt, resposta_lucy))
                     conn_salvar.commit()
