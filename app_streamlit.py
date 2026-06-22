@@ -1105,8 +1105,8 @@ elif menu_atual == "planos":
     elif st.session_state.sub_visao == "🛒 Loja do App":
         # Botão posicionado no topo para o usuário conseguir voltar aos planos
         if st.button("📋 Ver Descrição dos Planos", use_container_width=True):
-            st.session_state.sub_visao = "🛒 Loja do App"
-            st.rerun()
+            mostrar_popup_loja(id_usuario):
+            
             
         st.markdown('<hr style="border: 0.5px solid #30363d; margin: 15px 0;">', unsafe_allow_html=True)
         
