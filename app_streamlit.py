@@ -1038,7 +1038,7 @@ elif menu_atual == "cadastro":
                         st.session_state.username = usuario.strip()
                         st.session_state.genero = genero
                         conn.commit()
-                        st.session_state.opcao_menu = "plataforma_planos"
+                        st.session_state.opcao_menu = "planos"
                         st.rerun()
                     cursor.close(); conn.close()
                 except Exception as e: 
@@ -1047,6 +1047,10 @@ elif menu_atual == "cadastro":
     if st.button("← Voltar para o Login", use_container_width=True):
         st.session_state.opcao_menu = "login"
         st.rerun()
+
+elif menu_atual == "planos":
+    st.session_state.opcao_menu = "planos"
+
 
 
 # --- TELAS PRIVADAS (Com Barra Lateral de Usuário Logado) ---
@@ -1487,4 +1491,5 @@ elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Ger
 
 # --- FALLBACK DE SEGURANÇA ---
 else:
-    template_home()
+    st.session_state.opcao_menu = "home"
+        st.rerun()
