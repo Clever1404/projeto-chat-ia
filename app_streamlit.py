@@ -602,8 +602,6 @@ def template_fale_conosco():
 
 
 
-
-
 # ==============================================================================
 # CONTROLE DE MENUS E BARRA LATERAL (SIDEBAR DE USUÁRIO LOGADO)
 # ==============================================================================
@@ -1039,9 +1037,27 @@ def modal_recuperar_senha():
 # 6. TEMPLATES / TELAS DO SISTEMA
 # ==============================================================================
 def template_home():
-    st.markdown("Lucy Chat IA — Chat virtual online", unsafe_allow_html=True)
-    st.markdown("Conversa com afinidades baseadas em IA e encontros virtuais criptografados de ponta a ponta.", unsafe_allow_html=True)
-    
+    st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
+
+    st.markdown("""
+        <div style='text-align: center;'>
+        🔒 **Ambiente 100% Seguro:** Suas mensagens e chamadas são privadas.<br>
+        🎥 **Videochamada Integrada:** Conecte-se por vídeo com um clique.<br>
+        📬 **Suporte Dedicado:** Canal direto via Fale Conosco.<br>
+        </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+        <div style="background-color: #004085; padding: 20px; border-radius: 5px; text-align: center; border-left: 5px solid #0066cc; margin-bottom: 20px;">
+            <h1 style="margin: 0; color: #ffffff; font-size: 24px;">
+                💡 CADASTRE-SE AGORA EM NOSSO SITE ENCONTRE SEU MATCH E MARQUE UM ENCONTRO VIRTUAL!!
+            </h1>
+        </div>
+    """, unsafe_allow_html=True)
+
+
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
