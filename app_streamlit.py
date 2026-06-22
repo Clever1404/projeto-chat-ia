@@ -387,9 +387,9 @@ def modal_agendamento_encontro(dados_r):
                 st.success("🎉 Convite enviado!")
                 st.session_state.abrir_reserva_fluxo = None
                 st.rerun()
-    except Exception as e: 
-        st.error(f"Erro ao carregar dados do banco: {e}")
-        return
+        except Exception as e: 
+            st.error(f"Erro ao carregar dados do banco: {e}")
+            return
 
     exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
 
