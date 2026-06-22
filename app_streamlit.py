@@ -931,7 +931,7 @@ menu_atual = st.session_state.get("opcao_menu", "home")
 
 # --- TELAS PÚBLICAS (Sem Barra Lateral de Usuário) ---
 if menu_atual == "home":
-    def template_home():
+    template_home()
         st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
         st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>", unsafe_allow_html=True)
         st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
@@ -968,7 +968,7 @@ if menu_atual == "home":
                     st.rerun()
 
 elif menu_atual == "login":
-    def template_login():
+    template_login()
         st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
         with st.form("form_login"):
             user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed")
@@ -1011,7 +1011,7 @@ elif menu_atual == "login":
 
 
 elif menu_atual == "cadastro":
-    def template_cadastro():
+    template_cadastro()
         st.html('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>')
         with st.form(key=f"form_cad_unico_{st.session_state.form_seed}"):
             usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
@@ -1054,7 +1054,7 @@ elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Ger
     
     
     # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
-    def renderizar_listas_sidebar_e_acoes():
+    renderizar_listas_sidebar_e_acoes()
         with st.sidebar: 
             # ==========================================================================
             # --- PERFIL DO USUÁRIO & AVATAR HTML ---
@@ -1317,7 +1317,7 @@ elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Ger
             template_disponibilidade()
             
     elif menu_atual == "🤝 Gerenciar Conexões":
-        def template_gerenciar_conexoes_completo():
+        template_gerenciar_conexoes_completo()
             st.title("🤝 Gestão de Relacionamentos") 
                 
             if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
