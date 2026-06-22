@@ -322,8 +322,10 @@ def processar_match_lucy(dados_m):
 @st.dialog("📅 Reserva de Encontro")
 def modal_agendamento_encontro(dados_r):
     st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
+    
     dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
     dia_s = st.selectbox("Escolha o Dia da Semana:", dias, key="dg_res_dia")
+    
     opcoes_periodo = ["🌅 Manhã (06:00 às 11:59)", "☀️ Tarde (12:00 às 17:59)", "🌙 Noite (18:00 às 23:59)"]
     per_exibicao = st.selectbox("Escolha o Período:", opcoes_periodo, key="dg_res_per")
     per_s = "manha" if "Manhã" in per_exibicao else "tarde" if "Tarde" in per_exibicao else "noite"
@@ -331,29 +333,34 @@ def modal_agendamento_encontro(dados_r):
     horario_sugestao = datetime.strptime("09:00" if per_s=="manha" else "14:00" if per_s=="tarde" else "20:00", "%H:%M").time()
     hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
     
-    if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True):
-        def limpar_id_absoluto(id_bruto):
-            while isinstance(id_bruto, (tuple, list)): 
-                id_bruto = id_bruto[0] if len(id_bruto)>0 else 0
-            return int(id_bruto)
-            
-        m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
-        meu_id_limpo = limpar_id_absoluto(st.session_state.usuario_id)
-        parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
-        
+    # Executa a limpeza profunda de IDs encapsulados em listas/tuplas do banco
+    def limpar_id_absoluto(id_bruto):
+        while isinstance(id_bruto, (tuple, list)): 
+            id_bruto = id_bruto[0] if len(id_bruto) > 0 else 0
+        return int(id_bruto) if id_bruto is not None else 0
+
+    m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
+    meu_id_limpo = limpar_id_absoluto(st.session_state.get("usuario_id"))
+    parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
+
+    # Botão de confirmação
+    if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True, key="btn_confirmar_reserva_click"):
         try:
             conn_check = conectar_supabase()
             cursor_check = conn_check.cursor()
             
+            # 1. Verifica se VOCÊ está disponível nesse horário
             cursor_check.execute("""
                 SELECT COUNT(*) FROM disponibilidade_usuarios 
                 WHERE usuario_id = %s AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
             """, (meu_id_limpo, str(dia_s), str(per_s)))
             meu_registro_existe = cursor_check.fetchone()[0] > 0
             
+            # 2. Verifica se o PARCEIRO cadastrou alguma grade
             cursor_check.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
             parceiro_tem_algum_horario = cursor_check.fetchone()[0] > 0
             
+            # 3. Verifica se o PARCEIRO está livre nesse horário específico
             cursor_check.execute("""
                 SELECT COUNT(*) FROM disponibilidade_usuarios 
                 WHERE usuario_id = %s AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
@@ -363,6 +370,7 @@ def modal_agendamento_encontro(dados_r):
             cursor_check.close()
             conn_check.close()
             
+            # 4. Validações de consistência de relógio
             hora_int = hor_s.hour
             if per_s == 'manha' and (hora_int < 6 or hora_int >= 12): 
                 st.error("❌ Horário inválido para Manhã (06:00 às 11:59).")
@@ -375,22 +383,25 @@ def modal_agendamento_encontro(dados_r):
             elif parceiro_tem_algum_horario and not parceiro_registro_existe: 
                 st.error(f"❌ {dados_r['nome_par']} configurou este horário como indisponível.")
             else:
+                # 5. Se passou em tudo, insere o agendamento de forma segura
                 conn = conectar_supabase()
                 cursor = conn.cursor()
                 cursor.execute("""
                     INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
                     VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
-                """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, dia_s, per_s, hor_s))
+                """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), hor_s))
                 conn.commit()
                 cursor.close()
                 conn.close()
                 
-                st.success("🎉 Convite enviado!")
+                # Salva o sucesso e limpa o gatilho de abertura do fluxo
+                st.success("🎉 Convite enviado com sucesso!")
                 st.session_state.abrir_reserva_fluxo = None
+                time.sleep(1.2)
                 st.rerun()
+                
         except Exception as e: 
-            st.error(f"Erro ao carregar dados do banco: {e}")
-            return
+            st.error(f"Erro crítico ao salvar agendamento no banco: {e}")
 
 # ==============================================================================
 # FUNÇÃO AUXILIAR: BANCO DE DADOS DA SALA PRIVADA
