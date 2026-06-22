@@ -1406,9 +1406,88 @@ elif menu_atual == "🛠️ Painel Admin":
     template_painel_admin()
 elif menu_atual == "💬 Conversar com Lucy":
     renderizar_listas_sidebar_e_acoes()
-    # Mock/Chamada padrão para a interface com o Bot IA caso não use templates externos adicionais
-    st.markdown("### 💬 Conversar com Lucy")
-    st.info("Interface de Chat com IA pronta. Adicione aqui os seus blocos de st.chat_input e st.chat_message.")
+    
+    st.markdown("### 🤖 Conversar com Lucy")
+    st.caption("Fale sobre sua rotina, hobbies e o que procura. Lucy usa IA para analisar seu perfil e encontrar pessoas compatíveis.")
+    st.markdown("<hr style='border-color: #30363d; margin: 10px 0 20px 0;'>", unsafe_allow_html=True)
+
+    meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
+
+    # 1. Carrega o histórico de mensagens do banco de dados (Memória da IA)
+    # Garante que as mensagens anteriores apareçam na tela ao mudar de menu
+    historico_banco = buscar_memoria(meu_id_limpo, limite=20)
+    
+    # Exibe as mensagens antigas salvas no banco
+    for pergunta_antiga, resposta_antiga in historico_banco:
+        with st.chat_message("user"):
+            st.markdown(pergunta_antiga)
+        with st.chat_message("assistant", avatar="🤖"):
+            st.markdown(resposta_antiga)
+
+    # 2. Caixa de Entrada para novas mensagens (Chat Input)
+    if prompt := st.chat_input("Digite sua mensagem para a Lucy..."):
+        
+        # Exibe a mensagem digitada imediatamente na tela
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # Container com animação de carregamento enquanto a IA processa
+        with st.chat_message("assistant", avatar="🤖"):
+            with st.spinner("Lucy está pensando..."):
+                try:
+                    # Monta o contexto para a OpenAI com as últimas interações
+                    contexto_mensagens = [
+                        {"role": "system", "content": "Você é a Lucy, uma IA psicóloga e assistente de relacionamentos altamente empática. Seu objetivo é entender o estilo de vida, gostos e rotina do usuário através de uma conversa natural. Seja acolhedora, faça perguntas abertas e ajude-o a se expressar para encontrar o par ideal."}
+                    ]
+                    
+                    # Alimenta a IA com o histórico recente para ela lembrar do contexto
+                    for p, r in historico_banco[-5:]:
+                        contexto_mensagens.append({"role": "user", "content": p})
+                        contexto_mensagens.append({"role": "assistant", "content": r})
+                    
+                    # Adiciona a pergunta atual do usuário
+                    contexto_mensagens.append({"role": "user", "content": prompt})
+
+                    # Chama a API da OpenAI para gerar a resposta da Lucy
+                    resposta_openai = client.chat.completions.create(
+                        model='gpt-4o-mini',
+                        messages=contexto_mensagens,
+                        temperature=0.7
+                    )
+                    resposta_lucy = resposta_openai.choices[0].message.content
+                    
+                    # Exibe a resposta da IA na tela
+                    st.markdown(resposta_lucy)
+
+                    # 3. Salva a interação no histórico do banco de dados PostgreSQL
+                    conn_salvar = conectar_supabase()
+                    cursor_salvar = conn_salvar.cursor()
+                    cursor_salvar.execute("""
+                        INSERT INTO historico_ia (usuario_id, usuario_pregunta, ia_resposta) 
+                        VALUES (%s, %s, %s);
+                    """, (meu_id_limpo, prompt, resposta_lucy))
+                    conn_salvar.commit()
+                    cursor_salvar.close()
+                    conn_salvar.close()
+
+                    # 4. Dispara o Motor de Afinidade e Embeddings em segundo plano
+                    # Analisa o texto enviado para recalcular os matches do usuário
+                    dados_match = processar_afinidade_e_match(meu_id_limpo, prompt)
+                    
+                    # Se encontrar um match com afinidade acima de 75% (distância <= 0.22)
+                    if dados_match and dados_match.get("match"):
+                        # Guarda o alerta na sessão e força a abertura do Modal Dialog de Match
+                        st.session_state.alerta_match = {
+                            "match_id": dados_match.get("match_id", random.randint(1000, 9999)),
+                            "id_par": dados_match.get("id_par"),
+                            "nome": dados_match.get("nome_par"),
+                            "online": dados_match.get("online", False)
+                        }
+                        # Executa o modal dialog criado na sua Etapa 5
+                        processar_match_lucy(st.session_state.alerta_match)
+
+                except Exception as e:
+                    st.error(f"Erro ao processar conversa com a IA: {e}")  
 else:
     # Fallback seguro caso o estado se corrompa
     template_home()
