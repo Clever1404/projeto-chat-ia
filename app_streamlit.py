@@ -1578,11 +1578,11 @@ else:
         elif menu_atual == "🛠️ Painel Admin":
             template_painel_admin()
 
-# ==============================================================================
-# FALLBACK DE SEGURANÇA SEGURO (FIM DO ARQUIVO)
-# ==============================================================================
-else:
-    # Se o menu atual não corresponder a nenhuma tela, redefine para a home 
-    # e renderiza o layout visual imediatamente, quebrando loops de st.rerun()
-    st.session_state.opcao_menu = "home"
-    #template_home()
+    # ==============================================================================
+    # FALLBACK DE SEGURANÇA SEGURO (FIM DO ARQUIVO)
+    # ==============================================================================
+    else:
+        # Se o menu atual não corresponder a nenhuma tela, redefine para a home 
+        # e renderiza o layout visual imediatamente, quebrando loops de st.rerun()
+        st.session_state.opcao_menu = "home"
+        #template_home()
