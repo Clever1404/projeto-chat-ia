@@ -1058,7 +1058,6 @@ elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Ger
     
     
     # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
-    renderizar_listas_sidebar_e_acoes()
     with st.sidebar: 
         # ==========================================================================
         # --- PERFIL DO USUÁRIO & AVATAR HTML ---
