@@ -1091,6 +1091,7 @@ elif menu_atual == "planos":
         
         # Botão para ir para a loja (Troca a tela inteira)
         if st.button("🛒 Ir para a Loja de Moedas e Assinaturas", type="primary", use_container_width=True):
+            id_usuario = st.session_state.get("id_usuario", "usuario_teste")
             mostrar_popup_loja(id_usuario_atual=id_usuario)
             mostrar_popup_loja(id_usuario_atual)
             
