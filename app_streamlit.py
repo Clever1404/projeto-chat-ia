@@ -1418,11 +1418,23 @@ else:
             aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
             meu_id_limpo = int(st.session_state.usuario_id)
 
-            # Regra de permissão por planos
-            plano_atual = str(st.session_state.get("tipo_plano", "grátis")).strip().lower()
-            usuario_tem_acesso = (plano_atual == "vip") or ("crédito" in plano_atual) or ("credito" in plano_atual)
-            bloquear_botoes = not usuario_tem_acesso
-
+            # ==========================================================================
+            # 🚨 REGLA DE PERMISSÃO CORRIGIDA (UNIFICADA COM A SIDEBAR)
+            # ==========================================================================
+            # Captura o plano bruto e garante tratamento contra None
+            plano_bruto_sessao = str(st.session_state.get("tipo_plano", "Grátis")).strip()
+            
+            # Remove acentos, ç, espaços extras e joga tudo para minúsculo
+            plano_normalizado = unicodedata.normalize('NFKD', plano_bruto_sessao).encode('ASCII', 'ignore').decode('utf-8').lower()
+            
+            # Validação idêntica: aceita "vip", "assinante", "credito" ou "moedas" de forma limpa
+            if "vip" in plano_normalizado or "assinante" in plano_normalizado or "credito" in plano_normalizado or "moedas" in plano_normalizado:
+                usuario_tem_acesso = True
+                bloquear_botoes = False
+            else:
+                usuario_tem_acesso = False
+                bloquear_botoes = True
+                
             # Mapeamento do dia atual para filtros
             dia_ingles = datetime.now().strftime("%A")
             mapeamento_dias = {
@@ -1532,37 +1544,39 @@ else:
                                 st.write(f"📅 **Encontro com {parceiro_limpo}:** {dia} às {str(hora)[:5]}")
                                 st.caption(f"Status do Convite: {status.upper()}")
                         with col_b:
-                                    if status == 'pendente' and not eu_enviei:
-                                        if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                                            help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                                            try:
-                                                conn = conectar_supabase()
-                                                cursor = conn.cursor()
-                                                cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (int(ag_id),))
-                                                conn.commit()
-                                                cursor.close()
-                                                conn.close()
-                                                st.toast("Convite aceito!")
-                                                st.rerun()
-                                            except Exception as e:
-                                                st.error(f"Erro ao aceitar: {e}")
-                                    elif status == 'aceito':
-                                        if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                                            help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                                            st.session_state.match_id_atual = m_id
-                                            st.session_state.opcao_menu = "🤝 Sala Privada"
+                            if status == 'pendente' and not eu_enviei:
+                                if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True, 
+                                    disabled=bloquear_botoes, # <-- Usa a variável corrigida acima
+                                    help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
+                                        try:
+                                            conn = conectar_supabase()
+                                            cursor = conn.cursor()
+                                            cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (int(ag_id),))
+                                            conn.commit()
+                                            cursor.close()
+                                            conn.close()
+                                            st.toast("Convite aceito!")
                                             st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Erro ao aceitar: {e}")
+                                elif status == 'aceito':
+                                    if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True, 
+                                                disabled=bloquear_botoes, # <-- Usa a variável corrigida acima
+                                                help="Disponível apenas para planos VIP ou Plano Crédito de Moedas" if bloquear_botoes else None):
+                                        st.session_state.match_id_atual = m_id
+                                        st.session_state.opcao_menu = "🤝 Sala Privada"
+                                        st.rerun()
                                 
-                        # --- HISTÓRICO DE ENCONTROS PASSADOS ---
-                        st.markdown("<br><hr style='border-color: #21262d;'>", unsafe_allow_html=True)
-                        st.markdown("### 📚 Histórico de Encontros Concluídos")
+                    # --- HISTÓRICO DE ENCONTROS PASSADOS ---
+                    st.markdown("<br><hr style='border-color: #21262d;'>", unsafe_allow_html=True)
+                    st.markdown("### 📚 Histórico de Encontros Concluídos")
                                 
-                        if not encontros_passados:
-                            st.caption("Nenhum registro antigo arquivado.")
+                    if not encontros_passados:
+                        st.caption("Nenhum registro antigo arquivado.")
                                     
-                        for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados:
-                            parceiro_antigo_limpo = str(parceiro_nome).split('@')[0].capitalize()
-                            st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
+                    for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados:
+                        parceiro_antigo_limpo = str(parceiro_nome).split('@')[0].capitalize()
+                        st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
                                     
                 except Exception as e: 
                     st.error(f"Erro crítico no processamento de convites: {e}")            
