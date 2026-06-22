@@ -726,12 +726,12 @@ def template_disponibilidade():
 # MODAL DA LOJA DO APP (CORRIGIDO E FECHADO)
 # ==============================================================================
 @st.dialog("🛒 Loja do App")
-def mostrar_popup_loja(id_usuario_atual):
+def mostrar_popup_loja(id_usuario):
     opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
 
     if st.button("Gerar Pix de Pagamento"):
         valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (5.00, "Pacote de 10 Moedas", "moedas")
-        id_limpo = id_usuario_atual if isinstance(id_usuario_atual, (list, tuple)) else id_usuario_atual
+        id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
         
         payment_data = {
             "transaction_amount": valor, 
@@ -1092,8 +1092,7 @@ elif menu_atual == "planos":
         # Botão para ir para a loja (Troca a tela inteira)
         if st.button("🛒 Ir para a Loja de Moedas e Assinaturas", type="primary", use_container_width=True):
             id_usuario = st.session_state.get("id_usuario", "usuario_teste")
-            mostrar_popup_loja(id_usuario_atual=id_usuario)
-            mostrar_popup_loja(id_usuario_atual)
+            mostrar_popup_loja(id_usuario)
             
             
       
