@@ -1540,8 +1540,8 @@ elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Ger
                         parceiro_antigo_limpo = str(parceiro_nome).split('@')[0].capitalize()
                         st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
                                 
-                except Exception as e: 
-                    st.error(f"Erro crítico no processamento de convites: {e}")            
+            except Exception as e: 
+                st.error(f"Erro crítico no processamento de convites: {e}")            
 
     elif menu_atual == "🤝 Sala Privada":
         if st.session_state.get("match_id_atual"):
