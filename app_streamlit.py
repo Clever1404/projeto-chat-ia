@@ -305,7 +305,7 @@ def processar_match_lucy(dados_m):
     if id_usuario_logado is None: 
         return
     try:
-        id_limpo = id_usuario_logado[0] if isinstance(id_usuario_logado, (list, tuple)) else id_usuario_logado
+        id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (list, tuple)) else id_usuario_logado
         user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_limpo)).execute()
         if user_data.data:
             registro_banco = user_data.data[0]
@@ -313,7 +313,8 @@ def processar_match_lucy(dados_m):
             saldo_moedas = registro_banco.get("moedas", 0)
     except Exception as e: 
         st.error(f"Erro ao carregar dados do banco: {e}")
-        return
+        return  # 🟢 FIX: O bloco 'except' agora possui conteúdo e encerra a função com segurança
+        
     exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
 
 @st.dialog("📅 Reserva de Encontro")
@@ -388,6 +389,9 @@ def modal_agendamento_encontro(dados_r):
                 st.rerun()
         except Exception as e: 
 
+# ==============================================================================
+# MODAL DA LOJA DO APP (LINHA 391)
+# ==============================================================================
 @st.dialog("🛒 Loja do App")
 def mostrar_popup_loja(id_usuario):
     opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
