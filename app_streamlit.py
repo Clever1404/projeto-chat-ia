@@ -934,6 +934,10 @@ def template_painel_admin():
 # Verifica se há alguma requisição para abrir a loja
 if st.session_state.get("abrir_popup_loja"):
     st.session_state.abrir_popup_loja = False  # Reseta o gatilho
+    # COLOQUE ISSO NO SEU ROTEADOR GLOBAL (Abaixo da verificação da loja)
+if st.session_state.get("abrir_reserva_fluxo"):
+    # Invoca e mantém o modal ativo se houver dados de reserva pendentes na sessão
+    modal_agendamento_encontro(st.session_state.abrir_reserva_fluxo)
     if st.session_state.get("usuario_id"):
         mostrar_popup_loja(st.session_state.usuario_id)
 
