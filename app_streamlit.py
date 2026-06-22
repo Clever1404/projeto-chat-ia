@@ -931,44 +931,44 @@ menu_atual = st.session_state.get("opcao_menu", "home")
 
 # --- TELAS PÚBLICAS (Sem Barra Lateral de Usuário) ---
 if menu_atual == "home":
-    template_home()
-    st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>", unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
+    def template_home():
+        st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
 
-    st.markdown("""
-        <div style='text-align: center;'>
-        🔒 **Ambiente 100% Seguro:** Suas mensagens e chamadas são privadas.<br>
-        🎥 **Videochamada Integrada:** Conecte-se por vídeo com um clique.<br>
-        📬 **Suporte Dedicado:** Canal direto via Fale Conosco.<br>
-        </div>
-    """, unsafe_allow_html=True)
+        st.markdown("""
+            <div style='text-align: center;'>
+            🔒 **Ambiente 100% Seguro:** Suas mensagens e chamadas são privadas.<br>
+            🎥 **Videochamada Integrada:** Conecte-se por vídeo com um clique.<br>
+            📬 **Suporte Dedicado:** Canal direto via Fale Conosco.<br>
+            </div>
+        """, unsafe_allow_html=True)
 
-    st.markdown("""
-        <div style="background-color: #004085; padding: 20px; border-radius: 5px; text-align: center; border-left: 5px solid #0066cc; margin-bottom: 20px;">
-            <h1 style="margin: 0; color: #ffffff; font-size: 24px;">
-                💡 CADASTRE-SE AGORA EM NOSSO SITE ENCONTRE SEU MATCH E MARQUE UM ENCONTRO VIRTUAL!!
-            </h1>
-        </div>
-    """, unsafe_allow_html=True)
+        st.markdown("""
+            <div style="background-color: #004085; padding: 20px; border-radius: 5px; text-align: center; border-left: 5px solid #0066cc; margin-bottom: 20px;">
+                <h1 style="margin: 0; color: #ffffff; font-size: 24px;">
+                    💡 CADASTRE-SE AGORA EM NOSSO SITE ENCONTRE SEU MATCH E MARQUE UM ENCONTRO VIRTUAL!!
+                </h1>
+            </div>
+        """, unsafe_allow_html=True)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
-            st.session_state.opcao_menu = "login"
-            st.rerun()
-            
-    with col2:
-        with stylable_container(
-            key="green_button", 
-            css_styles="button { background-color: #28a745; color: white; }"
-        ):
-            if st.button("📝 Cadastre-se", use_container_width=True):
-                st.session_state.opcao_menu = "cadastro"
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
+                st.session_state.opcao_menu = "login"
                 st.rerun()
+                
+        with col2:
+            with stylable_container(
+                key="green_button", 
+                css_styles="button { background-color: #28a745; color: white; }"
+            ):
+                if st.button("📝 Cadastre-se", use_container_width=True):
+                    st.session_state.opcao_menu = "cadastro"
+                    st.rerun()
 
 elif menu_atual == "login":
-    def template_login()
+    def template_login():
         st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
         with st.form("form_login"):
             user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed")
@@ -1011,7 +1011,7 @@ elif menu_atual == "login":
 
 
 elif menu_atual == "cadastro":
-    def template_cadastro()
+    def template_cadastro():
         st.html('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>')
         with st.form(key=f"form_cad_unico_{st.session_state.form_seed}"):
             usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
@@ -1054,7 +1054,7 @@ elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Ger
     
     
     # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
-    def renderizar_listas_sidebar_e_acoes()
+    def renderizar_listas_sidebar_e_acoes():
         with st.sidebar: 
             # ==========================================================================
             # --- PERFIL DO USUÁRIO & AVATAR HTML ---
@@ -1317,7 +1317,7 @@ elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Ger
             template_disponibilidade()
             
         elif menu_atual == "🤝 Gerenciar Conexões":
-            def template_gerenciar_conexoes_completo()
+            def template_gerenciar_conexoes_completo():
                 st.title("🤝 Gestão de Relacionamentos") 
                 
                 if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
