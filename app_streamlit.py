@@ -1102,10 +1102,10 @@ elif menu_atual == "planos":
             st.rerun()
 
     # --- TELA 2: RENDERIZAÇÃO DA SUA LOJA (TELA CHEIA) ---
-    elif st.session_state.sub_visao == "loja":
+    elif st.session_state.sub_visao == "🛒 Loja do App":
         # Botão posicionado no topo para o usuário conseguir voltar aos planos
         if st.button("📋 Ver Descrição dos Planos", use_container_width=True):
-            st.session_state.sub_visao = "planos"
+            st.session_state.sub_visao = "🛒 Loja do App"
             st.rerun()
             
         st.markdown('<hr style="border: 0.5px solid #30363d; margin: 15px 0;">', unsafe_allow_html=True)
