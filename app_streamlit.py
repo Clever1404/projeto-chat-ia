@@ -1091,32 +1091,10 @@ elif menu_atual == "planos":
         
         # Botão para ir para a loja (Troca a tela inteira)
         if st.button("🛒 Ir para a Loja de Moedas e Assinaturas", type="primary", use_container_width=True):
-            st.session_state.sub_visao = "loja"
-            st.rerun()
-            
-        st.markdown('<br>', unsafe_allow_html=True)
-        
-        # Botão de voltar para o login
-        if st.button("← Voltar para o 🔒 Login", use_container_width=True):
-            st.session_state.opcao_menu = "login"
-            st.rerun()
-
-    # --- TELA 2: RENDERIZAÇÃO DA SUA LOJA (TELA CHEIA) ---
-    elif st.session_state.sub_visao == "🛒 Loja do App":
-        # Botão posicionado no topo para o usuário conseguir voltar aos planos
-        if st.button("📋 Ver Descrição dos Planos", use_container_width=True):
             mostrar_popup_loja(id_usuario)
             
             
-        st.markdown('<hr style="border: 0.5px solid #30363d; margin: 15px 0;">', unsafe_allow_html=True)
-        
-        # Recupera as variáveis necessárias
-        id_usuario = st.session_state.get("id_usuario", "usuario_teste")
-        saldo_atual = st.session_state.get("saldo_moedas", 0)
-        
-        # Executa a sua loja com a tela totalmente limpa e isolada
-        renderizar_loja_app(id_usuario_atual=id_usuario, saldo_moedas=saldo_atual)
-
+      
 
 # --- TELAS PRIVADAS (Com Barra Lateral de Usuário Logado) ---
 elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Gerenciar Conexões", "🤝 Sala Privada", "🛠️ Painel Admin"]:
