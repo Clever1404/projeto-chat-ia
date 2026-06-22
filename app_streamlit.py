@@ -1094,6 +1094,9 @@ elif menu_atual == "planos":
             id_usuario = st.session_state.get("id_usuario", "usuario_teste")
             mostrar_popup_loja(id_usuario)
             
+        if st.button("← Voltar para o Login", use_container_width=True):
+        st.session_state.opcao_menu = "login"
+        st.rerun() 
             
       
 
