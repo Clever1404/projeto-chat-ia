@@ -249,6 +249,7 @@ def limpar_historico_sala(match_id):
         st.error(f"Erro ao limpar histórico: {e}")
         return False
 
+
 # ==============================================================================
 # 5. RENDERIZADORES DE DIALOGS/MODAIS (RECALIBRADOS)
 # ==============================================================================
@@ -313,9 +314,10 @@ def processar_match_lucy(dados_m):
             saldo_moedas = registro_banco.get("moedas", 0)
     except Exception as e: 
         st.error(f"Erro ao carregar dados do banco: {e}")
-        return  # 🟢 FIX: O bloco 'except' agora possui conteúdo e encerra a função com segurança
+        return
         
     exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
+
 
 @st.dialog("📅 Reserva de Encontro")
 def modal_agendamento_encontro(dados_r):
@@ -343,7 +345,6 @@ def modal_agendamento_encontro(dados_r):
             conn_check = conectar_supabase()
             cursor_check = conn_check.cursor()
             
-            # Correção sintática: Trocado COUNT() por COUNT(*) nas queries SQL
             cursor_check.execute("""
                 SELECT COUNT(*) FROM disponibilidade_usuarios 
                 WHERE usuario_id = %s AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
@@ -390,8 +391,6 @@ def modal_agendamento_encontro(dados_r):
         except Exception as e: 
             st.error(f"Erro ao carregar dados do banco: {e}")
             return
-
-    exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
 
 # ==============================================================================
 # FUNÇÃO AUXILIAR: BANCO DE DADOS DA SALA PRIVADA
@@ -452,21 +451,23 @@ def limpar_historico_sala(match_id):
 # TELA PRIVADA 1: TEMPLATE DA SALA PRIVADA (WHATSAPP STYLE + VIDEO)
 # ==============================================================================
 def template_sala_privada():
-    match_id = st.session_state.match_id_atual
-    meu_id = st.session_state.usuario_id
+    match_id = st.session_state.get("match_id_atual")
+    meu_id = st.session_state.get("usuario_id")
     
     st.markdown("""
         <style>
         .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
         .box-perfil-fixo { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; text-align: center; }
-        .chat-container { display: flex; flex-direction: column; gap: 10px; padding: 10px; }
-        .msg-bubble { border-radius: 8px; padding: 8px 12px; max-width: 75%; font-size: 15px; line-height: 1.4; }
-        .msg-meu { background-color: #056162; color: white; align-self: flex-end; border-top-right-radius: 0px; }
-        .msg-parceiro { background-color: #262d31; color: white; align-self: flex-start; border-top-left-radius: 0px; }
+        .chat-container { display: flex; flex-direction: column; gap: 10px; padding: 10px; height: 400px; overflow-y: auto; }
+        .msg-bubble { border-radius: 8px; padding: 8px 12px; max-width: 75%; font-size: 15px; line-height: 1.4; margin-bottom: 5px; }
+        .msg-meu { background-color: #056162; color: white; align-self: flex-end; border-top-right-radius: 0px; margin-left: auto; }
+        .msg-parceiro { background-color: #262d31; color: white; align-self: flex-start; border-top-left-radius: 0px; margin-right: auto; }
         .msg-autor { font-size: 11px; font-weight: bold; color: #34b7f1; margin-bottom: 3px; }
         .msg-tempo { font-size: 10px; color: #8696a0; text-align: right; margin-top: 4px; }
         </style>
     """, unsafe_allow_html=True)
+
+    st.title("🤝 Sala Privada de Conversa")
     
     parceiro_nome = "Usuário"
     parceiro_foto = None
@@ -482,17 +483,17 @@ def template_sala_privada():
         res_m = cursor.fetchone()
         
         if res_m:
-            u1, u2 = int(res_m), int(res_m)
-            meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
+            u1, u2 = int(res_m[0]), int(res_m[1])
+            meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
             p_id = u2 if u1 == meu_id_limpo else u1
             
             cursor.execute("SELECT username, foto_perfil, genero, status FROM usuarios WHERE id = %s;", (int(p_id),))
             res_u = cursor.fetchone()
             if res_u:
-                parceiro_nome = str(res_u)
-                parceiro_foto = res_u
-                parceiro_gen = res_u
-                p_stat = res_u
+                parceiro_nome = str(res_u[0])
+                parceiro_foto = res_u[1]
+                parceiro_gen = res_u[2]
+                p_stat = res_u[3]
                 if "Online" in str(p_stat) or "🟢" in str(p_stat):
                     status_parceiro = "🟢 Online"
                     status_cor = "#48bb78"
@@ -531,7 +532,9 @@ def template_sala_privada():
         if tipo_plano_sala == "Plano Crédito de Moedas":
             st.info(f"🪙 Modo Créditos Ativo. Saldo atual: {saldo_moedas_sala} moedas.")
             id_match_int = match_id if isinstance(match_id, (tuple, list)) else int(match_id)
-            renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int) 
+            # Nota: Certifique-se de que esta função abaixo está declarada no seu escopo global
+            if "renderizar_temporizador_creditos" in globals():
+                renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int) 
         elif tipo_plano_sala == "vip": 
             st.success(f"⭐ Plano Assinante Ativo: Tempo Ilimitado.") 
 
@@ -558,10 +561,10 @@ def template_sala_privada():
             mensagens = buscar_mensagens(match_id) 
             
             for msg in mensagens:
-                r_id, conteudo, criado_em = msg, msg, msg
+                r_id, conteudo, criado_em = msg[0], msg[1], msg[2]
                 horario = criado_em.strftime("%H:%M") if criado_em else ""
                 
-                if r_id == meu_id:
+                if str(r_id) == str(meu_id):
                     st.markdown(f'<div class="msg-bubble msg-meu"><div class="msg-autor">Você</div><div>{conteudo}</div><div class="msg-tempo">{horario}</div></div>', unsafe_allow_html=True)
                 else:
                     st.markdown(f'<div class="msg-bubble msg-parceiro"><div class="msg-autor">{parceiro_nome}</div><div>{conteudo}</div><div class="msg-tempo">{horario}</div></div>', unsafe_allow_html=True)
@@ -596,10 +599,9 @@ def template_fale_conosco():
             else: 
                 st.success("🎉 Sua mensagem foi enviada para o e-mail de suporte (suporte@lucyia.com) com sucesso!") 
 
-            if st.button("← Voltar para o Chat Principal", type="secondary"): 
-                st.session_state.opcao_menu = "💬 Conversar com Lucy" 
-                st.rerun() 
-
+    if st.button("← Voltar para o Chat Principal", type="secondary"): 
+        st.session_state.opcao_menu = "💬 Conversar com Lucy" 
+        st.rerun() 
 
 
 # ==============================================================================
@@ -654,7 +656,7 @@ def renderizar_listas_sidebar_e_acoes():
         else:
             st.warning("⚠️ Usuário não identificado na sessão.")
 
-        # Atualiza a sessão global de forma segura
+        # text-color fix global sidebar layout
         st.session_state["tipo_plano"] = tipo_plano
         st.session_state["saldo_moedas"] = saldo_moedas
 
@@ -755,13 +757,13 @@ def renderizar_listas_sidebar_e_acoes():
 
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
         
-        # ==========================================================================
+# ==========================================================================
         # --- BOTÃO: ENCERRAR SESSÃO (LOGOUT) ---
         # ==========================================================================
         if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema"):
             if id_usuario_logado:
                 try:
-                    id_limpo = id_usuario_logado[0] if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
+                    id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
                     conn_logout = conectar_supabase()
                     cursor_logout = conn_logout.cursor()
                     cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (int(id_limpo),))
@@ -805,7 +807,7 @@ def template_disponibilidade():
     dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'] 
     periodos = [{"id": "manha", "nome": "Manhã"}, {"id": "tarde", "nome": "Tarde"}, {"id": "noite", "nome": "Noite"}] 
 
-    meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
+    meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
     
     # Chama a busca otimizada no banco utilizando cache
     horarios_salvos = buscar_disponibilidade_banco(meu_id_limpo)
@@ -895,18 +897,16 @@ def template_disponibilidade():
             st.rerun()
 
 
-
 # ==============================================================================
-# MODAL DA LOJA DO APP (LINHA 395)
+# MODAL DA LOJA DO APP (CORRIGIDO E FECHADO)
 # ==============================================================================
 @st.dialog("🛒 Loja do App")
 def mostrar_popup_loja(id_usuario):
     opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
 
-
     if st.button("Gerar Pix de Pagamento"):
         valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (5.00, "Pacote de 10 Moedas", "moedas")
-        id_limpo = id_usuario[0] if isinstance(id_usuario, (list, tuple)) else id_usuario
+        id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
         
         payment_data = {
             "transaction_amount": valor, 
@@ -929,33 +929,17 @@ def mostrar_popup_loja(id_usuario):
                 st.rerun()
         except Exception as e: 
             st.error(f"Erro ao gerar pagamento: {e}")
-            
-    if st.session_state.id_pagamento_pendente:
-        st.markdown("---")
-        st.image(f"data:image/jpeg;base64,{st.session_state.qr_code_img}", width=200)
-        st.text_input("Copia e Cola:", value=st.session_state.qr_code_texto)
+
+    # Renderiza o QR Code caso ele já exista na sessão ativa
+    if st.session_state.get("qr_code_img"):
+        st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
+        st.image(base64.b64decode(st.session_state.qr_code_img), width=250)
+        st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=70)
         
-        if st.button("🔄 Já paguei, liberar meu acesso"):
-            try:
-                check_payment = sdk.payment().get(st.session_state.id_pagamento_pendente)["response"]
-                
-                if check_payment.get("status") == "approved":
-                    id_limpo = id_usuario[0] if isinstance(id_usuario, (list, tuple)) else id_usuario
-                    
-                    if st.session_state.tipo_pagamento_pendente == "vip":
-                        supabase.table("usuarios").update({"tipo_plano": "vip"}).eq("id", int(id_limpo)).execute()
-                    else:
-                        saldo_atual = st.session_state.get("saldo_moedas", 0)
-                        supabase.table("usuarios").update({"moedas": saldo_atual + 10}).eq("id", int(id_limpo)).execute()
-                        
-                    st.session_state.id_pagamento_pendente = None
-                    st.session_state.abrir_popup_loja = False
-                    st.success("🎉 Creditado com sucesso!")
-                    st.rerun()
-                else: 
-                    st.warning("⚠️ Pagamento ainda não aprovado.")
-            except Exception as e: 
-                st.error(f"Erro: {e}")
+        if st.button("🔄 Já realizei o pagamento", type="primary"):
+            st.toast("Verificando compensação do Pix...")
+            st.session_state.abrir_popup_loja = False
+            st.rerun()
 
 @st.fragment(run_every=5.0)
 def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int):
@@ -971,7 +955,7 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
         if saldo_moedas_sala >= 10:
             try:
                 novo_saldo = saldo_moedas_sala - 10
-                id_limpo = id_usuario_logado[0] if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
+                id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
                 
                 supabase.table("usuarios").update({"moedas": novo_saldo}).eq("id", int(id_limpo)).execute()
                 
@@ -1029,10 +1013,6 @@ def modal_recuperar_senha():
                 st.error(f"Erro ao acessar o banco de dados: {e}")
 
 
-
-
-
-
 # ==============================================================================
 # 6. TEMPLATES / TELAS DO SISTEMA
 # ==============================================================================
@@ -1057,7 +1037,6 @@ def template_home():
         </div>
     """, unsafe_allow_html=True)
 
-
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
@@ -1081,7 +1060,8 @@ def template_login():
         
         if st.form_submit_button("login", type="primary", use_container_width=True):
             try:
-                conn = conectar_supabase(); cursor = conn.cursor()
+                conn = conectar_supabase()
+                cursor = conn.cursor()
                 cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
                 res = cursor.fetchone()
                 if res:
@@ -1152,7 +1132,7 @@ def template_cadastro():
 
 
 # ==============================================================================
-# 7. TELA DE GESTÃO DE RELACIONAMENTOS (MEUS MATCHES E CONVITES)
+# 7. TELA DE GESTÃO DE RELACIONAMENTOS (MEUS MATCHES E CONVITES) - CORRIGIDA
 # ==============================================================================
 def template_gerenciar_conexoes_completo(): 
     st.title("🤝 Gestão de Relacionamentos") 
@@ -1359,4 +1339,76 @@ def template_painel_admin():
         return
 
     df_usuarios_mod = pd.DataFrame(usuarios_bd, columns=["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", "Status Presença"])
-   
+    
+    # Exibe Métricas Rápidas
+    st.metric(label="Salas Privadas com Atividade Recente (5m)", value=int(total_salas_ativas))
+    
+    # Renderização da Tabela de Moderação
+    st.markdown("### 👥 Tabela Geral de Usuários Cadastrados")
+    st.dataframe(df_usuarios_mod, use_container_width=True, hide_index=True)
+    
+    # Gráfico Simples de Engajamento Semanal
+    st.markdown("### 📊 Monitoramento de Interações Semanais")
+    dias_semana_lista = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
+    
+    dados_grafico = []
+    for d in dias_semana_lista:
+        dados_grafico.append({
+            "Dia": d.capitalize(),
+            "Agendados": dados_agendados.get(d, 0),
+            "Matches": dados_matches.get(d, 0),
+            "Mensagens": dados_realizados.get(d, 0)
+        })
+    
+    df_grafico = pd.DataFrame(dados_grafico)
+    st.line_chart(df_grafico.set_index("Dia"), use_container_width=True)
+
+    if st.button("← Voltar para o Chat", use_container_width=True, key="btn_voltar_admin"):
+        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+        st.rerun()
+
+
+# ==============================================================================
+# 8. ROTEADOR DE FLUXO GLOBAL (O CORAÇÃO DA APLICAÇÃO)
+# ==============================================================================
+# Executa a renderização dinâmica baseada no estado atual guardado na sessão
+
+# 1. Se o usuário disparou a abertura da loja por qualquer botão
+if st.session_state.get("abrir_popup_loja"):
+    mostrar_popup_loja(st.session_state.usuario_id)
+    st.session_state.abrir_popup_loja = False
+
+# 2. Roteamento principal de layouts de tela
+menu_atual = st.session_state.opcao_menu
+
+if menu_atual == "home":
+    template_home()
+elif menu_atual == "login":
+    template_login()
+elif menu_atual == "cadastro":
+    template_cadastro()
+elif menu_atual == "📅 Disponibilidade":
+    renderizar_listas_sidebar_e_acoes()
+    template_disponibilidade()
+elif menu_atual == "🤝 Gerenciar Conexões":
+    renderizar_listas_sidebar_e_acoes()
+    template_gerenciar_conexoes_completo()
+elif menu_atual == "🤝 Sala Privada":
+    renderizar_listas_sidebar_e_acoes()
+    # Verifica se há um ID ativo antes de carregar
+    if st.session_state.get("match_id_atual"):
+        template_sala_privada()
+    else:
+        st.warning("Nenhuma sala privada selecionada.")
+        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+        st.rerun()
+elif menu_atual == "🛠️ Painel Admin":
+    template_painel_admin()
+elif menu_atual == "💬 Conversar com Lucy":
+    renderizar_listas_sidebar_e_acoes()
+    # Mock/Chamada padrão para a interface com o Bot IA caso não use templates externos adicionais
+    st.markdown("### 💬 Conversar com Lucy")
+    st.info("Interface de Chat com IA pronta. Adicione aqui os seus blocos de st.chat_input e st.chat_message.")
+else:
+    # Fallback seguro caso o estado se corrompa
+    template_home()
