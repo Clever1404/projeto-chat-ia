@@ -271,7 +271,7 @@ def processar_match_lucy(dados_m):
 
 
 # ==============================================================================
-# FUNÇÃO ISOLADA VIA FRAGMENTO PARA ACELERAR O CHAT DA LUCY
+# FUNÇÃO ISOLADA VIA FRAGMENTO COM INPUT FIXADO NA PARTE INFERIOR
 # ==============================================================================
 @st.fragment
 def renderizar_chat_lucy_isolado():
@@ -281,18 +281,20 @@ def renderizar_chat_lucy_isolado():
 
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
-    # 1. Carrega o histórico de mensagens do banco de dados (Memória da IA)
+    # 1. Carrega e exibe TODO o histórico de mensagens primeiro (Fica no topo/meio)
     historico_banco = buscar_memoria(meu_id_limpo, limite=20)
     
-    # Exibe as mensagens antigas salvas no banco
     for pergunta_antiga, resposta_antiga in historico_banco:
         with st.chat_message("user"):
             st.markdown(pergunta_antiga)
         with st.chat_message("assistant", avatar="🤖"):
             st.markdown(resposta_antiga)
 
-    # 2. Caixa de Entrada para novas mensagens (Chat Input)
-    if prompt := st.chat_input("Digite sua mensagem para a Lucy..."):
+    # 2. Inicializa variáveis de controle para processamento assíncrono
+    prompt = st.chat_input("Digite sua mensagem para a Lucy...")
+    
+    # 3. Processa a nova mensagem APENAS se o usuário digitou e enviou no input inferior
+    if prompt:
         with st.chat_message("user"):
             st.markdown(prompt)
 
@@ -314,10 +316,10 @@ def renderizar_chat_lucy_isolado():
                         messages=contexto_mensagens,
                         temperature=0.7
                     )
-                    resposta_lucy = resposta_openai.choices[0].message.content
+                    resposta_lucy = resposta_openai.choices.message.content
                     st.markdown(resposta_lucy)
 
-                    # Salva no histórico usando a estratégia de conexão estável
+                    # Salva no histórico de forma eficiente
                     conn_salvar = obter_conexao_eficiente()
                     cursor_salvar = conn_salvar.cursor()
                     cursor_salvar.execute("""
@@ -340,6 +342,9 @@ def renderizar_chat_lucy_isolado():
 
                 except Exception as e:
                     st.error(f"Erro ao processar conversa com a IA: {e}")
+                
+                # Força a atualização do fragmento para empurrar o histórico e manter o input embaixo
+                st.rerun()
 
 
 
