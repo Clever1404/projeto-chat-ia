@@ -126,36 +126,38 @@ except Exception as e:
     st.error(f"Erro ao carregar credenciais do Mercado Pago: {e}")
     sdk = None
 
-def conectar_supabase():
-    conn = psycopg2.connect(
-        host=st.secrets["postgres"]["host"],
-        database=st.secrets["postgres"]["database"],
-        user=st.secrets["postgres"]["user"],
-        password=st.secrets["postgres"]["password"],
-        port=st.secrets["postgres"]["port"],
-        sslmode="require" 
-    )
-    return conn
+def obter_conexao_eficiente():
+    # Se não existe ou se foi fechada pelo banco, abre uma nova
+    if "conexao_db_ativa" not in st.session_state or st.session_state.conexao_db_ativa.closed != 0:
+        st.session_state.conexao_db_ativa = psycopg2.connect(
+            host=st.secrets["postgres"]["host"],
+            database=st.secrets["postgres"]["database"],
+            user=st.secrets["postgres"]["user"],
+            password=st.secrets["postgres"]["password"],
+            port=st.secrets["postgres"]["port"],
+            sslmode="require"
+        )
+    return st.session_state.conexao_db_ativa
 
 # ==============================================================================
 # 4. FUNÇÕES DE SUPORTE E MECANISMO DE INTELIGÊNCIA ARTIFICIAL (4 PILARES)
 # ==============================================================================
 def buscar_memoria(usuario_id, limite=15):
     try:
-        conn = conectar_supabase(); cursor = conn.cursor()
+        conn = obter_conexao_eficiente(); cursor = conn.cursor()
         cursor.execute('SELECT usuario_pergunta, ia_resposta FROM historico_ia WHERE usuario_id = %s ORDER BY id ASC LIMIT %s;', (int(usuario_id), limite))
-        hist = cursor.fetchall(); cursor.close(); conn.close()
+        hist = cursor.fetchall(); cursor.close(); 
         return hist
     except Exception: return []
 
 def processar_afinidade_e_match(usuario_id, texto_atual):
     try:
         meu_id_limpo = usuario_id if not isinstance(usuario_id, (tuple, list)) else int(usuario_id[0] if isinstance(usuario_id, tuple) else usuario_id)
-        conn = conectar_supabase(); cursor = conn.cursor()
+        conn = obter_conexao_eficiente(); cursor = conn.cursor()
         cursor.execute("SELECT idade, genero, procura_por, procura_relacionamento FROM usuarios WHERE id = %s;", (meu_id_limpo,))
         meu_perfil = cursor.fetchone()
         if not meu_perfil:
-            cursor.close(); conn.close()
+            cursor.close(); 
             return {"match": False}
         minha_idade, meu_genero, o_que_eu_procuro_gen, o_que_eu_procuro_rel = meu_perfil
 
@@ -188,66 +190,13 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
             if distancia_val <= 0.22:
                 similaridade_bruta = 1.0 - distancia_val
                 porcentagem_match = max(0.0, min(100.0, (similaridade_bruta - 0.75) / (0.88 - 0.75) * 100))
-                conn.commit(); cursor.close(); conn.close()
+                conn.commit(); cursor.close(); 
                 return {"match": True, "id_par": int(id_par), "nome_par": nome_par, "online": "🟢" in str(status_par) or "Online" in str(status_par), "afinidade_porcentagem": round(porcentagem_match, 1)}
-        conn.commit(); cursor.close(); conn.close()
+        conn.commit(); cursor.close()
     except Exception as e:
-        if 'conn' in locals() and conn: conn.rollback(); cursor.close(); conn.close()
+        if 'conn' in locals() and conn: conn.rollback(); cursor.close()
     return {"match": False}
 
-# ==============================================================================
-# FUNÇÕES DE GERENCIAMENTO DE MENSAGENS E HISTÓRICO DA SALA PRIVADA
-# ==============================================================================
-def enviar_mensagem(match_id, remetente_id, texto):
-    if not texto or str(texto).strip() == "": 
-        return
-    try:
-        id_match_int = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id)
-        id_remetente_int = remetente_id[0] if isinstance(remetente_id, (tuple, list)) else int(remetente_id)
-        
-        conn = conectar_supabase()
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO mensagens_sala (match_id, remetente_id, conteudo) 
-            VALUES (%s, %s, %s);
-        """, (id_match_int, id_remetente_int, str(texto).strip()))
-        conn.commit()
-        cursor.close()
-        conn.close()
-    except Exception as e: 
-        st.error(f"Erro ao enviar mensagem: {e}")
-
-def buscar_mensagens(match_id):
-    try:
-        id_match_int = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id)
-        conn = conectar_supabase()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT remetente_id, conteudo, criado_em 
-            FROM mensagens_sala 
-            WHERE match_id = %s 
-            ORDER BY criado_em ASC;
-        """, (id_match_int,))
-        mensagens = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return mensagens
-    except Exception: 
-        return []
-
-def limpar_historico_sala(match_id):
-    try:
-        id_match_int = match_id[0] if isinstance(match_id, (tuple, list)) else int(match_id)
-        conn = conectar_supabase()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM mensagens_sala WHERE match_id = %s;", (id_match_int,))
-        conn.commit()
-        cursor.close()
-        conn.close()
-        return True
-    except Exception as e: 
-        st.error(f"Erro ao limpar histórico: {e}")
-        return False
 
 
 # ==============================================================================
@@ -320,6 +269,80 @@ def processar_match_lucy(dados_m):
     exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
 
 
+
+# ==============================================================================
+# FUNÇÃO ISOLADA VIA FRAGMENTO PARA ACELERAR O CHAT DA LUCY
+# ==============================================================================
+@st.fragment
+def renderizar_chat_lucy_isolado():
+    st.markdown("### 🤖 Conversar com Lucy")
+    st.caption("Fale sobre sua rotina, hobbies e o que procura. Lucy usa IA para analisar seu perfil e encontrar pessoas compatíveis.")
+    st.markdown("<hr style='border-color: #30363d; margin: 10px 0 20px 0;'>", unsafe_allow_html=True)
+
+    meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
+
+    # 1. Carrega o histórico de mensagens do banco de dados (Memória da IA)
+    historico_banco = buscar_memoria(meu_id_limpo, limite=20)
+    
+    # Exibe as mensagens antigas salvas no banco
+    for pergunta_antiga, resposta_antiga in historico_banco:
+        with st.chat_message("user"):
+            st.markdown(pergunta_antiga)
+        with st.chat_message("assistant", avatar="🤖"):
+            st.markdown(resposta_antiga)
+
+    # 2. Caixa de Entrada para novas mensagens (Chat Input)
+    if prompt := st.chat_input("Digite sua mensagem para a Lucy..."):
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        with st.chat_message("assistant", avatar="🤖"):
+            with st.spinner("Lucy está pensando..."):
+                try:
+                    contexto_mensagens = [
+                        {"role": "system", "content": "Você é a Lucy, uma IA psicóloga e assistente de relacionamentos altamente empática. Seu objetivo é entender o estilo de vida, gostos e rotina do usuário através de uma conversa natural. Seja acolhedora, faça perguntas abertas e ajude-o a se expressar para encontrar o par ideal."}
+                    ]
+                    
+                    for p, r in historico_banco[-5:]:
+                        contexto_mensagens.append({"role": "user", "content": p})
+                        contexto_mensagens.append({"role": "assistant", "content": r})
+                    
+                    contexto_mensagens.append({"role": "user", "content": prompt})
+
+                    resposta_openai = client.chat.completions.create(
+                        model='gpt-4o-mini',
+                        messages=contexto_mensagens,
+                        temperature=0.7
+                    )
+                    resposta_lucy = resposta_openai.choices[0].message.content
+                    st.markdown(resposta_lucy)
+
+                    # Salva no histórico usando a estratégia de conexão estável
+                    conn_salvar = obter_conexao_eficiente()
+                    cursor_salvar = conn_salvar.cursor()
+                    cursor_salvar.execute("""
+                        INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta) 
+                        VALUES (%s, %s, %s);
+                    """, (meu_id_limpo, prompt, resposta_lucy))
+                    conn_salvar.commit()
+                    cursor_salvar.close()
+
+                    # Dispara o motor de afinidade
+                    dados_match = processar_afinidade_e_match(meu_id_limpo, prompt)
+                    if dados_match and dados_match.get("match"):
+                        st.session_state.alerta_match = {
+                            "match_id": dados_match.get("match_id", random.randint(1000, 9999)),
+                            "id_par": dados_match.get("id_par"),
+                            "nome": dados_match.get("nome_par"),
+                            "online": dados_match.get("online", False)
+                        }
+                        processar_match_lucy(st.session_state.alerta_match)
+
+                except Exception as e:
+                    st.error(f"Erro ao processar conversa com a IA: {e}")
+
+
+
 @st.dialog("📅 Reserva de Encontro")
 def modal_agendamento_encontro(dados_r):
     st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
@@ -345,7 +368,7 @@ def modal_agendamento_encontro(dados_r):
 
     if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True, key="btn_confirmar_reserva_click"):
         try:
-            conn = conectar_supabase()
+            conn = obter_conexao_eficiente()
             cursor = conn.cursor()
             
             # PROTEÇÃO CRÍTICA: Verifica se o match_id realmente existe na tabela 'matches' antes de tentar o INSERT
@@ -382,7 +405,7 @@ def modal_agendamento_encontro(dados_r):
             cursor.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
             parceiro_tem_algum_horario = cursor_check.fetchone()[0] > 0 if 'cursor_check' in locals() else cursor.fetchone()[0] > 0
             
-            cursor.close(); conn.close()
+            cursor.close(); 
             
             # Validação simples de segurança horária
             hora_int = hor_s.hour
@@ -394,7 +417,7 @@ def modal_agendamento_encontro(dados_r):
                 st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
             else:
                 # Executa o agendamento vinculando o ID verificado/recuperado
-                conn_salvar = conectar_supabase()
+                conn = obter_conexao_eficiente()
                 cursor_salvar = conn_salvar.cursor()
                 cursor_salvar.execute("""
                     INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
@@ -402,7 +425,7 @@ def modal_agendamento_encontro(dados_r):
                 """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), hor_s))
                 conn_salvar.commit()
                 cursor_salvar.close()
-                conn_salvar.close()
+                
                 
                 st.success("🎉 Convite enviado com sucesso!")
                 st.session_state.abrir_reserva_fluxo = None
@@ -411,6 +434,128 @@ def modal_agendamento_encontro(dados_r):
                 
         except Exception as e: 
             st.error(f"Erro crítico ao salvar agendamento no banco: {e}")
+
+
+# ==============================================================================
+# FUNÇÃO AUXILIAR COM CACHE PARA OTIMIZAÇÃO DA GRADE HORÁRIA
+# ==============================================================================
+@st.cache_data(ttl=60)  # Limpa o cache automaticamente após 1 minuto
+def buscar_disponibilidade_banco(usuario_id):
+    horarios = set()
+    try:
+        conn = obter_conexao_eficiente()
+        cursor = conn.cursor()
+        cursor.execute("SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", (usuario_id,))
+        for d_sem, per_id in cursor.fetchall():
+            horarios.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
+        cursor.close()
+        
+    except Exception:
+        pass
+    return horarios
+
+# ==============================================================================
+# TELA DE CONFIGURAÇÃO DE DISPONIBILIDADE SEMANAL
+# ==============================================================================
+def template_disponibilidade(): 
+    st.subheader("📅 Sua Grade de Disponibilidade") 
+    st.caption("Marque os dias da semana em que você está disponível. Seus matches verão apenas a combinação dos seus horários livres.")
+
+    dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'] 
+    periodos = [{"id": "manha", "nome": "Manhã"}, {"id": "tarde", "nome": "Tarde"}, {"id": "noite", "nome": "Noite"}] 
+
+    meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
+    
+    # Chama a busca otimizada no banco utilizando cache
+    horarios_salvos = buscar_disponibilidade_banco(meu_id_limpo)
+
+    # Constrói a matriz na memória usando Session State para evitar travamento na digitação
+    if "df_grade_memoria" not in st.session_state:
+        matriz = [] 
+        for per in periodos: 
+            linha = {"Período": per["nome"]} 
+            for d in dias: 
+                linha[d] = f"{d}_{per['id']}" in horarios_salvos
+            matriz.append(linha) 
+        st.session_state["df_grade_memoria"] = pd.DataFrame(matriz)
+
+    config_c = {"Período": st.column_config.TextColumn(disabled=True)} 
+    for d in dias: 
+        config_c[d] = st.column_config.CheckboxColumn(default=False) 
+
+    # Bloco isolado em formulário para salvar alterações em lote de uma vez só
+    with st.form("container_formulario_grade_horaria", clear_on_submit=False):
+        grade_editada = st.data_editor(
+            st.session_state["df_grade_memoria"], 
+            column_config=config_c, 
+            use_container_width=True, 
+            hide_index=True, 
+            key="grade_horaria_editor"
+        ) 
+        
+        botao_salvar_ativo = st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True)
+        
+        if botao_salvar_ativo: 
+            try:
+                conn = obter_conexao_eficiente()
+                cursor = conn.cursor() 
+                cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
+                
+                for idx, row in grade_editada.iterrows(): 
+                    p_id = periodos[idx]["id"]
+                    for d in dias: 
+                        if row[d]: 
+                            cursor.execute("""
+                                INSERT INTO disponibilidade_usuarios (usuario_id, dia_semana, periodo) 
+                                VALUES (%s, %s, %s);
+                            """, (meu_id_limpo, str(d), str(p_id))) 
+                
+                conn.commit()
+                cursor.close()
+                 
+                
+                # Limpa os estados do cache para refletir no próximo turno
+                st.cache_data.clear()
+                if "df_grade_memoria" in st.session_state:
+                    del st.session_state["df_grade_memoria"]
+                
+                st.toast("🎉 Sua grade horária foi salva com sucesso no banco de dados!")
+                time.sleep(1)
+                st.rerun() 
+            except Exception as e:
+                st.error(f"Erro crítico ao salvar no banco: {e}")
+
+    # Áreas e gatilhos adicionais fora do formulário
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    col_l, col_v = st.columns(2)
+    
+    with col_l:
+        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True, key="btn_limpar_grade_real"):
+            try:
+                conn = obter_conexao_eficiente()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
+                conn.commit()
+                cursor.close()
+               
+                
+                st.cache_data.clear()
+                if "df_grade_memoria" in st.session_state:
+                    del st.session_state["df_grade_memoria"]
+                    
+                st.toast("Toda a sua grade horária foi limpa!")
+                st.rerun()
+            except Exception as e: 
+                st.error(f"Erro ao limpar grade: {e}")
+            
+    with col_v: 
+        if st.button("Voltar ao Chat", use_container_width=True, key="btn_voltar_chat_grade"): 
+            st.session_state.opcao_menu = "💬 Conversar com Lucy" 
+            st.rerun()
+
+
+
+
 
 # ==============================================================================
 # FUNÇÃO AUXILIAR: BANCO DE DADOS DA SALA PRIVADA
@@ -422,7 +567,7 @@ def enviar_mensagem(match_id, remetente_id, texto):
         id_match_int = match_id if isinstance(match_id, (tuple, list)) else int(match_id)
         id_remetente_int = remetente_id if isinstance(remetente_id, (tuple, list)) else int(remetente_id)
         
-        conn = conectar_supabase()
+        conn = obter_conexao_eficiente()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO mensagens_sala (match_id, remetente_id, conteudo) 
@@ -430,14 +575,14 @@ def enviar_mensagem(match_id, remetente_id, texto):
         """, (id_match_int, id_remetente_int, str(texto).strip()))
         conn.commit()
         cursor.close()
-        conn.close()
+        
     except Exception as e:
         st.error(f"Erro ao enviar mensagem: {e}")
 
 def buscar_mensagens(match_id):
     try:
         id_match_int = match_id if isinstance(match_id, (tuple, list)) else int(match_id)
-        conn = conectar_supabase()
+        conn = obter_conexao_eficiente()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT remetente_id, conteudo, criado_em 
@@ -447,7 +592,7 @@ def buscar_mensagens(match_id):
         """, (id_match_int,))
         mensagens = cursor.fetchall()
         cursor.close()
-        conn.close()
+        
         return mensagens
     except Exception:
         return []
@@ -455,12 +600,12 @@ def buscar_mensagens(match_id):
 def limpar_historico_sala(match_id):
     try:
         id_match_int = match_id if isinstance(match_id, (tuple, list)) else int(match_id)
-        conn = conectar_supabase()
+        conn = obter_conexao_eficiente()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM mensagens_sala WHERE match_id = %s;", (id_match_int,))
         conn.commit()
         cursor.close()
-        conn.close()
+        
         return True
     except Exception as e:
         st.error(f"Erro ao limpar histórico: {e}")
@@ -496,7 +641,7 @@ def template_sala_privada():
     status_cor = "#a0aec0"
     
     try:
-        conn = conectar_supabase()
+        conn = obter_conexao_eficiente()
         cursor = conn.cursor()
         id_match_int = match_id if isinstance(match_id, (tuple, list)) else int(match_id)
         cursor.execute("SELECT usuario_1_id, usuario_2_id FROM matches WHERE id = %s;", (id_match_int,))
@@ -518,7 +663,7 @@ def template_sala_privada():
                     status_parceiro = "🟢 Online"
                     status_cor = "#48bb78"
         cursor.close()
-        conn.close()
+        
     except Exception as e: 
         print(f"Erro ao buscar status na Sala Privada: {e}")
 
@@ -624,122 +769,6 @@ def template_fale_conosco():
         st.rerun() 
 
 
-# ==============================================================================
-# FUNÇÃO AUXILIAR COM CACHE PARA OTIMIZAÇÃO DA GRADE HORÁRIA
-# ==============================================================================
-@st.cache_data(ttl=60)  # Limpa o cache automaticamente após 1 minuto
-def buscar_disponibilidade_banco(usuario_id):
-    horarios = set()
-    try:
-        conn = conectar_supabase()
-        cursor = conn.cursor()
-        cursor.execute("SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", (usuario_id,))
-        for d_sem, per_id in cursor.fetchall():
-            horarios.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
-        cursor.close()
-        conn.close()
-    except Exception:
-        pass
-    return horarios
-
-# ==============================================================================
-# TELA DE CONFIGURAÇÃO DE DISPONIBILIDADE SEMANAL
-# ==============================================================================
-def template_disponibilidade(): 
-    st.subheader("📅 Sua Grade de Disponibilidade") 
-    st.caption("Marque os dias da semana em que você está disponível. Seus matches verão apenas a combinação dos seus horários livres.")
-
-    dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'] 
-    periodos = [{"id": "manha", "nome": "Manhã"}, {"id": "tarde", "nome": "Tarde"}, {"id": "noite", "nome": "Noite"}] 
-
-    meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
-    
-    # Chama a busca otimizada no banco utilizando cache
-    horarios_salvos = buscar_disponibilidade_banco(meu_id_limpo)
-
-    # Constrói a matriz na memória usando Session State para evitar travamento na digitação
-    if "df_grade_memoria" not in st.session_state:
-        matriz = [] 
-        for per in periodos: 
-            linha = {"Período": per["nome"]} 
-            for d in dias: 
-                linha[d] = f"{d}_{per['id']}" in horarios_salvos
-            matriz.append(linha) 
-        st.session_state["df_grade_memoria"] = pd.DataFrame(matriz)
-
-    config_c = {"Período": st.column_config.TextColumn(disabled=True)} 
-    for d in dias: 
-        config_c[d] = st.column_config.CheckboxColumn(default=False) 
-
-    # Bloco isolado em formulário para salvar alterações em lote de uma vez só
-    with st.form("container_formulario_grade_horaria", clear_on_submit=False):
-        grade_editada = st.data_editor(
-            st.session_state["df_grade_memoria"], 
-            column_config=config_c, 
-            use_container_width=True, 
-            hide_index=True, 
-            key="grade_horaria_editor"
-        ) 
-        
-        botao_salvar_ativo = st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True)
-        
-        if botao_salvar_ativo: 
-            try:
-                conn = conectar_supabase()
-                cursor = conn.cursor() 
-                cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
-                
-                for idx, row in grade_editada.iterrows(): 
-                    p_id = periodos[idx]["id"]
-                    for d in dias: 
-                        if row[d]: 
-                            cursor.execute("""
-                                INSERT INTO disponibilidade_usuarios (usuario_id, dia_semana, periodo) 
-                                VALUES (%s, %s, %s);
-                            """, (meu_id_limpo, str(d), str(p_id))) 
-                
-                conn.commit()
-                cursor.close()
-                conn.close() 
-                
-                # Limpa os estados do cache para refletir no próximo turno
-                st.cache_data.clear()
-                if "df_grade_memoria" in st.session_state:
-                    del st.session_state["df_grade_memoria"]
-                
-                st.toast("🎉 Sua grade horária foi salva com sucesso no banco de dados!")
-                time.sleep(1)
-                st.rerun() 
-            except Exception as e:
-                st.error(f"Erro crítico ao salvar no banco: {e}")
-
-    # Áreas e gatilhos adicionais fora do formulário
-    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-    col_l, col_v = st.columns(2)
-    
-    with col_l:
-        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True, key="btn_limpar_grade_real"):
-            try:
-                conn = conectar_supabase()
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
-                conn.commit()
-                cursor.close()
-                conn.close()
-                
-                st.cache_data.clear()
-                if "df_grade_memoria" in st.session_state:
-                    del st.session_state["df_grade_memoria"]
-                    
-                st.toast("Toda a sua grade horária foi limpa!")
-                st.rerun()
-            except Exception as e: 
-                st.error(f"Erro ao limpar grade: {e}")
-            
-    with col_v: 
-        if st.button("Voltar ao Chat", use_container_width=True, key="btn_voltar_chat_grade"): 
-            st.session_state.opcao_menu = "💬 Conversar com Lucy" 
-            st.rerun()
 
 
 # ==============================================================================
@@ -818,6 +847,24 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
             st.rerun()
 
 # ==============================================================================
+# 3. CONEXÕES DE APIs E BANCO DE DADOS (ÁREA DO ESCOPO GLOBAL)
+# ==============================================================================
+
+@st.cache_data(ttl=15)  # Guarda os dados na memória por 15 segundos reduzindo requisições ao Supabase
+def carregar_plano_e_moedas_cached(id_usuario):
+    try:
+        id_limpo = id_usuario[0] if isinstance(id_usuario, (tuple, list)) else id_usuario
+        if id_limpo is not None:
+            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_limpo)).execute()
+            if user_data.data and len(user_data.data) > 0:
+                return user_data.data[0]
+    except Exception:
+        pass
+    return {"tipo_plano": "Grátis", "moedas": 0}
+
+
+
+# ==============================================================================
 # 5. RENDERIZADORES DE DIALOGS / MODAIS
 # ==============================================================================
 
@@ -834,7 +881,7 @@ def modal_recuperar_senha():
                 st.error("Por favor, preencha todos os campos.")
                 return
             try:
-                conn = conectar_supabase()
+                conn = obter_conexao_eficiente()
                 cursor = conn.cursor()
                 cursor.execute('SELECT id FROM usuarios WHERE email = %s', (email_digitado,))
                 usuario_encontrado = cursor.fetchone()
@@ -844,7 +891,7 @@ def modal_recuperar_senha():
                     cursor.execute('UPDATE usuarios SET password_hash = %s WHERE email = %s', (senha_criptografada, email_digitado))
                     conn.commit()
                     cursor.close()
-                    conn.close()
+                    
                             
                     st.success("Senha redefinida com sucesso!")
                     time.sleep(1.5)
@@ -852,7 +899,7 @@ def modal_recuperar_senha():
                     st.rerun() 
                 else:
                     cursor.close()
-                    conn.close()
+                    
                     st.error("E-mail não localizado no sistema.")
             except Exception as e:
                 st.error(f"Erro ao acessar o banco de dados: {e}")
@@ -871,7 +918,7 @@ def template_painel_admin():
     total_salas_ativas = 0
 
     try:
-        conn = conectar_supabase()
+       conn = obter_conexao_eficiente()
         cursor = conn.cursor()
         cursor.execute("SELECT id, username, email, genero, idade, procura_por, status FROM usuarios ORDER BY id ASC;")
         usuarios_bd = cursor.fetchall()
@@ -897,7 +944,7 @@ def template_painel_admin():
         """)
         dados_matches = dict(cursor.fetchall())
 
-        cursor.close(); conn.close()
+        cursor.close(); 
     except Exception as e:
         st.error(f"Erro na varredura analítica do banco: {e}")
         total_salas_ativas = 0
@@ -999,7 +1046,7 @@ else:
                 
             if st.form_submit_button("login", type="primary", use_container_width=True):
                 try:
-                    conn = conectar_supabase()
+                    conn = obter_conexao_eficiente()
                     cursor = conn.cursor()
                     cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
                     res = cursor.fetchone()
@@ -1014,12 +1061,12 @@ else:
                             "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", "moedas": res[6] if res[6] else 0
                         }
                         cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (int(res[0]),))
-                        conn.commit(); cursor.close(); conn.close()
+                        conn.commit(); cursor.close(); 
                         st.session_state.opcao_menu = "💬 Conversar com Lucy"
                         st.rerun()
                     else:
                         st.error("Usuário não encontrado.")
-                    cursor.close(); conn.close()
+                    cursor.close(); 
                 except Exception as e: 
                     st.error(f"Erro: {e}")       
 
@@ -1052,7 +1099,7 @@ else:
                 else:
                     conn = None
                     try:
-                        conn = conectar_supabase()
+                        conn = obter_conexao_eficiente()
                         cursor = conn.cursor()
                         cursor.execute("SELECT username, email FROM usuarios WHERE username = %s OR email = %s;", (usuario.strip(), email.strip()))
                         existente = cursor.fetchone()
@@ -1074,7 +1121,7 @@ else:
                     finally:
                         if conn:
                             cursor.close()
-                            conn.close()
+                            
 
         if st.button("← Voltar para o Login", use_container_width=True):
             st.session_state.opcao_menu = "login"
@@ -1129,39 +1176,71 @@ else:
     # --- TELAS PRIVADAS (Com Barra Lateral de Usuário Logado) ---
     elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Gerenciar Conexões", "🤝 Sala Privada", "🛠️ Painel Admin"]:
         
-        
         # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
         with st.sidebar: 
-            # ==========================================================================
-            # --- PERFIL DO USUÁRIO & AVATAR HTML ---
-            # ==========================================================================
+            
+        st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
+
+        # 1. Verifica os dados salvos na Sessão Atual do Navegador
+        id_usuario_logado = st.session_state.get("usuario_id")
+        foto_sessao = st.session_state.get("foto_perfil")
+
+        st.write(f"🔹 **Seu ID de Usuário:** `{id_usuario_logado}`")
+        st.write(f"🔹 **Caminho salvo na Session State:** `{foto_sessao}`")
+
+        # 2. Testa a limpeza da barra que o sistema operacional exige
+        if foto_sessao:
+            caminho_limpo = str(foto_sessao).strip().lstrip('/')
+            st.write(f"🥾 **Caminho convertido para o Servidor:** `{caminho_limpo}`")
+            st.write(f"📂 **O arquivo existe fisicamente no servidor?** `{'✅ SIM' if os.path.exists(caminho_limpo) else '❌ NÃO'}`")
+
+        # 3. Faz uma varredura real na pasta física para listar TODAS as fotos salvas
+        st.markdown("#### 📁 Arquivos encontrados na pasta `static/uploads/perfis/`:")
+        try:
+            if os.path.exists(UPLOAD_FOLDER):
+                arquivos = os.listdir(UPLOAD_FOLDER)
+                if arquivos:
+                    for arq in arquivos:
+                        caminho_completo_arquivo = os.path.join(UPLOAD_FOLDER, arq)
+                        tamanho_kb = os.path.getsize(caminho_completo_arquivo) / 1024
+                        st.code(f"📄 {arq} ({tamanho_kb:.1f} KB) -> Caminho para ler no st.image: '{caminho_completo_arquivo}'")
+                else:
+                    st.info("A pasta existe, mas está vazia. Nenhum usuário fez upload de foto ainda.")
+            else:
+                st.warning("⚠️ A pasta de uploads ainda não foi criada fisicamente no servidor remoto.")
+        except Exception as e:
+            st.error(f"Erro ao listar diretório: {e}")
+
+
             avatar_html = ""
+            # ==========================================================================
+            # --- PERFIL DO USUÁRIO & AVATAR NATIVO (ULTRA RÁPIDO) ---
+            # ==========================================================================
             caminho_minha_foto = str(st.session_state.get("foto_perfil", "")).strip().lstrip('/')
                 
-            if caminho_minha_foto and os.path.exists(caminho_minha_foto):
-                try:
-                    with open(caminho_minha_foto, "rb") as image_file:
-                        encoded_string = base64.b64encode(image_file.read()).decode()
-                    avatar_html = f'<img src="data:image/jpeg;base64,{encoded_string}" style="width:65px; height:65px; border-radius:50%; object-fit:cover; border:2px solid #30363d; margin:0 auto 10px auto; display:block;">'
-                except Exception:
-                    avatar_html = '<div style="font-size: 35px; text-align:center;">👩</div>'
-            else:
-                avatar_html = '<div style="font-size: 35px; text-align:center;">👩</div>'
+            # Centralização visual usando colunas nativas para o componente do avatar
+            col_avatar_centro, _ = st.columns([1, 2])
+            with col_avatar_centro:
+                if caminho_minha_foto and os.path.exists("/static/uploads/perfis/user_{id_do_usuario}.jpg"):
+                    # O st.image lê o caminho do arquivo direto no servidor de forma instantânea
+                    st.image("/static/uploads/perfis/user_{id_do_usuario}.jpg", width=65)
+                else:
+                    # Fallback simples usando texto/emoji nativo caso não tenha imagem cadastrada
+                    st.markdown('<div style="font-size: 50px; text-align:center; padding-bottom:10px;">👩</div>', unsafe_allow_html=True)
 
             # Extração limpa do nome do usuário antes do '@'
             username_atual = st.session_state.get("username", "Usuário")
             nome_usuario_puro = str(username_atual).split('@')[0].capitalize()
 
             st.markdown(f"""
-                <div class="box-perfil-fixo" style="background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; text-align: center; margin-bottom: 15px;">
-                    {avatar_html}
-                    <h3 style="margin: 0; font-size: 15px; font-weight: bold; color: #f0f6fc;">{nome_usuario_puro}</h3>
+                <div style="text-align: center; margin-bottom: 15px; margin-top: -10px;">
+                    <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: #f0f6fc;">{nome_usuario_puro}</h3>
                     <p style="color: #48bb78; font-weight: bold; font-size: 12px; margin: 3px 0 0 0;">🟢 Online</p>
                 </div>
             """, unsafe_allow_html=True)
 
             # ==========================================================================
-            # --- CONSULTA 1: PLANO E SALDO DE MOEDAS REAL (SUPABASE CORRIGIDO) ---
+            # --- CONSULTA 1: PLANO E SALDO DE MOEDAS REAL (PROCESSO CACHED ULTRA RÁPIDO) ---
             # ==========================================================================
             tipo_plano = "Grátis"
             saldo_moedas = 0
@@ -1169,26 +1248,34 @@ else:
 
             if id_usuario_logado is not None:
                 try:
-                    id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
-                    user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_limpo)).execute()
+                    # Carrega o registro direto da memória cache otimizada
+                    registro_banco = carregar_plano_e_moedas_cached(id_usuario_logado)
                     
-                    if user_data.data and len(user_data.data) > 0:
-                        registro_banco = user_data.data[0]
+                    # Captura o plano e força uma string limpa
+                    plano_bruto = str(registro_banco.get("tipo_plano", "Grátis")).strip()
+                    
+                    # Normalização para evitar problemas de acentuação (Crédito vs Credito)
+                    plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
+                    
+                    if "credito" in plano_norm or "moedas" in plano_norm:
+                        tipo_plano = "Plano Crédito de Moedas"
+                    elif "vip" in plano_norm or "assinante" in plano_norm:
+                        tipo_plano = "vip"
+                    else:
+                        tipo_plano = "Grátis"
                         
-                        # Captura o plano e força uma string limpa
-                        plano_bruto = str(registro_banco.get("tipo_plano", "Grátis")).strip()
+                    saldo_moedas = int(registro_banco.get("moedas", 0) or 0)
                         
-                        # Normalização para evitar problemas de acentuação (Crédito vs Credito)
-                        plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
-                        
-                        if "credito" in plano_norm or "moedas" in plano_norm:
-                            tipo_plano = "Plano Crédito de Moedas"
-                        elif "vip" in plano_norm or "assinante" in plano_norm:
-                            tipo_plano = "vip"
-                        else:
-                            tipo_plano = "Grátis"
-                            
-                        saldo_moedas = int(registro_banco.get("moedas", 0) or 0)
+                except Exception as e:
+                    st.error(f"Erro ao mapear cache de saldo: {e}")
+            else:
+                st.warning("⚠️ Usuário não identificado na sessão.")
+
+            # Sincroniza de forma idêntica os estados globais da aplicação
+            st.session_state["tipo_plano"] = tipo_plano
+            st.session_state["saldo_moedas"] = saldo_moedas
+
+            st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
                         
                 except Exception as e:
                     st.error(f"Erro ao carregar saldo do banco: {e}")
@@ -1215,12 +1302,12 @@ else:
                     f.write(f_nova.getbuffer()) 
                     
                 try:
-                    conn = conectar_supabase()
+                    conn = obter_conexao_eficiente()
                     cursor = conn.cursor() 
                     cursor.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s", (f"/{c_completo}", int(id_limpo))) 
                     conn.commit()
                     cursor.close()
-                    conn.close() 
+                   
                     st.session_state.foto_perfil = f"/{c_completo}"
                     st.rerun() 
                 except Exception as e:
@@ -1235,14 +1322,14 @@ else:
             if id_usuario_logado:
                 try:
                     meu_id_limpo = int(id_usuario_logado[0]) if isinstance(id_usuario_logado, (tuple, list)) else int(id_usuario_logado)
-                    conn_b = conectar_supabase()
+                    conn_b = obter_conexao_eficiente()
                     cursor_b = conn_b.cursor()
                     cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
                     count_res = cursor_b.fetchone()
                     if count_res and count_res[0] > 0: 
                         possui_convite_pendente = True
                     cursor_b.close()
-                    conn_b.close()
+                    
                 except Exception: 
                     pass
 
@@ -1283,12 +1370,12 @@ else:
                 if id_usuario_logado:
                     try:
                         id_limpo = id_usuario_logado[0] if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
-                        conn = conectar_supabase()
+                        conn = obter_conexao_eficiente()
                         cursor = conn.cursor()
                         cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(id_limpo),))
                         conn.commit()
                         cursor.close()
-                        conn.close()
+                       
                         st.toast("Histórico limpo!")
                         st.rerun()
                     except Exception as e: 
@@ -1308,7 +1395,7 @@ else:
                         cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (int(id_limpo),))
                         conn_logout.commit()
                         cursor_logout.close()
-                        conn_logout.close()
+                       
                     except Exception: 
                         pass
                     
@@ -1319,92 +1406,12 @@ else:
                 st.rerun()
 
 
-
+       
         # Renderiza estritamente a tela selecionada no miolo da página
         if menu_atual == "💬 Conversar com Lucy":   
-            st.markdown("### 🤖 Conversar com Lucy")
-            st.caption("Fale sobre sua rotina, hobbies e o que procura. Lucy usa IA para analisar seu perfil e encontrar pessoas compatíveis.")
-            st.markdown("<hr style='border-color: #30363d; margin: 10px 0 20px 0;'>", unsafe_allow_html=True)
-
-            meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
-
-            # 1. Carrega o histórico de mensagens do banco de dados (Memória da IA)
-            # Garante que as mensagens anteriores apareçam na tela ao mudar de menu
-            historico_banco = buscar_memoria(meu_id_limpo, limite=20)
-            
-            # Exibe as mensagens antigas salvas no banco
-            for pergunta_antiga, resposta_antiga in historico_banco:
-                with st.chat_message("user"):
-                    st.markdown(pergunta_antiga)
-                with st.chat_message("assistant", avatar="🤖"):
-                    st.markdown(resposta_antiga)
-
-            # 2. Caixa de Entrada para novas mensagens (Chat Input)
-            if prompt := st.chat_input("Digite sua mensagem para a Lucy..."):
-                
-                # Exibe a mensagem digitada imediatamente na tela
-                with st.chat_message("user"):
-                    st.markdown(prompt)
-
-                # Container com animação de carregamento enquanto a IA processa
-                with st.chat_message("assistant", avatar="🤖"):
-                    with st.spinner("Lucy está pensando..."):
-                        try:
-                            # Monta o contexto para a OpenAI com as últimas interações
-                            contexto_mensagens = [
-                                {"role": "system", "content": "Você é a Lucy, uma IA psicóloga e assistente de relacionamentos altamente empática. Seu objetivo é entender o estilo de vida, gostos e rotina do usuário através de uma conversa natural. Seja acolhedora, faça perguntas abertas e ajude-o a se expressar para encontrar o par ideal."}
-                            ]
-                            
-                            # Alimenta a IA com o histórico recente para ela lembrar do contexto
-                            for p, r in historico_banco[-5:]:
-                                contexto_mensagens.append({"role": "user", "content": p})
-                                contexto_mensagens.append({"role": "assistant", "content": r})
-                            
-                            # Adiciona a pergunta atual do usuário
-                            contexto_mensagens.append({"role": "user", "content": prompt})
-
-                            # Chama a API da OpenAI para gerar a resposta da Lucy
-                            resposta_openai = client.chat.completions.create(
-                                model='gpt-4o-mini',
-                                messages=contexto_mensagens,
-                                temperature=0.7
-                            )
-                            resposta_lucy = resposta_openai.choices[0].message.content
-                            
-                            # Exibe a resposta da IA na tela
-                            st.markdown(resposta_lucy)
-
-                            # 3. Salva a interação no histórico do banco de dados PostgreSQL
-                            conn_salvar = conectar_supabase()
-                            cursor_salvar = conn_salvar.cursor()
-                            cursor_salvar.execute("""
-                                INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta) 
-                                VALUES (%s, %s, %s);
-                            """, (meu_id_limpo, prompt, resposta_lucy))
-                            conn_salvar.commit()
-                            cursor_salvar.close()
-                            conn_salvar.close()
-
-                            # 4. Dispara o Motor de Afinidade e Embeddings em segundo plano
-                            # Analisa o texto enviado para recalcular os matches do usuário
-                            dados_match = processar_afinidade_e_match(meu_id_limpo, prompt)
-                            
-                            # Se encontrar um match com afinidade acima de 75% (distância <= 0.22)
-                            if dados_match and dados_match.get("match"):
-                                # Guarda o alerta na sessão e força a abertura do Modal Dialog de Match
-                                st.session_state.alerta_match = {
-                                    "match_id": dados_match.get("match_id", random.randint(1000, 9999)),
-                                    "id_par": dados_match.get("id_par"),
-                                    "nome": dados_match.get("nome_par"),
-                                    "online": dados_match.get("online", False)
-                                }
-                                # Executa o modal dialog criado na sua Etapa 5
-                                processar_match_lucy(st.session_state.alerta_match)
-
-                        except Exception as e:
-                            st.error(f"Erro ao processar conversa com a IA: {e}")  
-
-
+            # Apenas invoca o fragmento global de forma ultra eficiente
+            renderizar_chat_lucy_isolado()    
+           
         elif menu_atual == "📅 Disponibilidade":
                 template_disponibilidade()
                 
@@ -1433,9 +1440,9 @@ else:
                 st.markdown("### 👥 Suas Afinidades")
                 matches_dados = []
                 try:
-                    conn = conectar_supabase(); cursor = conn.cursor()
+                    conn = obter_conexao_eficiente(); cursor = conn.cursor()
                     cursor.execute('SELECT m.id, u.username, u.foto_perfil, u.genero, u.id FROM matches m JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;', (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-                    matches_dados = cursor.fetchall(); cursor.close(); conn.close()
+                    matches_dados = cursor.fetchall(); cursor.close(); 
                 except Exception: pass
 
                 if not matches_dados: st.info("Nenhum par localizado.")
@@ -1469,11 +1476,11 @@ else:
                             # RESTAURADO: Botão cinza para excluir afinidades indesejadas do banco
                             if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", use_container_width=True):
                                 try:
-                                    conn = conectar_supabase(); cursor = conn.cursor()
+                                    conn = obter_conexao_eficiente(); cursor = conn.cursor()
                                     cursor.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(m_id),))
                                     cursor.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
                                     cursor.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
-                                    conn.commit(); cursor.close(); conn.close()
+                                    conn.commit(); cursor.close(); 
                                     st.toast("Match removido!")
                                     st.rerun()
                                 except Exception as e: st.error(f"Erro: {e}")
@@ -1482,14 +1489,14 @@ else:
             with aba_e:
                 st.markdown("### 📩 Convites Ativos da Semana")
                 try:
-                    conn = conectar_supabase(); cursor = conn.cursor()
+                    conn = obter_conexao_eficiente(); cursor = conn.cursor()
                     cursor.execute("""
                         SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
                         CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
                         FROM agendamentos_virtuais a JOIN matches m ON m.id = a.match_id JOIN usuarios u1 ON u1.id = m.usuario_1_id JOIN usuarios u2 ON u2.id = m.usuario_2_id
                         WHERE a.remetente_id = %s OR a.destinatario_id = %s ORDER BY a.id DESC;
                     """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-                    encontros = cursor.fetchall(); cursor.close(); conn.close()
+                    encontros = cursor.fetchall(); cursor.close(); 
                     
                     # Separa registros Ativos e Passados baseado no dia do servidor
                     encontros_ativos = [e for e in encontros if str(e[1]).lower() == str(dia_atual_servidor).lower() or str(e[4]).lower() == 'pendente']
@@ -1512,7 +1519,7 @@ else:
                                 if status == 'pendente' and not eu_enviei:
                                     if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
                                         help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                                        conn = conectar_supabase(); cursor = conn.cursor(); cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,)); conn.commit(); cursor.close(); conn.close(); st.rerun()
+                                        conn = obter_conexao_eficiente(); cursor = conn.cursor(); cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,)); conn.commit(); cursor.close(); st.rerun()
                                 elif status == 'aceito':
                                     if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
                                         help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None
