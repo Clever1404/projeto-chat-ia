@@ -1180,7 +1180,7 @@ else:
     elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Gerenciar Conexões", "🤝 Sala Privada", "🛠️ Painel Admin"]:
         
         # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
-        #with st.sidebar: 
+        with st.sidebar: 
 
         #    st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
 
