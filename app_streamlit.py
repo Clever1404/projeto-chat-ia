@@ -1316,10 +1316,17 @@ else:
                         
 
             # ==========================================================================
-            # --- COMPONENTE: ALTERAR FOTO DE PERFIL (INTEGRAÇÃO SUPABASE STORAGE) ---
+            # --- COMPONENTE: ALTERAR FOTO DE PERFIL (CORREÇÃO ANTI-LOOP) ---
             # ==========================================================================
             st.caption("📷 Enviar nova foto de perfil:")
-            f_nova = st.file_uploader("Alterar Foto", type=["png","jpg","jpeg"], key="side_f_up", label_visibility="collapsed") 
+            
+            # Usamos uma chave dinâmica baseada no form_seed para resetar o uploader após o sucesso
+            f_nova = st.file_uploader(
+                "Alterar Foto", 
+                type=["png","jpg","jpeg"], 
+                key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
+                label_visibility="collapsed"
+            ) 
             
             if f_nova and id_usuario_logado: 
                 id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
@@ -1329,15 +1336,14 @@ else:
                     # 1. Converte o arquivo enviado para bytes brutos
                     dados_imagem_bytes = f_nova.getvalue()
                     
-                    # 2. Faz o upload direto para o bucket 'perfis' do Supabase Storage
-                    # Nota: Garanta que você criou um bucket chamado "perfis" como PUBLIC no painel do Supabase
+                    # 2. Faz o upload direto para o bucket 'perfis' (Ignorando RLS via Service Key)
                     supabase.storage.from_("perfis").upload(
                         path=nome_arquivo_storage,
                         file=dados_imagem_bytes,
-                        file_options={"content-type": "image/jpeg", "upsert": "true"} # 'upsert' sobrescreve a foto antiga
+                        file_options={"content-type": "image/jpeg", "upsert": "true"}
                     )
                     
-                    # 3. Captura a URL pública definitiva da foto direto do servidor deles
+                    # 3. Captura a URL pública definitiva da foto
                     url_publica_foto = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
                     
                     # 4. Grava a URL estável na coluna 'foto_perfil' do seu banco PostgreSQL
@@ -1351,8 +1357,15 @@ else:
                     st.session_state.foto_perfil = url_publica_foto
                     st.cache_data.clear()
                     
+                    # 🚨 O SEGREDO AQUI: Alteramos o ID da semente para resetar o componente st.file_uploader
+                    # Isso faz o arquivo "sumir" da memória do uploader, quebrando o loop de rerun
+                    if "form_seed" in st.session_state:
+                        st.session_state.form_seed += 1
+                    else:
+                        st.session_state.form_seed = 43
+                    
                     st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
-                    time.sleep(1.2)
+                    time.sleep(1)
                     st.rerun() 
                     
                 except Exception as e:
