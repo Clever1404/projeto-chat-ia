@@ -564,12 +564,10 @@ def processar_mudanca_grade():
     """Intercepta mudanças no editor de dados e impede alterações em horários bloqueados."""
     estado_edicao = st.session_state.get("grade_horaria_editor")
     
-    # Se houver alguma modificação pendente nas linhas do editor
     if estado_edicao and "edited_rows" in estado_edicao:
         linhas_editadas = estado_edicao["edited_rows"]
         df_original = st.session_state["df_grade_memoria"]
         
-        # Mapeamento estrito do índice da linha para os IDs de períodos do seu sistema
         periodos_mapeamento = {0: "manha", 1: "tarde", 2: "noite"}
         dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
         
@@ -580,17 +578,12 @@ def processar_mudanca_grade():
                 if dia in dias:
                     chave_horario = f"{dia}_{p_id}"
                     
-                    # ------------------------------------------------------------------
-                    # ⚠️ REGRA DE BLOQUEIO (Substitua pela sua lógica ou variável global)
-                    # Exemplo: Se este horário for considerado INDISPONÍVEL no sistema global
-                    # ------------------------------------------------------------------
+                    # Substitua pela sua lista ou variável global de restrições
                     horarios_bloqueados_sistema = st.session_state.get("lista_bloqueios_globais", [])
                     
                     if chave_horario in horarios_bloqueados_sistema:
-                        # Emite um alerta visual flutuante para o usuário
                         st.toast(f"🔒 O período da {dia} ({p_id}) está bloqueado pelo sistema!", icon="🚫")
-                        
-                        # Altera diretamente o buffer do Streamlit, forçando o valor a voltar ao estado original
+                        # Reverte a alteração indesejada diretamente no buffer do estado do widget
                         st.session_state["grade_horaria_editor"]["edited_rows"][idx_linha][dia] = df_original.at[idx_linha, dia]
 
 # ==============================================================================
@@ -605,10 +598,9 @@ def template_disponibilidade():
 
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
     
-    # Chama a busca otimizada no banco utilizando cache
     horarios_salvos = buscar_disponibilidade_banco(meu_id_limpo)
 
-    # Constrói a matriz na memória usando Session State para evitar travamento na digitação
+    # Inicializa a matriz base na memória do Session State
     if "df_grade_memoria" not in st.session_state:
         matriz = [] 
         for per in periodos: 
@@ -622,55 +614,54 @@ def template_disponibilidade():
     for d in dias: 
         config_c[d] = st.column_config.CheckboxColumn(default=False) 
 
-    # Bloco isolado em formulário para salvar alterações em lote de uma vez só
-    with st.form("container_formulario_grade_horaria", clear_on_submit=False):
-        # 🔥 ADICIONADO: 'on_change' atrela a validação imediata a cada clique
-        grade_editada = st.data_editor(
-            st.session_state["df_grade_memoria"], 
-            column_config=config_c, 
-            use_container_width=True, 
-            hide_index=True, 
-            key="grade_horaria_editor",
-            on_change=processar_mudanca_grade
-        ) 
-        
-        botao_salvar_ativo = st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True)
-        
-        if botao_salvar_ativo: 
-            try:
-                conn = obter_conexao_eficiente()
-                cursor = conn.cursor() 
-                cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
-                
-                for idx, row in grade_editada.iterrows(): 
-                    p_id = periodos[idx]["id"]
-                    for d in dias: 
-                        if row[d]: 
-                            cursor.execute("""
-                                INSERT INTO disponibilidade_usuarios (usuario_id, dia_semana, periodo) 
-                                VALUES (%s, %s, %s);
-                            """, (meu_id_limpo, str(d), str(p_id))) 
-                
-                conn.commit()
-                cursor.close()
-                
-                # Limpa os estados do cache para refletir no próximo turno
-                st.cache_data.clear()
-                if "df_grade_memoria" in st.session_state:
-                    del st.session_state["df_grade_memoria"]
-                
-                st.toast("🎉 Sua grade horária foi salva com sucesso no banco de dados!")
-                time.sleep(1)
-                st.rerun() 
-            except Exception as e:
-                st.error(f"Erro crítico ao salvar no banco: {e}")
+    # CORREÇÃO: O st.data_editor agora fica livre (fora de um formulário)
+    # Isso permite usar o on_change com sucesso para bloquear os cliques inválidos instantaneamente
+    grade_editada = st.data_editor(
+        st.session_state["df_grade_memoria"], 
+        column_config=config_c, 
+        use_container_width=True, 
+        hide_index=True, 
+        key="grade_horaria_editor",
+        on_change=processar_mudanca_grade
+    ) 
+    
+    # Substituído st.form_submit_button por st.button padrão
+    botao_salvar_ativo = st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key="btn_salvar_grade_real")
+    
+    if botao_salvar_ativo: 
+        try:
+            conn = obter_conexao_eficiente()
+            cursor = conn.cursor() 
+            cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
+            
+            for idx, row in grade_editada.iterrows(): 
+                p_id = periodos[idx]["id"]
+                for d in dias: 
+                    if row[d]: 
+                        cursor.execute("""
+                            INSERT INTO disponibilidade_usuarios (usuario_id, dia_semana, periodo) 
+                            VALUES (%s, %s, %s);
+                        """, (meu_id_limpo, str(d), str(p_id))) 
+            
+            conn.commit()
+            cursor.close()
+            
+            st.cache_data.clear()
+            if "df_grade_memoria" in st.session_state:
+                del st.session_state["df_grade_memoria"]
+            
+            st.toast("🎉 Sua grade horária foi salva com sucesso no banco de dados!")
+            time.sleep(1)
+            st.rerun() 
+        except Exception as e:
+            st.error(f"Erro crítico ao salvar no banco: {e}")
 
-    # Áreas e gatilhos adicionais fora do formulário
+    # Áreas e gatilhos adicionais inferiores
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     col_l, col_v = st.columns(2)
     
     with col_l:
-        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True, key="btn_limpar_grade_real"):
+        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True, key="btn_limpar_grade_real_final"):
             try:
                 conn = obter_conexao_eficiente()
                 cursor = conn.cursor()
