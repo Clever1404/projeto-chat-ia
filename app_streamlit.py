@@ -216,80 +216,61 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
 
 
 # ==============================================================================
-# 5. RENDERIZADORES DE DIALOGS/MODAIS (CORRIGIDO COM CHAVE ÚNICA)
+# 5. RENDERIZADORES DE DIALOGS/MODAIS (RECALIBRADOS)
 # ==============================================================================
-# CORREÇÃO: O parâmetro key atrelado ao dados_m garante identificadores únicos no ecossistema reativo
-def registrar_e_exibir_modal(dados_m, tipo_plano, saldo_moedas):
+@st.dialog("🤖 Lucy Notou Afinidade!")
+def exibir_modal_match(dados_m, tipo_plano, saldo_moedas):
+    st.markdown(f"Lucy identificou uma excelente afinidade entre você e {dados_m['nome']}!")
+    id_usuario = st.session_state.usuario_id
     
-    # Geramos uma chave única com base no ID do match para evitar colisões na árvore do Streamlit
-    id_unico_match = dados_m.get("match_id", "padrao")
-    
-    @st.dialog("🤖 Lucy Notou Afinidade!", width="large", key=f"dialog_match_{id_unico_match}")
-    def desenhar_conteudo_modal():
-        st.markdown(f"Lucy identificou uma excelente afinidade entre você e **{dados_m['nome']}**!")
-        id_usuario = st.session_state.usuario_id
-        
-        if dados_m["online"]:
-            st.markdown(f"🟢 {dados_m['nome']} está online agora!")
-            if tipo_plano == "vip":
-                if st.button("🚀 Entrar na Sala Privada (Acesso Total Ilimitado)", type="primary", use_container_width=True):
-                    st.session_state.match_id_atual = dados_m["match_id"]
-                    st.session_state.tempo_limite_sala = -1
-                    st.session_state.opcao_menu = "🤝 Sala Privada"
-                    st.rerun()
-            elif tipo_plano == "Plano Crédito de Moedas":
-                st.info(f"🪙 Seu Saldo: {saldo_moedas} moedas. Custo da Sala Privada: 10 moedas = 10 minutos.")
-                if st.button("🪙 Entrar na Sala Privada (Gasta 10 moedas)", type="primary", use_container_width=True):
-                    if saldo_moedas >= 10:
-                        try:
-                            id_limpo = id_usuario[0] if isinstance(id_usuario, (list, tuple)) else id_usuario
-                            supabase.table("usuarios").update({"moedas": saldo_moedas - 10}).eq("id", int(id_limpo)).execute()
-                            st.success("Moedas debitadas! Sala privada liberada por 10 minutos iniciais.")
-                            st.session_state.match_id_atual = dados_m["match_id"]
-                            st.session_state.tempo_limite_sala = 10
-                            st.session_state.opcao_menu = "🤝 Sala Privada"
-                            st.rerun()
-                        except Exception as e: 
-                            st.error(f"Falha na transação: {e}")
-                    else: 
-                        st.warning("🔒 Saldo insuficiente. Você precisa de pelo menos 10 moedas.")
-            else: 
-                st.error("🔒 O acesso a salas privadas é exclusivo para clientes com plano de Crédito ou Assinantes.")
-        else:
-            st.button(f"⚪ {dados_m['nome']} está offline. Indisponível para chat instantâneo.", disabled=True, use_container_width=True)
-            
-            if st.button("📅 Agende um encontro virtual", type="secondary", use_container_width=True):
-                if tipo_plano in ["vip", "Plano Crédito de Moedas"]:
-                    if "match_id" in dados_m and dados_m["match_id"]:
-                        st.session_state.abrir_reserva_fluxo = {
-                            "id_par": dados_m["id_par"], 
-                            "nome_par": dados_m["nome"], 
-                            "m_id": dados_m["match_id"]
-                        }
+    if dados_m["online"]:
+        st.markdown(f"🟢 {dados_m['nome']} está online agora!")
+        if tipo_plano == "vip":
+            if st.button("🚀 Entrar na Sala Privada (Acesso Total Ilimitado)", type="primary", use_container_width=True):
+                st.session_state.match_id_atual = dados_m["match_id"]
+                st.session_state.tempo_limite_sala = -1
+                st.session_state.opcao_menu = "🤝 Sala Privada"
+                st.rerun()
+        elif tipo_plano == "Plano Crédito de Moedas":
+            st.info(f"🪙 Seu Saldo: {saldo_moedas} moedas. Custo da Sala Privada: 10 moedas = 10 minutos.")
+            if st.button("🪙 Entrar na Sala Privada (Gasta 10 moedas)", type="primary", use_container_width=True):
+                if saldo_moedas >= 10:
+                    try:
+                        id_limpo = id_usuario[0] if isinstance(id_usuario, (list, tuple)) else id_usuario
+                        supabase.table("usuarios").update({"moedas": saldo_moedas - 10}).eq("id", int(id_limpo)).execute()
+                        st.success("Moedas debitadas! Sala privada liberada por 10 minutos iniciais.")
+                        st.session_state.match_id_atual = dados_m["match_id"]
+                        st.session_state.tempo_limite_sala = 10
+                        st.session_state.opcao_menu = "🤝 Sala Privada"
                         st.rerun()
-                    else:
-                        st.error("Erro interno: O ID do Match não foi localizado para este par. Tente novamente.")
+                    except Exception as e: 
+                        st.error(f"Falha na transação: {e}")
                 else: 
-                    st.warning("🔒 O agendamento de encontros virtuais não está disponível no Plano Grátis. Faça um upgrade!")
-                    
-        if st.button("❌ Não tenho interesse", type="secondary", use_container_width=True): 
-            st.rerun()
-
-    # Executa a função interna de desenho imediatamente
-    desenhar_conteudo_modal()
-
-
+                    st.warning("🔒 Saldo insuficiente. Você precisa de pelo menos 10 moedas.")
+        else: 
+            st.error("🔒 O acesso a salas privadas é exclusivo para clientes com plano de Crédito ou Assinantes.")
+    else:
+        st.button(f"⚪ {dados_m['nome']} está offline. Indisponível para chat instantâneo.", disabled=True, use_container_width=True)
+        if st.button("📅 Agende um encontro virtual", type="secondary", use_container_width=True):
+            if tipo_plano in ["vip", "Plano Crédito de Moedas"]:
+                # APENAS salva os dados na sessão. O Roteador Global vai abrir o modal de forma limpa.
+                st.session_state.abrir_reserva_fluxo = {
+                    "id_par": dados_m["id_par"], 
+                    "nome_par": dados_m["nome"], 
+                    "m_id": dados_m["match_id"]
+                }
+                st.rerun()
+            else: 
+                st.warning("🔒 O agendamento de encontros virtuais não está disponível no Plano Grátis. Faça um upgrade!")
+                
+    if st.button("❌ Não tenho interesse", type="secondary", use_container_width=True): 
+        st.rerun()
 
 def processar_match_lucy(dados_m):
     tipo_plano, saldo_moedas = "Grátis", 0
     id_usuario_logado = st.session_state.get("usuario_id")
     if id_usuario_logado is None: 
         return
-        
-    # Garante que dados_m possui o match_id antes mesmo de abrir a interface do modal
-    if not dados_m or "match_id" not in dados_m:
-        return
-        
     try:
         id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (list, tuple)) else id_usuario_logado
         user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_limpo)).execute()
@@ -301,9 +282,7 @@ def processar_match_lucy(dados_m):
         st.error(f"Erro ao carregar dados do banco: {e}")
         return
         
-    # Dispara a abertura controlada do modal passando os parâmetros limpos
     exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
-
 
 
 
@@ -318,12 +297,14 @@ def renderizar_chat_lucy_isolado():
 
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
-    # 1. PROCESSAMENTO EM SEGUNDO PLANO
+    # 1. PROCESSAMENTO EM SEGUNDO PLANO (Roda antes de desenhar a tela)
+    # Se houver uma mensagem guardada no buffer da rodada anterior, processa com a OpenAI
     if st.session_state.get("prompt_buffer"):
         prompt_atual = st.session_state.prompt_buffer
-        del st.session_state["prompt_buffer"]
+        del st.session_state["prompt_buffer"] # Limpa o buffer para não processar duas vezes
         
         try:
+            # Carrega o histórico para fornecer contexto à IA
             historico_contexto = buscar_memoria(meu_id_limpo, limite=5)
             contexto_mensagens = [
                 {"role": "system", "content": "Você é a Lucy, uma IA psicóloga e assistente de relacionamentos altamente empática. Seu objetivo é entender o estilo de vida, gostos e rotina do usuário através de uma conversa natural. Seja acolhedora, faça perguntas abertas e ajude-o a se expressar para encontrar o par ideal."}
@@ -341,6 +322,7 @@ def renderizar_chat_lucy_isolado():
             )
             resposta_lucy = resposta_openai.choices[0].message.content
 
+            # Salva no histórico do banco de dados
             conn_salvar = obter_conexao_eficiente()
             cursor_salvar = conn_salvar.cursor()
             cursor_salvar.execute("""
@@ -352,86 +334,30 @@ def renderizar_chat_lucy_isolado():
 
             # Dispara o motor de afinidade
             dados_match = processar_afinidade_e_match(meu_id_limpo, prompt_atual)
-            
             if dados_match and dados_match.get("match"):
-                id_par_encontrado = dados_match.get("id_par")
-                match_id_real = dados_match.get("match_id")
-
-            # ================= CORREÇÃO CRÍTICA COM SUPORTE A MATCH EXISTENTE =================
-            if not match_id_real:
-                try:
-                    conn_match = obter_conexao_eficiente()
-                    cursor_match = conn_match.cursor()
-                    
-                    # 1. Primeiro tenta buscar se já existe um match entre esses dois usuários (em qualquer ordem)
-                    cursor_match.execute("""
-                        SELECT id FROM matches 
-                        WHERE (usuario_1_id = %s AND usuario_2_id = %s) 
-                        OR (usuario_1_id = %s AND usuario_2_id = %s)
-                        LIMIT 1;
-                    """, (meu_id_limpo, int(id_par_encontrado), int(id_par_encontrado), meu_id_limpo))
-                    
-                    resultado_match = cursor_match.fetchone()
-                    
-                    if resultado_match:
-                        # Se já existir, reaproveita o ID encontrado
-                        match_id_real = int(resultado_match[0])
-                    else:
-                        # 2. Se não existir, realiza o INSERT com segurança
-                        try:
-                            cursor_match.execute("""
-                                INSERT INTO matches (usuario_1_id, usuario_2_id, status_conexao)
-                                VALUES (%s, %s, 'offline')
-                                RETURNING id;
-                            """, (meu_id_limpo, int(id_par_encontrado)))
-                            
-                            match_id_real = int(cursor_match.fetchone()[0])
-                            conn_match.commit()
-                        except Exception as err_dup:
-                            # Proteção extra: Caso haja concorrência e o registro foi criado no mesmo milissegundo
-                            conn_match.rollback()
-                            cursor_match.execute("""
-                                SELECT id FROM matches 
-                                WHERE (usuario_1_id = %s AND usuario_2_id = %s) 
-                                OR (usuario_1_id = %s AND usuario_2_id = %s)
-                                LIMIT 1;
-                            """, (meu_id_limpo, int(id_par_encontrado), int(id_par_encontrado), meu_id_limpo))
-                            resultado_concorrente = cursor_match.fetchone()
-                            if resultado_concorrente:
-                                match_id_real = int(resultado_concorrente[0])
-                    
-                    cursor_match.close()
-                except Exception as err_db:
-                    if 'conn_match' in locals() and conn_match: 
-                        conn_match.rollback()
-                    st.error(f"Erro ao persistir o match no banco de dados: {err_db}")
-                    match_id_real = None
-            # ==================================================================================
-
-                # ============== ENCONTRE ESTE BLOCO NO SEU CHAT ISOLADO ==============
-                if match_id_real:
-                    st.session_state.alerta_match = {
-                        "match_id": match_id_real, 
-                        "id_par": id_par_encontrado,
-                        "nome": dados_match.get("nome_par"),
-                        "online": dados_match.get("online", False)
-                    }
-                    
-                    # ❌ ALTERE ESTA LINHA ANTIGA:
-                    # processar_match_lucy(st.session_state.alerta_match)
-                    
-                    #  PARA ESTA NOVA LINHA CORRIGIDA:
-                    registrar_e_exibir_modal(st.session_state.alerta_match, tipo_plano, saldo_moedas)
-                else:
-                    st.error("Não foi possível gerar a sala: falha de sincronização do Match com o servidor.")
+                st.session_state.alerta_match = {
+                    "match_id": dados_match.get("match_id", random.randint(1000, 9999)),
+                    "id_par": dados_match.get("id_par"),
+                    "nome": dados_match.get("nome_par"),
+                    "online": dados_match.get("online", False)
+                }
+                processar_match_lucy(st.session_state.alerta_match)
 
         except Exception as e:
+            # DESTRAVA A TRANSAÇÃO NO CHAT
             if 'conn_salvar' in locals() and conn_salvar:
-                try: conn_salvar.rollback()
-                except Exception: pass
+                try:
+                    conn_salvar.rollback()
+                except Exception:
+                    pass
+            if 'cursor_salvar' in locals() and cursor_salvar:
+                try:
+                    cursor_salvar.close()
+                except Exception:
+                    pass
             st.error(f"Erro ao processar conversa com a IA: {e}")
 
-    # 2. ÁREA VISUAL SUPERIOR
+    # 2. ÁREA VISUAL SUPERIOR (Área de rolagem das mensagens)
     historico_banco = buscar_memoria(meu_id_limpo, limite=20)
     
     with st.container(height=450, border=False):
@@ -441,126 +367,109 @@ def renderizar_chat_lucy_isolado():
             with st.chat_message("assistant", avatar="🤖"):
                 st.markdown(resposta_antiga)
 
-    # 3. ÁREA VISUAL INFERIOR
+    # 3. ÁREA VISUAL INFERIOR (A caixa de texto fica obrigatoriamente no rodapé da página)
     prompt_capturado = st.chat_input("Digite sua mensagem para a Lucy...")
     
     if prompt_capturado:
+        # Guarda o texto digitado no buffer e força o rerun
         st.session_state.prompt_buffer = prompt_capturado
         st.rerun()
 
 
 
-# ==============================================================================
-# FUNÇÃO GERENCIADORA COM ESCAPE DE ID DUPLICADO (CORRIGIDO)
-# ==============================================================================
-def iniciar_modal_agendamento(dados_r):
-    """Encapsula o diálogo gerando um ID exclusivo para evitar colisões na árvore do Streamlit."""
+@st.dialog("📅 Reserva de Encontro")
+def modal_agendamento_encontro(dados_r):
+    st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
     
-    # Geramos uma chave única combinando o ID do parceiro e o do match (se houver)
-    id_par_unico = dados_r.get('id_par', '0')
-    match_id_unico = dados_r.get('m_id', '0')
-    chave_exclusiva_dialog = f"dialog_agenda_{id_par_unico}_{match_id_unico}"
+    dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
+    dia_s = st.selectbox("Escolha o Dia da Semana:", dias, key="dg_res_dia")
     
-    @st.dialog("📅 Reserva de Encontro", key=chave_exclusiva_dialog)
-    def desenhar_modal_agendamento():
-        st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
-        
-        dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
-        dia_s = st.selectbox("Escolha o Dia da Semana:", dias, key="dg_res_dia")
-        
-        opcoes_periodo = ["🌅 Manhã (06:00 às 11:59)", "☀️ Tarde (12:00 às 17:59)", "🌙 Noite (18:00 às 23:59)"]
-        per_exibicao = st.selectbox("Escolha o Período:", opcoes_periodo, key="dg_res_per")
-        per_s = "manha" if "Manhã" in per_exibicao else "tarde" if "Tarde" in per_exibicao else "noite"
-        
-        horario_sugestao = datetime.strptime("09:00" if per_s=="manha" else "14:00" if per_s=="tarde" else "20:00", "%H:%M").time()
-        hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
-        
-        def limpar_id_absoluto(id_bruto):
-            while isinstance(id_bruto, (tuple, list)): 
-                id_bruto = id_bruto[0] if len(id_bruto) > 0 else 0
-            return int(id_bruto) if id_bruto is not None else 0
+    opcoes_periodo = ["🌅 Manhã (06:00 às 11:59)", "☀️ Tarde (12:00 às 17:59)", "🌙 Noite (18:00 às 23:59)"]
+    per_exibicao = st.selectbox("Escolha o Período:", opcoes_periodo, key="dg_res_per")
+    per_s = "manha" if "Manhã" in per_exibicao else "tarde" if "Tarde" in per_exibicao else "noite"
+    
+    horario_sugestao = datetime.strptime("09:00" if per_s=="manha" else "14:00" if per_s=="tarde" else "20:00", "%H:%M").time()
+    hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
+    
+    def limpar_id_absoluto(id_bruto):
+        while isinstance(id_bruto, (tuple, list)): 
+            id_bruto = id_bruto[0] if len(id_bruto) > 0 else 0
+        return int(id_bruto) if id_bruto is not None else 0
 
-        m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
-        meu_id_limpo = limpar_id_absoluto(st.session_state.get("usuario_id"))
-        parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
+    m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
+    meu_id_limpo = limpar_id_absoluto(st.session_state.get("usuario_id"))
+    parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
 
-        if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True, key="btn_confirmar_reserva_click"):
-            conn = None
-            cursor = None
-            try:
-                conn = obter_conexao_eficiente()
-                cursor = conn.cursor()
-                
-                # PROTEÇÃO CRÍTICA: Verifica se o match_id realmente existe na tabela 'matches'
-                cursor.execute("SELECT COUNT(*) FROM matches WHERE id = %s;", (m_id_limpo,))
-                match_existe = cursor.fetchone()[0] > 0
-                
-                if not match_existe:
-                    cursor.execute("""
-                        SELECT id FROM matches 
-                        WHERE (usuario_1_id = %s AND usuario_2_id = %s) OR (usuario_1_id = %s AND usuario_2_id = %s) 
-                        LIMIT 1;
-                    """, (meu_id_limpo, parceiro_id_limpo, parceiro_id_limpo, meu_id_limpo))
-                    match_recuperado = cursor.fetchone()
-                    
-                    if match_recuperado:
-                        m_id_limpo = int(match_recuperado[0])
-                    else:
-                        cursor.execute("""
-                            INSERT INTO matches (usuario_1_id, usuario_2_id, status_conexao) 
-                            VALUES (%s, %s, 'offline') RETURNING id;
-                        """, (meu_id_limpo, parceiro_id_limpo))
-                        m_id_limpo = int(cursor.fetchone()[0])
-                        conn.commit()
-
-                # Realiza as validações de disponibilidade padrão
+    if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True, key="btn_confirmar_reserva_click"):
+        try:
+            conn = obter_conexao_eficiente()
+            cursor = conn.cursor()
+            
+            # PROTEÇÃO CRÍTICA: Verifica se o match_id realmente existe na tabela 'matches' antes de tentar o INSERT
+            cursor.execute("SELECT COUNT(*) FROM matches WHERE id = %s;", (m_id_limpo,))
+            match_existe = cursor.fetchone()[0] > 0
+            
+            if not match_existe:
+                # Caso o match_id original tenha sumido, tenta localizar ou criar um novo ID de vínculo estável
                 cursor.execute("""
-                    SELECT COUNT(*) FROM disponibilidade_usuarios 
-                    WHERE usuario_id = %s AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-                """, (meu_id_limpo, str(dia_s), str(per_s)))
+                    SELECT id FROM matches 
+                    WHERE (usuario_1_id = %s AND usuario_2_id = %s) OR (usuario_1_id = %s AND usuario_2_id = %s) 
+                    LIMIT 1;
+                """, (meu_id_limpo, parceiro_id_limpo, parceiro_id_limpo, meu_id_limpo))
+                match_recuperado = cursor.fetchone()
                 
-                cursor.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
-                parceiro_tem_algum_horario = cursor.fetchone()[0] > 0
-                
-                # Validação de segurança horária
-                hora_int = hor_s.hour
-                if per_s == 'manha' and (hora_int < 6 or hora_int >= 12): 
-                    st.error("❌ Horário inválido para Manhã (06:00 às 11:59).")
-                elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18): 
-                    st.error("❌ Horário inválido para Tarde (12:00 às 17:59).")
-                elif per_s == 'noite' and (hora_int < 18 or hora_int > 23): 
-                    st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
+                if match_recuperado:
+                    m_id_limpo = int(match_recuperado[0])
                 else:
+                    # Se não existir nenhuma linha de match entre os dois usuários, cria uma na hora
                     cursor.execute("""
-                        INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
-                        VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
-                    """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), hor_s))
-                    
+                        INSERT INTO matches (usuario_1_id, usuario_2_id, status_conexao) 
+                        VALUES (%s, %s, 'offline') RETURNING id;
+                    """, (meu_id_limpo, parceiro_id_limpo))
+                    m_id_limpo = int(cursor.fetchone()[0])
                     conn.commit()
-                    cursor.close()
-                    
-                    st.success("🎉 Convite enviado com sucesso!")
-                    st.session_state.abrir_reserva_fluxo = None
-                    time.sleep(1.2)
-                    st.rerun()
-                    
-            except Exception as e: 
-                if conn:
-                    conn.rollback()
-                st.error(f"Erro crítico ao salvar agendamento no banco: {e}")
-            finally:
-                if cursor and not cursor.closed:
-                    cursor.close()
 
-    # Dispara a abertura controlada da árvore visual imediatamente
-    desenhar_modal_agendamento()
-
-# ==============================================================================
-# ROTEADOR GLOBAL (ATUALIZADO PARA EXECUTAR A FUNÇÃO GERENCIADORA)
-# ==============================================================================
-if st.session_state.get("abrir_reserva_fluxo"):
-    dados_da_reserva = st.session_state.abrir_reserva_fluxo
-    iniciar_modal_agendamento(dados_da_reserva)
+            # Realiza as validações de disponibilidade padrão
+            cursor.execute("""
+                SELECT COUNT(*) FROM disponibilidade_usuarios 
+                WHERE usuario_id = %s AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+            """, (meu_id_limpo, str(dia_s), str(per_s)))
+            meu_registro_existe = cursor.fetchone()[0] > 0
+            
+            cursor.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
+            parceiro_tem_algum_horario = cursor_check.fetchone()[0] > 0 if 'cursor_check' in locals() else cursor.fetchone()[0] > 0
+            
+            cursor.close(); 
+            
+            # Validação simples de segurança horária
+            hora_int = hor_s.hour
+            if per_s == 'manha' and (hora_int < 6 or hora_int >= 12): 
+                st.error("❌ Horário inválido para Manhã (06:00 às 11:59).")
+            elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18): 
+                st.error("❌ Horário inválido para Tarde (12:00 às 17:59).")
+            elif per_s == 'noite' and (hora_int < 18 or hora_int > 23): 
+                st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
+            else:
+                # CORREÇÃO: Abre a conexão persistente e garante o mesmo nome em todas as linhas
+                conn_salvar = obter_conexao_eficiente()
+                cursor_salvar = conn_salvar.cursor()
+                
+                cursor_salvar.execute("""
+                    INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
+                    VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
+                """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), hor_s))
+                
+                # Executa o commit e fecha o cursor usando a variável correta definida acima
+                conn_salvar.commit()
+                cursor_salvar.close()
+                
+                st.success("🎉 Convite enviado com sucesso!")
+                st.session_state.abrir_reserva_fluxo = None
+                time.sleep(1.2)
+                st.rerun()
+                
+        except Exception as e: 
+            st.error(f"Erro crítico ao salvar agendamento no banco: {e}")
 
 
 # ==============================================================================
@@ -576,38 +485,10 @@ def buscar_disponibilidade_banco(usuario_id):
         for d_sem, per_id in cursor.fetchall():
             horarios.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
         cursor.close()
+        
     except Exception:
         pass
     return horarios
-
-# ==============================================================================
-# INTERCEPTADOR DE ALTERAÇÕES (CALLBACK DE BLOQUEIO DE HORÁRIOS INDISPONÍVEIS)
-# ==============================================================================
-def processar_mudanca_grade():
-    """Intercepta mudanças no editor de dados e impede alterações em horários bloqueados."""
-    estado_edicao = st.session_state.get("grade_horaria_editor")
-    
-    if estado_edicao and "edited_rows" in estado_edicao:
-        linhas_editadas = estado_edicao["edited_rows"]
-        df_original = st.session_state["df_grade_memoria"]
-        
-        periodos_mapeamento = {0: "manha", 1: "tarde", 2: "noite"}
-        dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
-        
-        for idx_linha, alteracoes in linhas_editadas.items():
-            p_id = periodos_mapeamento.get(idx_linha)
-            
-            for dia, novo_valor in alteracoes.items():
-                if dia in dias:
-                    chave_horario = f"{dia}_{p_id}"
-                    
-                    # Substitua pela sua lista ou variável global de restrições
-                    horarios_bloqueados_sistema = st.session_state.get("lista_bloqueios_globais", [])
-                    
-                    if chave_horario in horarios_bloqueados_sistema:
-                        st.toast(f"🔒 O período da {dia} ({p_id}) está bloqueado pelo sistema!", icon="🚫")
-                        # Reverte a alteração indesejada diretamente no buffer do estado do widget
-                        st.session_state["grade_horaria_editor"]["edited_rows"][idx_linha][dia] = df_original.at[idx_linha, dia]
 
 # ==============================================================================
 # TELA DE CONFIGURAÇÃO DE DISPONIBILIDADE SEMANAL
@@ -621,9 +502,10 @@ def template_disponibilidade():
 
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
     
+    # Chama a busca otimizada no banco utilizando cache
     horarios_salvos = buscar_disponibilidade_banco(meu_id_limpo)
 
-    # Inicializa a matriz base na memória do Session State
+    # Constrói a matriz na memória usando Session State para evitar travamento na digitação
     if "df_grade_memoria" not in st.session_state:
         matriz = [] 
         for per in periodos: 
@@ -637,54 +519,54 @@ def template_disponibilidade():
     for d in dias: 
         config_c[d] = st.column_config.CheckboxColumn(default=False) 
 
-    # CORREÇÃO: O st.data_editor agora fica livre (fora de um formulário)
-    # Isso permite usar o on_change com sucesso para bloquear os cliques inválidos instantaneamente
-    grade_editada = st.data_editor(
-        st.session_state["df_grade_memoria"], 
-        column_config=config_c, 
-        use_container_width=True, 
-        hide_index=True, 
-        key="grade_horaria_editor",
-        on_change=processar_mudanca_grade
-    ) 
-    
-    # Substituído st.form_submit_button por st.button padrão
-    botao_salvar_ativo = st.button("💾 Salvar Alterações", type="primary", use_container_width=True, key="btn_salvar_grade_real")
-    
-    if botao_salvar_ativo: 
-        try:
-            conn = obter_conexao_eficiente()
-            cursor = conn.cursor() 
-            cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
-            
-            for idx, row in grade_editada.iterrows(): 
-                p_id = periodos[idx]["id"]
-                for d in dias: 
-                    if row[d]: 
-                        cursor.execute("""
-                            INSERT INTO disponibilidade_usuarios (usuario_id, dia_semana, periodo) 
-                            VALUES (%s, %s, %s);
-                        """, (meu_id_limpo, str(d), str(p_id))) 
-            
-            conn.commit()
-            cursor.close()
-            
-            st.cache_data.clear()
-            if "df_grade_memoria" in st.session_state:
-                del st.session_state["df_grade_memoria"]
-            
-            st.toast("🎉 Sua grade horária foi salva com sucesso no banco de dados!")
-            time.sleep(1)
-            st.rerun() 
-        except Exception as e:
-            st.error(f"Erro crítico ao salvar no banco: {e}")
+    # Bloco isolado em formulário para salvar alterações em lote de uma vez só
+    with st.form("container_formulario_grade_horaria", clear_on_submit=False):
+        grade_editada = st.data_editor(
+            st.session_state["df_grade_memoria"], 
+            column_config=config_c, 
+            use_container_width=True, 
+            hide_index=True, 
+            key="grade_horaria_editor"
+        ) 
+        
+        botao_salvar_ativo = st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True)
+        
+        if botao_salvar_ativo: 
+            try:
+                conn = obter_conexao_eficiente()
+                cursor = conn.cursor() 
+                cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
+                
+                for idx, row in grade_editada.iterrows(): 
+                    p_id = periodos[idx]["id"]
+                    for d in dias: 
+                        if row[d]: 
+                            cursor.execute("""
+                                INSERT INTO disponibilidade_usuarios (usuario_id, dia_semana, periodo) 
+                                VALUES (%s, %s, %s);
+                            """, (meu_id_limpo, str(d), str(p_id))) 
+                
+                conn.commit()
+                cursor.close()
+                 
+                
+                # Limpa os estados do cache para refletir no próximo turno
+                st.cache_data.clear()
+                if "df_grade_memoria" in st.session_state:
+                    del st.session_state["df_grade_memoria"]
+                
+                st.toast("🎉 Sua grade horária foi salva com sucesso no banco de dados!")
+                time.sleep(1)
+                st.rerun() 
+            except Exception as e:
+                st.error(f"Erro crítico ao salvar no banco: {e}")
 
-    # Áreas e gatilhos adicionais inferiores
+    # Áreas e gatilhos adicionais fora do formulário
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     col_l, col_v = st.columns(2)
     
     with col_l:
-        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True, key="btn_limpar_grade_real_final"):
+        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True, key="btn_limpar_grade_real"):
             try:
                 conn = obter_conexao_eficiente()
                 cursor = conn.cursor()
@@ -692,6 +574,7 @@ def template_disponibilidade():
                 conn.commit()
                 cursor.close()
                
+                
                 st.cache_data.clear()
                 if "df_grade_memoria" in st.session_state:
                     del st.session_state["df_grade_memoria"]
@@ -705,6 +588,7 @@ def template_disponibilidade():
         if st.button("Voltar ao Chat", use_container_width=True, key="btn_voltar_chat_grade"): 
             st.session_state.opcao_menu = "💬 Conversar com Lucy" 
             st.rerun()
+
 
 
 
