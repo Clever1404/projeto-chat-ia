@@ -498,6 +498,8 @@ def modal_agendamento_encontro(dados_r):
             except Exception as e:
                 st.error(f"❌ Erro ao gravar agendamento: {e}")
 
+        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+        st.rerun()
 
 # ==============================================================================
 # FUNÇÃO AUXILIAR COM CACHE PARA OTIMIZAÇÃO DA GRADE HORÁRIA
