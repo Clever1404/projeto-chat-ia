@@ -425,7 +425,7 @@ def modal_agendamento_encontro(dados_r):
                 """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), hor_s))
                 conn_salvar.commit()
                 cursor_salvar.close()
-                
+                conn_salvar()
                 
                 st.success("🎉 Convite enviado com sucesso!")
                 st.session_state.abrir_reserva_fluxo = None
