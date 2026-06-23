@@ -1439,38 +1439,40 @@ else:
 
             st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
                 
-           # ==========================================================================
-            # --- BOTÃO: ENCERRAR SESSÃO (LOGOUT 100% GARANTIDO) ---
+           
+            # ==========================================================================
+            # --- BOTÃO: ENCERRAR SESSÃO (LOGOUT 100% CORRIGIDO SEM ERRO DE INT) ---
             # ==========================================================================
             if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema"):
                 if id_usuario_logado:
                     try:
-                        # Limpeza profunda do ID do usuário logado
-                        id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
+                        # Como st.session_state.usuario_id já guarda um inteiro puro do Login,
+                        # forçamos a conversão direta sem tentar ler índices de lista/tupla
+                        id_limpo = int(id_usuario_logado)
                         
-                        # Usa uma conexão nova dedicada estritamente para fechar a sessão com segurança
-                        conn_logout = conectar_supabase()
+                        # Conecta e executa a atualização imediata no banco
+                        conn_logout = obter_conexao_eficiente()
                         cursor_logout = conn_logout.cursor()
-                        cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (int(id_limpo),))
+                        cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (id_limpo,))
                         conn_logout.commit()
                         cursor_logout.close()
-                        conn_logout.close() # Garante o fechamento para liberar o pool do banco
-                    except Exception: 
-                        pass
+                    except Exception as e:
+                        # Se falhar, limpa o canal de transação do PostgreSQL
+                        if 'conn_logout' in locals() and conn_logout:
+                            conn_logout.rollback()
+                        st.sidebar.error(f"Erro no banco ao deslogar: {e}")
                 
-                # 1. Deleta TODAS as chaves salvas na memória de sessão do navegador de uma vez só
-                # Isso limpa dados_usuario, tipo_plano, moedas, e o histórico volátil
+                # Limpa absolutamente toda a memória do navegador do usuário
                 for chave in list(st.session_state.keys()):
                     del st.session_state[chave]
                     
-                # 2. Força o estado padrão inicial de usuário deslogado
+                # Restabelece os estados padrão iniciais para o roteador abrir a tela de login
                 st.session_state.usuario_id = None
                 st.session_state.username = None
                 st.session_state.opcao_menu = "login"
+                st.session_state.form_seed = 42
                 
-                # 3. Executa o recarregamento definitivo da página saindo do contexto do sidebar
                 st.rerun()
-
        
         # Renderiza estritamente a tela selecionada no miolo da página
         if menu_atual == "💬 Conversar com Lucy":   
