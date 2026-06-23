@@ -1179,37 +1179,37 @@ else:
         # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
         with st.sidebar: 
 
-        st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
+            st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
 
-        # 1. Verifica os dados salvos na Sessão Atual do Navegador
-        id_usuario_logado = st.session_state.get("usuario_id")
-        foto_sessao = st.session_state.get("foto_perfil")
+            # 1. Verifica os dados salvos na Sessão Atual do Navegador
+            id_usuario_logado = st.session_state.get("usuario_id")
+            foto_sessao = st.session_state.get("foto_perfil")
 
-        st.write(f"🔹 **Seu ID de Usuário:** `{id_usuario_logado}`")
-        st.write(f"🔹 **Caminho salvo na Session State:** `{foto_sessao}`")
+            st.write(f"🔹 **Seu ID de Usuário:** `{id_usuario_logado}`")
+            st.write(f"🔹 **Caminho salvo na Session State:** `{foto_sessao}`")
 
-        # 2. Testa a limpeza da barra que o sistema operacional exige
-        if foto_sessao:
-            caminho_limpo = str(foto_sessao).strip().lstrip('/')
-            st.write(f"🥾 **Caminho convertido para o Servidor:** `{caminho_limpo}`")
-            st.write(f"📂 **O arquivo existe fisicamente no servidor?** `{'✅ SIM' if os.path.exists(caminho_limpo) else '❌ NÃO'}`")
+            # 2. Testa a limpeza da barra que o sistema operacional exige
+            if foto_sessao:
+                caminho_limpo = str(foto_sessao).strip().lstrip('/')
+                st.write(f"🥾 **Caminho convertido para o Servidor:** `{caminho_limpo}`")
+                st.write(f"📂 **O arquivo existe fisicamente no servidor?** `{'✅ SIM' if os.path.exists(caminho_limpo) else '❌ NÃO'}`")
 
-        # 3. Faz uma varredura real na pasta física para listar TODAS as fotos salvas
-        st.markdown("#### 📁 Arquivos encontrados na pasta `static/uploads/perfis/`:")
-        try:
-            if os.path.exists(UPLOAD_FOLDER):
-                arquivos = os.listdir(UPLOAD_FOLDER)
-                if arquivos:
-                    for arq in arquivos:
-                        caminho_completo_arquivo = os.path.join(UPLOAD_FOLDER, arq)
-                        tamanho_kb = os.path.getsize(caminho_completo_arquivo) / 1024
-                        st.code(f"📄 {arq} ({tamanho_kb:.1f} KB) -> Caminho para ler no st.image: '{caminho_completo_arquivo}'")
+            # 3. Faz uma varredura real na pasta física para listar TODAS as fotos salvas
+            st.markdown("#### 📁 Arquivos encontrados na pasta `static/uploads/perfis/`:")
+            try:
+                if os.path.exists(UPLOAD_FOLDER):
+                    arquivos = os.listdir(UPLOAD_FOLDER)
+                    if arquivos:
+                        for arq in arquivos:
+                            caminho_completo_arquivo = os.path.join(UPLOAD_FOLDER, arq)
+                            tamanho_kb = os.path.getsize(caminho_completo_arquivo) / 1024
+                            st.code(f"📄 {arq} ({tamanho_kb:.1f} KB) -> Caminho para ler no st.image: '{caminho_completo_arquivo}'")
+                    else:
+                        st.info("A pasta existe, mas está vazia. Nenhum usuário fez upload de foto ainda.")
                 else:
-                    st.info("A pasta existe, mas está vazia. Nenhum usuário fez upload de foto ainda.")
-            else:
-                st.warning("⚠️ A pasta de uploads ainda não foi criada fisicamente no servidor remoto.")
-        except Exception as e:
-            st.error(f"Erro ao listar diretório: {e}")
+                    st.warning("⚠️ A pasta de uploads ainda não foi criada fisicamente no servidor remoto.")
+            except Exception as e:
+                st.error(f"Erro ao listar diretório: {e}")
 
 
             avatar_html = ""
