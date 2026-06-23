@@ -1255,12 +1255,12 @@ else:
             # ==========================================================================
             caminho_foto_perfil = str(st.session_state.get("foto_perfil", "")).strip()
                 
-            col_avatar_centro, _ = st.columns([1, 1]) # Mantém proporção limpa na barra lateral
+            col_avatar_centro, _ = st.columns([2, 2]) # Mantém proporção limpa na barra lateral
             with col_avatar_centro:
                 # Se for um link válido da nuvem (Supabase) ou um arquivo local válido
                 if caminho_foto_perfil and (caminho_foto_perfil.startswith("http") or os.path.exists(caminho_foto_perfil.lstrip('/'))):
                     # O st.image consegue abrir URLs externas diretamente sem Base64!
-                    st.image(caminho_foto_perfil, width=65)
+                    st.image(caminho_foto_perfil, width=80)
                 else:
                     # Caso o link esteja em branco, exibe o emoji centralizado padrão
                     st.markdown('<div style="font-size: 50px; text-align:center; padding-bottom:10px; margin-left: 10px;">👩</div>', unsafe_allow_html=True)
