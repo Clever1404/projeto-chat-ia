@@ -400,76 +400,86 @@ def modal_agendamento_encontro(dados_r):
     meu_id_limpo = limpar_id_absoluto(st.session_state.get("usuario_id"))
     parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
 
-    if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True, key="btn_confirmar_reserva_click"):
+    # --- 2. TRAVA DE DISPONIBILIDADE DIRETA NO POSTGRESQL (CRUZAMENTO SEGURO) ---
+    meu_registro_existe = False
+    parceiro_registro_existe = False
+    parceiro_tem_algum_horario = False
+        
+    try:
+        conn_check = obter_conexao_eficiente()
+        cursor_check = conn_check.cursor()
+            
+        # Verifica se você possui o horário na grade
+        cursor_check.execute("""
+            SELECT COUNT(*) FROM disponibilidade_usuarios 
+            WHERE usuario_id = %s 
+                AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
+                AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+        """, (meu_id_limpo, str(dia_s), str(per_s)))
+        meu_count = cursor_check.fetchone()[0]
+        meu_registro_existe = (meu_count > 0)
+            
+        # Verifica se o parceiro possui ALGUNS horários cadastrados no banco (para saber se a grade dele está vazia)
+        cursor_check.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
+        total_parceiro = cursor_check.fetchone()[0]
+        parceiro_tem_algum_horario = (total_parceiro > 0)
+            
+        # Verifica se o parceiro possui ESTE horário específico na grade
+        cursor_check.execute("""
+            SELECT COUNT(*) FROM disponibilidade_usuarios 
+            WHERE usuario_id = %s 
+                AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
+                AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+         """, (parceiro_id_limpo, str(dia_s), str(per_s)))
+        parceiro_count = cursor_check.fetchone()[0]
+        parceiro_registro_existe = (parceiro_count > 0)
+            
+        cursor_check.close()
+        
+            
+        # Painel de depuração limpo
+        with st.expander("🔍 Depurador de Agenda (Debug)"):
+            st.write(f"**Seu ID ({st.session_state.username}):** {meu_id_limpo} | Possui este horário? `{'Sim' if meu_registro_existe else 'Não'}`")
+            st.write(f"**ID do Par ({dados_r['nome_par']}):** {parceiro_id_limpo} | Possui este horário? `{'Sim' if parceiro_registro_existe else 'Não'}`")
+            st.write(f"**O parceiro já preencheu a grade alguma vez?** `{'Sim' if parceiro_tem_algum_horario else 'Não'}`")
+            
+    except Exception as e:
+        st.error(f"Erro ao consultar o banco de dados: {e}")
+
+    # --- 3. EXECUÇÃO DAS TRAVAS DE HORÁRIO ---
+    if per_s == 'manha' and (hora_int < 6 or hora_int >= 12):
+        st.error("❌ Horário inválido! Para o período da manhã, ajuste entre **06:00 e 11:59**.")
+    elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18):
+        st.error("❌ Horário inválido! Para o período da tarde, ajuste entre **12:00 e 17:59**.")
+    elif per_s == 'noite' and (hora_int < 18 or hora_int > 23):
+        st.error("❌ Horário inválido! Para o período da noite, ajuste entre **18:00 e 23:59**.")
+            
+    # Alerta de recusa: Se você não marcou o dia na sua própria grade
+    elif not meu_registro_existe:
+        st.error(f"❌ **Agendamento Recusado:** Você ({st.session_state.username}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar.")
+            
+    # Alerta de recusa: Se o parceiro tem horários configurados mas não marcou este dia específico
+    elif parceiro_tem_algum_horario and not parceiro_registro_existe:
+        st.error(f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado.")
+            
+    # Se passar em todas as validações, realiza o agendamento pendente
+    else:
         try:
             conn = obter_conexao_eficiente()
             cursor = conn.cursor()
-            
-            # PROTEÇÃO CRÍTICA: Verifica se o match_id realmente existe na tabela 'matches' antes de tentar o INSERT
-            cursor.execute("SELECT COUNT(*) FROM matches WHERE id = %s;", (m_id_limpo,))
-            match_existe = cursor.fetchone()[0] > 0
-            
-            if not match_existe:
-                # Caso o match_id original tenha sumido, tenta localizar ou criar um novo ID de vínculo estável
-                cursor.execute("""
-                    SELECT id FROM matches 
-                    WHERE (usuario_1_id = %s AND usuario_2_id = %s) OR (usuario_1_id = %s AND usuario_2_id = %s) 
-                    LIMIT 1;
-                """, (meu_id_limpo, parceiro_id_limpo, parceiro_id_limpo, meu_id_limpo))
-                match_recuperado = cursor.fetchone()
+            cursor.execute('''
+                INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
+                VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
+            ''', (m_id_limpo, meu_id_limpo, parceiro_id_limpo, dia_s, per_s, hor_s))
+            conn.commit()
+            cursor.close()
+          
                 
-                if match_recuperado:
-                    m_id_limpo = int(match_recuperado[0])
-                else:
-                    # Se não existir nenhuma linha de match entre os dois usuários, cria uma na hora
-                    cursor.execute("""
-                        INSERT INTO matches (usuario_1_id, usuario_2_id, status_conexao) 
-                        VALUES (%s, %s, 'offline') RETURNING id;
-                    """, (meu_id_limpo, parceiro_id_limpo))
-                    m_id_limpo = int(cursor.fetchone()[0])
-                    conn.commit()
-
-            # Realiza as validações de disponibilidade padrão
-            cursor.execute("""
-                SELECT COUNT(*) FROM disponibilidade_usuarios 
-                WHERE usuario_id = %s AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-            """, (meu_id_limpo, str(dia_s), str(per_s)))
-            meu_registro_existe = cursor.fetchone()[0] > 0
-            
-            cursor.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
-            parceiro_tem_algum_horario = cursor_check.fetchone()[0] > 0 if 'cursor_check' in locals() else cursor.fetchone()[0] > 0
-            
-            cursor.close(); 
-            
-            # Validação simples de segurança horária
-            hora_int = hor_s.hour
-            if per_s == 'manha' and (hora_int < 6 or hora_int >= 12): 
-                st.error("❌ Horário inválido para Manhã (06:00 às 11:59).")
-            elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18): 
-                st.error("❌ Horário inválido para Tarde (12:00 às 17:59).")
-            elif per_s == 'noite' and (hora_int < 18 or hora_int > 23): 
-                st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
-            else:
-                # CORREÇÃO: Abre a conexão persistente e garante o mesmo nome em todas as linhas
-                conn_salvar = obter_conexao_eficiente()
-                cursor_salvar = conn_salvar.cursor()
-                
-                cursor_salvar.execute("""
-                    INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
-                    VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
-                """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), hor_s))
-                
-                # Executa o commit e fecha o cursor usando a variável correta definida acima
-                conn_salvar.commit()
-                cursor_salvar.close()
-                
-                st.success("🎉 Convite enviado com sucesso!")
-                st.session_state.abrir_reserva_fluxo = None
-                time.sleep(1.2)
-                st.rerun()
-                
-        except Exception as e: 
-            st.error(f"Erro crítico ao salvar agendamento no banco: {e}")
+            st.success("🎉 Convite de encontro enviado com sucesso!")
+            st.session_state.abrir_reserva_fluxo = None
+            st.rerun()
+        except Exception as e:
+            st.error(f"❌ Erro ao gravar agendamento: {e}")
 
 
 # ==============================================================================
