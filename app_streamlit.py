@@ -416,16 +416,18 @@ def modal_agendamento_encontro(dados_r):
             elif per_s == 'noite' and (hora_int < 18 or hora_int > 23): 
                 st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
             else:
-                # Executa o agendamento vinculando o ID verificado/recuperado
-                conn = obter_conexao_eficiente()
+                # CORREÇÃO: Abre a conexão persistente e garante o mesmo nome em todas as linhas
+                conn_salvar = obter_conexao_eficiente()
                 cursor_salvar = conn_salvar.cursor()
+                
                 cursor_salvar.execute("""
                     INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
                     VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
                 """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), hor_s))
+                
+                # Executa o commit e fecha o cursor usando a variável correta definida acima
                 conn_salvar.commit()
                 cursor_salvar.close()
-                conn_salvar()
                 
                 st.success("🎉 Convite enviado com sucesso!")
                 st.session_state.abrir_reserva_fluxo = None
