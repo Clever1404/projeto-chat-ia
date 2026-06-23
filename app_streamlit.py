@@ -351,28 +351,56 @@ def renderizar_chat_lucy_isolado():
                 id_par_encontrado = dados_match.get("id_par")
                 match_id_real = dados_match.get("match_id")
 
-                # ================= CORREÇÃO CRÍTICA AQUI =================
-                # Ajustado para usar os nomes corretos das colunas: usuario_1_id e usuario_2_id
-                if not match_id_real:
-                    try:
-                        conn_match = obter_conexao_eficiente()
-                        cursor_match = conn_match.cursor()
-                        
-                        cursor_match.execute("""
-                            INSERT INTO matches (usuario_1_id, usuario_2_id, status_conexao)
-                            VALUES (%s, %s, 'offline')
-                            RETURNING id;
-                        """, (meu_id_limpo, int(id_par_encontrado)))
-                        
-                        match_id_real = cursor_match.fetchone()[0] # Garante a captura do ID puro
-                        conn_match.commit()
-                        cursor_match.close()
-                    except Exception as err_db:
-                        if 'conn_match' in locals() and conn_match: 
+            # ================= CORREÇÃO CRÍTICA COM SUPORTE A MATCH EXISTENTE =================
+            if not match_id_real:
+                try:
+                    conn_match = obter_conexao_eficiente()
+                    cursor_match = conn_match.cursor()
+                    
+                    # 1. Primeiro tenta buscar se já existe um match entre esses dois usuários (em qualquer ordem)
+                    cursor_match.execute("""
+                        SELECT id FROM matches 
+                        WHERE (usuario_1_id = %s AND usuario_2_id = %s) 
+                        OR (usuario_1_id = %s AND usuario_2_id = %s)
+                        LIMIT 1;
+                    """, (meu_id_limpo, int(id_par_encontrado), int(id_par_encontrado), meu_id_limpo))
+                    
+                    resultado_match = cursor_match.fetchone()
+                    
+                    if resultado_match:
+                        # Se já existir, reaproveita o ID encontrado
+                        match_id_real = int(resultado_match[0])
+                    else:
+                        # 2. Se não existir, realiza o INSERT com segurança
+                        try:
+                            cursor_match.execute("""
+                                INSERT INTO matches (usuario_1_id, usuario_2_id, status_conexao)
+                                VALUES (%s, %s, 'offline')
+                                RETURNING id;
+                            """, (meu_id_limpo, int(id_par_encontrado)))
+                            
+                            match_id_real = int(cursor_match.fetchone()[0])
+                            conn_match.commit()
+                        except Exception as err_dup:
+                            # Proteção extra: Caso haja concorrência e o registro foi criado no mesmo milissegundo
                             conn_match.rollback()
-                        st.error(f"Erro ao persistir o match no banco de dados: {err_db}")
-                        match_id_real = None
-                # =========================================================
+                            cursor_match.execute("""
+                                SELECT id FROM matches 
+                                WHERE (usuario_1_id = %s AND usuario_2_id = %s) 
+                                OR (usuario_1_id = %s AND usuario_2_id = %s)
+                                LIMIT 1;
+                            """, (meu_id_limpo, int(id_par_encontrado), int(id_par_encontrado), meu_id_limpo))
+                            resultado_concorrente = cursor_match.fetchone()
+                            if resultado_concorrente:
+                                match_id_real = int(resultado_concorrente[0])
+                    
+                    cursor_match.close()
+                except Exception as err_db:
+                    if 'conn_match' in locals() and conn_match: 
+                        conn_match.rollback()
+                    st.error(f"Erro ao persistir o match no banco de dados: {err_db}")
+                    match_id_real = None
+            # ==================================================================================
 
                 # Só exibe o modal se tiver um ID real e persistido no banco
                 if match_id_real:
