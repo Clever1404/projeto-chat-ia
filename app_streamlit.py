@@ -752,10 +752,11 @@ def template_sala_privada():
         st.divider()
 
         if st.button("🎥 Iniciar Videochamada Privada"): 
-            id_match_int = match_id if isinstance(match_id, (tuple, list)) else int(match_id)
-            url_jitsi = f"https://jit.si_{id_match_int}" 
+            nome_da_sala_unica = f"Atendimento_FaleConosco_SalaPrivada_{id_match_int}" 
+            url_jitsi = f"https://meet.jit.si/{nome_da_sala_unica}" 
+        
             st.info("A videochamada foi iniciada abaixo. Garanta as permissões no navegador.") 
-            st.iframe(url_jitsi, height=500) 
+            st.iframe(url_jitsi, height=600)  
 
         with st.container(height=380, border=True):
             st.markdown('<div class="chat-container">', unsafe_allow_html=True)
@@ -857,7 +858,7 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
         st.session_state.tempo_inicio_sala = time.time()
         
     tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
-    tempo_restante = 600 - tempo_decorrido
+    tempo_restante = 15 - tempo_decorrido
     
     if tempo_restante > 0:
         st.warning(f"⏳ Tempo Restante: {int(tempo_restante // 60)}m {int(tempo_restante % 60)}s | Saldo: 🪙 {saldo_moedas_sala} moedas")
