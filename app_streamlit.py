@@ -352,24 +352,24 @@ def renderizar_chat_lucy_isolado():
                 match_id_real = dados_match.get("match_id")
 
                 # ================= CORREÇÃO CRÍTICA AQUI =================
-                # Se o motor não retornou um match_id válido vindo do banco, nós criamos um na tabela oficial antes de abrir o modal
+                # Ajustado para usar os nomes corretos das colunas: usuario_1_id e usuario_2_id
                 if not match_id_real:
                     try:
                         conn_match = obter_conexao_eficiente()
                         cursor_match = conn_match.cursor()
                         
-                        # Altere o nome das colunas e tabela abaixo para bater com a sua tabela 'matches'
                         cursor_match.execute("""
-                            INSERT INTO matches (usuario_id_1, usuario_id_2, criado_em)
-                            VALUES (%s, %s, NOW())
+                            INSERT INTO matches (usuario_1_id, usuario_2_id, status_conexao)
+                            VALUES (%s, %s, 'offline')
                             RETURNING id;
                         """, (meu_id_limpo, int(id_par_encontrado)))
                         
-                        match_id_real = cursor_match.fetchone()[0]
+                        match_id_real = cursor_match.fetchone()[0] # Garante a captura do ID puro
                         conn_match.commit()
                         cursor_match.close()
                     except Exception as err_db:
-                        if 'conn_match' in locals(): conn_match.rollback()
+                        if 'conn_match' in locals() and conn_match: 
+                            conn_match.rollback()
                         st.error(f"Erro ao persistir o match no banco de dados: {err_db}")
                         match_id_real = None
                 # =========================================================
