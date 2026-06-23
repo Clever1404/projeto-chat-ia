@@ -275,10 +275,27 @@ def processar_match_lucy(dados_m):
 # ==============================================================================
 @st.fragment
 def renderizar_chat_lucy_isolado():
-    st.markdown("### 🤖 Conversar com Lucy")
-    st.caption("Fale sobre sua rotina, hobbies e o que procura. Lucy usa IA para analisar seu perfil e encontrar pessoas compatíveis.")
-    st.markdown("<hr style='border-color: #30363d; margin: 10px 0 20px 0;'>", unsafe_allow_html=True)
 
+    col_titulos, col_botoes_topo = st.columns([2, 1])
+    
+    with col_titulos:
+        st.markdown("<h2 style='margin-top:0; margin-bottom:2px; font-size: 24px;'>🤖 Olá, Seja bem-vindo ao Lucy Chat IA</h2>", unsafe_allow_html=True) 
+        st.caption("Lucy conversa com você e armazena os seus interesses para encontrar matches.") 
+        
+    
+    with col_botoes_topo:
+        c_refresh, c_fc = st.columns(2)
+        with c_refresh:
+            if st.button("🔄 Atualizar Dados", type="tertiary", help="Sincronizar mensagens"):
+                st.rerun() 
+        with c_fc:
+            if st.button("✉️ Fale Conosco", type="tertiary"):
+                st.session_state.opcao_menu = "✉️ Fale Conosco"
+                st.rerun()
+
+    st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
+
+    
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
     # 1. Carrega e exibe TODO o histórico de mensagens primeiro (Fica no topo/meio)
@@ -290,14 +307,12 @@ def renderizar_chat_lucy_isolado():
         with st.chat_message("assistant", avatar="🤖"):
             st.markdown(resposta_antiga)
 
-    # 2. Inicializa variáveis de controle para processamento assíncrono
-    prompt = st.chat_input("Digite sua mensagem para a Lucy...")
-    
-    # 3. Processa a nova mensagem APENAS se o usuário digitou e enviou no input inferior
-    if prompt:
-        with st.chat_message("user"):
-            st.markdown(prompt)
 
+    if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
+        # 2. Inicializa variáveis de controle para processamento assíncrono
+        prompt = st.chat_input("Digite sua mensagem para a Lucy...")
+    
+   
         with st.chat_message("assistant", avatar="🤖"):
             with st.spinner("Lucy está pensando..."):
                 try:
