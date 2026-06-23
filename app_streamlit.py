@@ -1471,16 +1471,16 @@ else:
                         # Estrutura em colunas equilibradas para reduzir o tamanho do retângulo
                         c_av_c, c_nm_c, c_go_c, c_del_c = st.columns([0.6, 2, 1, 1])
                         
-                       with c_av_c:
-                        # Limpa o caminho para o sistema operacional encontrar o arquivo
-                        caminho_par_img = str(m_foto).strip().lstrip('/')
+                        with c_av_c:
+                            # Limpa o caminho para o sistema operacional encontrar o arquivo
+                            caminho_par_img = str(m_foto).strip().lstrip('/')
                         
-                        if m_foto and os.path.exists(caminho_par_img):
-                            # Desenha a foto de forma nativa e ultra veloz
-                            st.image(caminho_par_img, width=50)
-                        else:
-                            # Fallback limpo com layout alinhado caso não possua foto
-                            st.markdown(f'<div style="font-size: 35px; margin-top: 5px;">{"👩" if m_gen == "F" else "👨"}</div>', unsafe_allow_html=True)
+                            if m_foto and os.path.exists(caminho_par_img):
+                                # Desenha a foto de forma nativa e ultra veloz
+                                st.image(caminho_par_img, width=50)
+                            else:
+                                # Fallback limpo com layout alinhado caso não possua foto
+                                st.markdown(f'<div style="font-size: 35px; margin-top: 5px;">{"👩" if m_gen == "F" else "👨"}</div>', unsafe_allow_html=True)
 
                                 
                         with c_nm_c:
