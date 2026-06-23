@@ -1324,67 +1324,67 @@ else:
             st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
                             
 
-                # ==========================================================================
-                # --- COMPONENTE: ALTERAR FOTO DE PERFIL (CORREÇÃO ANTI-LOOP) ---
-                # ==========================================================================
-                st.caption("📷 Enviar nova foto de perfil:")
+            # ==========================================================================
+            # --- COMPONENTE: ALTERAR FOTO DE PERFIL (CORREÇÃO ANTI-LOOP) ---
+            # ==========================================================================
+            st.caption("📷 Enviar nova foto de perfil:")
                 
-                # Usamos uma chave dinâmica baseada no form_seed para resetar o uploader após o sucesso
-                f_nova = st.file_uploader(
-                    "Alterar Foto", 
-                    type=["png","jpg","jpeg"], 
-                    key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
-                    label_visibility="collapsed"
-                ) 
+            # Usamos uma chave dinâmica baseada no form_seed para resetar o uploader após o sucesso
+            f_nova = st.file_uploader(
+                "Alterar Foto", 
+                type=["png","jpg","jpeg"], 
+                key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
+                label_visibility="collapsed"
+            ) 
                 
-                if f_nova and id_usuario_logado: 
-                    id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
-                    nome_arquivo_storage = f"user_{id_limpo}.jpg"
+            if f_nova and id_usuario_logado: 
+                id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
+                nome_arquivo_storage = f"user_{id_limpo}.jpg"
                     
-                    try:
-                        # 1. Converte o arquivo enviado para bytes brutos
-                        dados_imagem_bytes = f_nova.getvalue()
+                try:
+                    # 1. Converte o arquivo enviado para bytes brutos
+                    dados_imagem_bytes = f_nova.getvalue()
                         
-                        # 2. Faz o upload direto para o bucket 'perfis' (Ignorando RLS via Service Key)
-                        supabase.storage.from_("perfis").upload(
-                            path=nome_arquivo_storage,
-                            file=dados_imagem_bytes,
-                            file_options={"content-type": "image/jpeg", "upsert": "true"}
-                        )
+                    # 2. Faz o upload direto para o bucket 'perfis' (Ignorando RLS via Service Key)
+                    supabase.storage.from_("perfis").upload(
+                        path=nome_arquivo_storage,
+                        file=dados_imagem_bytes,
+                        file_options={"content-type": "image/jpeg", "upsert": "true"}
+                    )
                         
-                        # 3. CORREÇÃO: Captura a string da URL pública de forma explícita
-                        resposta_url = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
+                    # 3. CORREÇÃO: Captura a string da URL pública de forma explícita
+                    resposta_url = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
                         
-                        # Dependendo da versão da biblioteca, extrai a string pura do link
-                        if hasattr(resposta_url, "public_url"):
-                            url_publica_foto = str(resposta_url.public_url).strip()
-                        else:
-                            url_publica_foto = str(resposta_url).strip()
+                    # Dependendo da versão da biblioteca, extrai a string pura do link
+                    if hasattr(resposta_url, "public_url"):
+                        url_publica_foto = str(resposta_url.public_url).strip()
+                    else:
+                        url_publica_foto = str(resposta_url).strip()
                         
-                        # 4. Grava a URL estável no PostgreSQL
-                        conn_foto = obter_conexao_eficiente()
-                        cursor_foto = conn_foto.cursor() 
-                        cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
-                        conn_foto.commit()
-                        cursor_foto.close()
+                    # 4. Grava a URL estável no PostgreSQL
+                    conn_foto = obter_conexao_eficiente()
+                    cursor_foto = conn_foto.cursor() 
+                    cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
+                    conn_foto.commit()
+                    cursor_foto.close()
                         
-                        # Atualiza a memória ativa do navegador
-                        st.session_state.foto_perfil = url_publica_foto
-                        st.cache_data.clear()
+                    # Atualiza a memória ativa do navegador
+                    st.session_state.foto_perfil = url_publica_foto
+                    st.cache_data.clear()
                         
-                        # 🚨 O SEGREDO AQUI: Alteramos o ID da semente para resetar o componente st.file_uploader
-                        # Isso faz o arquivo "sumir" da memória do uploader, quebrando o loop de rerun
-                        if "form_seed" in st.session_state:
-                            st.session_state.form_seed += 1
-                        else:
-                            st.session_state.form_seed = 43
+                    # 🚨 O SEGREDO AQUI: Alteramos o ID da semente para resetar o componente st.file_uploader
+                    # Isso faz o arquivo "sumir" da memória do uploader, quebrando o loop de rerun
+                    if "form_seed" in st.session_state:
+                        st.session_state.form_seed += 1
+                    else:
+                        st.session_state.form_seed = 43
                         
-                        st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
-                        time.sleep(1)
-                        st.rerun() 
+                    st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
+                    time.sleep(1)
+                    st.rerun() 
                         
-                    except Exception as e:
-                        st.error(f"Erro ao salvar foto no Storage: {e}")   
+                except Exception as e:
+                    st.error(f"Erro ao salvar foto no Storage: {e}")   
                 
             # ==========================================================================
             # --- CONSULTA 2: MOTOR DE BUSCA DA NOTIFICAÇÃO ---
