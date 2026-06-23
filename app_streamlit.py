@@ -1277,16 +1277,6 @@ else:
 
             st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
                         
-                except Exception as e:
-                    st.error(f"Erro ao carregar saldo do banco: {e}")
-            else:
-                st.warning("⚠️ Usuário não identificado na sessão.")
-
-            # Sincroniza de forma idêntica os estados globais da aplicação
-            st.session_state["tipo_plano"] = tipo_plano
-            st.session_state["saldo_moedas"] = saldo_moedas
-
-            st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
 
             # ==========================================================================
             # --- COMPONENTE: ALTERAR FOTO DE PERFIL ---
