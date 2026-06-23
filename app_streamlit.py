@@ -390,96 +390,100 @@ def modal_agendamento_encontro(dados_r):
     
     horario_sugestao = datetime.strptime("09:00" if per_s=="manha" else "14:00" if per_s=="tarde" else "20:00", "%H:%M").time()
     hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
-    
-    def limpar_id_absoluto(id_bruto):
-        while isinstance(id_bruto, (tuple, list)): 
-            id_bruto = id_bruto[0] if len(id_bruto) > 0 else 0
-        return int(id_bruto) if id_bruto is not None else 0
 
-    m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
-    meu_id_limpo = limpar_id_absoluto(st.session_state.get("usuario_id"))
-    parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
 
-    # --- 2. TRAVA DE DISPONIBILIDADE DIRETA NO POSTGRESQL (CRUZAMENTO SEGURO) ---
-    meu_registro_existe = False
-    parceiro_registro_existe = False
-    parceiro_tem_algum_horario = False
+    if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True):
+        hora_int = hor_s.hour
         
-    try:
-        conn_check = obter_conexao_eficiente()
-        cursor_check = conn_check.cursor()
-            
-        # Verifica se você possui o horário na grade
-        cursor_check.execute("""
-            SELECT COUNT(*) FROM disponibilidade_usuarios 
-            WHERE usuario_id = %s 
-                AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
-                AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-        """, (meu_id_limpo, str(dia_s), str(per_s)))
-        meu_count = cursor_check.fetchone()[0]
-        meu_registro_existe = (meu_count > 0)
-            
-        # Verifica se o parceiro possui ALGUNS horários cadastrados no banco (para saber se a grade dele está vazia)
-        cursor_check.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
-        total_parceiro = cursor_check.fetchone()[0]
-        parceiro_tem_algum_horario = (total_parceiro > 0)
-            
-        # Verifica se o parceiro possui ESTE horário específico na grade
-        cursor_check.execute("""
-            SELECT COUNT(*) FROM disponibilidade_usuarios 
-            WHERE usuario_id = %s 
-                AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
-                AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-         """, (parceiro_id_limpo, str(dia_s), str(per_s)))
-        parceiro_count = cursor_check.fetchone()[0]
-        parceiro_registro_existe = (parceiro_count > 0)
-            
-        cursor_check.close()
-        
-            
-        # Painel de depuração limpo
-        with st.expander("🔍 Depurador de Agenda (Debug)"):
-            st.write(f"**Seu ID ({st.session_state.username}):** {meu_id_limpo} | Possui este horário? `{'Sim' if meu_registro_existe else 'Não'}`")
-            st.write(f"**ID do Par ({dados_r['nome_par']}):** {parceiro_id_limpo} | Possui este horário? `{'Sim' if parceiro_registro_existe else 'Não'}`")
-            st.write(f"**O parceiro já preencheu a grade alguma vez?** `{'Sim' if parceiro_tem_algum_horario else 'Não'}`")
-            
-    except Exception as e:
-        st.error(f"Erro ao consultar o banco de dados: {e}")
+        def limpar_id_absoluto(id_bruto):
+            while isinstance(id_bruto, (tuple, list)): 
+                id_bruto = id_bruto[0] if len(id_bruto) > 0 else 0
+            return int(id_bruto) if id_bruto is not None else 0
 
-    # --- 3. EXECUÇÃO DAS TRAVAS DE HORÁRIO ---
-    if per_s == 'manha' and (hora_int < 6 or hora_int >= 12):
-        st.error("❌ Horário inválido! Para o período da manhã, ajuste entre **06:00 e 11:59**.")
-    elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18):
-        st.error("❌ Horário inválido! Para o período da tarde, ajuste entre **12:00 e 17:59**.")
-    elif per_s == 'noite' and (hora_int < 18 or hora_int > 23):
-        st.error("❌ Horário inválido! Para o período da noite, ajuste entre **18:00 e 23:59**.")
+        m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
+        meu_id_limpo = limpar_id_absoluto(st.session_state.get("usuario_id"))
+        parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
+
+        # --- 2. TRAVA DE DISPONIBILIDADE DIRETA NO POSTGRESQL (CRUZAMENTO SEGURO) ---
+        meu_registro_existe = False
+        parceiro_registro_existe = False
+        parceiro_tem_algum_horario = False
             
-    # Alerta de recusa: Se você não marcou o dia na sua própria grade
-    elif not meu_registro_existe:
-        st.error(f"❌ **Agendamento Recusado:** Você ({st.session_state.username}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar.")
-            
-    # Alerta de recusa: Se o parceiro tem horários configurados mas não marcou este dia específico
-    elif parceiro_tem_algum_horario and not parceiro_registro_existe:
-        st.error(f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado.")
-            
-    # Se passar em todas as validações, realiza o agendamento pendente
-    else:
         try:
-            conn = obter_conexao_eficiente()
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
-                VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
-            ''', (m_id_limpo, meu_id_limpo, parceiro_id_limpo, dia_s, per_s, hor_s))
-            conn.commit()
-            cursor.close()
-          
+            conn_check = obter_conexao_eficiente()
+            cursor_check = conn_check.cursor()
                 
-            st.success("🎉 Convite de encontro enviado com sucesso!")
-            st.session_state.abrir_reserva_fluxo = None
-            st.rerun()
+            # Verifica se você possui o horário na grade
+            cursor_check.execute("""
+                SELECT COUNT(*) FROM disponibilidade_usuarios 
+                WHERE usuario_id = %s 
+                    AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
+                    AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+            """, (meu_id_limpo, str(dia_s), str(per_s)))
+            meu_count = cursor_check.fetchone()[0]
+            meu_registro_existe = (meu_count > 0)
+                
+            # Verifica se o parceiro possui ALGUNS horários cadastrados no banco (para saber se a grade dele está vazia)
+            cursor_check.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
+            total_parceiro = cursor_check.fetchone()[0]
+            parceiro_tem_algum_horario = (total_parceiro > 0)
+                
+            # Verifica se o parceiro possui ESTE horário específico na grade
+            cursor_check.execute("""
+                SELECT COUNT(*) FROM disponibilidade_usuarios 
+                WHERE usuario_id = %s 
+                    AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
+                    AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+            """, (parceiro_id_limpo, str(dia_s), str(per_s)))
+            parceiro_count = cursor_check.fetchone()[0]
+            parceiro_registro_existe = (parceiro_count > 0)
+                
+            cursor_check.close()
+            
+                
+            # Painel de depuração limpo
+            with st.expander("🔍 Depurador de Agenda (Debug)"):
+                st.write(f"**Seu ID ({st.session_state.username}):** {meu_id_limpo} | Possui este horário? `{'Sim' if meu_registro_existe else 'Não'}`")
+                st.write(f"**ID do Par ({dados_r['nome_par']}):** {parceiro_id_limpo} | Possui este horário? `{'Sim' if parceiro_registro_existe else 'Não'}`")
+                st.write(f"**O parceiro já preencheu a grade alguma vez?** `{'Sim' if parceiro_tem_algum_horario else 'Não'}`")
+                
         except Exception as e:
-            st.error(f"❌ Erro ao gravar agendamento: {e}")
+            st.error(f"Erro ao consultar o banco de dados: {e}")
+
+        # --- 3. EXECUÇÃO DAS TRAVAS DE HORÁRIO ---
+        if per_s == 'manha' and (hora_int < 6 or hora_int >= 12):
+            st.error("❌ Horário inválido! Para o período da manhã, ajuste entre **06:00 e 11:59**.")
+        elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18):
+            st.error("❌ Horário inválido! Para o período da tarde, ajuste entre **12:00 e 17:59**.")
+        elif per_s == 'noite' and (hora_int < 18 or hora_int > 23):
+            st.error("❌ Horário inválido! Para o período da noite, ajuste entre **18:00 e 23:59**.")
+                
+        # Alerta de recusa: Se você não marcou o dia na sua própria grade
+        elif not meu_registro_existe:
+            st.error(f"❌ **Agendamento Recusado:** Você ({st.session_state.username}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar.")
+                
+        # Alerta de recusa: Se o parceiro tem horários configurados mas não marcou este dia específico
+        elif parceiro_tem_algum_horario and not parceiro_registro_existe:
+            st.error(f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado.")
+                
+        # Se passar em todas as validações, realiza o agendamento pendente
+        else:
+            try:
+                conn = obter_conexao_eficiente()
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
+                    VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
+                ''', (m_id_limpo, meu_id_limpo, parceiro_id_limpo, dia_s, per_s, hor_s))
+                conn.commit()
+                cursor.close()
+            
+                    
+                st.success("🎉 Convite de encontro enviado com sucesso!")
+                st.session_state.abrir_reserva_fluxo = None
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Erro ao gravar agendamento: {e}")
 
 
 # ==============================================================================
