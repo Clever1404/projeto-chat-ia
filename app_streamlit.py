@@ -271,48 +271,37 @@ def processar_match_lucy(dados_m):
 
 
 # ==============================================================================
-# FUNÇÃO ISOLADA VIA FRAGMENTO COM INPUT FIXADO NA PARTE INFERIOR
+# FUNÇÃO ISOLADA COM CONTAINER DE ROLAGEM (INPUT INFERIOR GARANTIDO)
 # ==============================================================================
 @st.fragment
 def renderizar_chat_lucy_isolado():
+    st.markdown("### 🤖 Conversar com Lucy")
+    st.caption("Fale sobre sua rotina, hobbies e o que procura. Lucy usa IA para analisar seu perfil e encontrar pessoas compatíveis.")
+    st.markdown("<hr style='border-color: #30363d; margin: 10px 0 20px 0;'>", unsafe_allow_html=True)
 
-    col_titulos, col_botoes_topo = st.columns([2, 1])
-    
-    with col_titulos:
-        st.markdown("<h2 style='margin-top:0; margin-bottom:2px; font-size: 24px;'>🤖 Olá, Seja bem-vindo ao Lucy Chat IA</h2>", unsafe_allow_html=True) 
-        st.caption("Lucy conversa com você e armazena os seus interesses para encontrar matches.") 
-        
-    
-    with col_botoes_topo:
-        c_refresh, c_fc = st.columns(2)
-        with c_refresh:
-            if st.button("🔄 Atualizar Dados", type="tertiary", help="Sincronizar mensagens"):
-                st.rerun() 
-        with c_fc:
-            if st.button("✉️ Fale Conosco", type="tertiary"):
-                st.session_state.opcao_menu = "✉️ Fale Conosco"
-                st.rerun()
-
-    st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
-
-    
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
-    # 1. Carrega e exibe TODO o histórico de mensagens primeiro (Fica no topo/meio)
+    # 1. Busca o histórico de mensagens do banco de dados
     historico_banco = buscar_memoria(meu_id_limpo, limite=20)
     
-    for pergunta_antiga, resposta_antiga in historico_banco:
-        with st.chat_message("user"):
-            st.markdown(pergunta_antiga)
-        with st.chat_message("assistant", avatar="🤖"):
-            st.markdown(resposta_antiga)
+    # SOLUÇÃO CRÍTICA: Cria uma área de rolagem vertical isolada para as mensagens
+    # Isso impede que o histórico empurre a barra de texto para fora da tela
+    with st.container(height=450, border=False):
+        for pergunta_antiga, resposta_antiga in historico_banco:
+            with st.chat_message("user"):
+                st.markdown(pergunta_antiga)
+            with st.chat_message("assistant", avatar="🤖"):
+                st.markdown(resposta_antiga)
 
-
-    if prompt := st.chat_input("Fale sobre seus gostos ou planos para o dia...", key="input_global_lucy_ia"): 
-        # 2. Inicializa variáveis de controle para processamento assíncrono
-        prompt = st.chat_input("Digite sua mensagem para a Lucy...")
+    # 2. Caixa de Entrada declarada no final absoluto (Forçada para o rodapé do Streamlit)
+    prompt = st.chat_input("Digite sua mensagem para a Lucy...")
     
-   
+    # 3. Processamento da nova mensagem enviado pelo rodapé
+    if prompt:
+        # Abre o contêiner temporário apenas para simular a resposta imediata na tela
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
         with st.chat_message("assistant", avatar="🤖"):
             with st.spinner("Lucy está pensando..."):
                 try:
@@ -331,7 +320,7 @@ def renderizar_chat_lucy_isolado():
                         messages=contexto_mensagens,
                         temperature=0.7
                     )
-                    resposta_lucy = resposta_openai.choices.message.content
+                    resposta_lucy = resposta_openai.choices[0].message.content # Ajustado índice para gpt-4o-mini estável
                     st.markdown(resposta_lucy)
 
                     # Salva no histórico de forma eficiente
@@ -358,9 +347,8 @@ def renderizar_chat_lucy_isolado():
                 except Exception as e:
                     st.error(f"Erro ao processar conversa com a IA: {e}")
                 
-                # Força a atualização do fragmento para empurrar o histórico e manter o input embaixo
+                # Força o fragmento a reler o histórico inserindo os novos balões no contêiner de cima
                 st.rerun()
-
 
 
 @st.dialog("📅 Reserva de Encontro")
