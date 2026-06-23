@@ -1283,13 +1283,43 @@ else:
             # ==========================================================================
             st.caption("📷 Enviar nova foto de perfil:")
             f_nova = st.file_uploader("Alterar Foto", type=["png","jpg","jpeg"], key="side_f_up", label_visibility="collapsed") 
+            
             if f_nova and id_usuario_logado: 
-                id_limpo = id_usuario_logado[0] if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
+                id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
+                
+                # 1. Garante que a pasta física exista no servidor
                 if not os.path.exists(UPLOAD_FOLDER): 
                     os.makedirs(UPLOAD_FOLDER, exist_ok=True) 
+                
+                # 2. Salva o arquivo de imagem no disco do contêiner
                 c_completo = os.path.join(UPLOAD_FOLDER, f"user_{id_limpo}.jpg") 
                 with open(c_completo, "wb") as f: 
-                    f.write(f_nova.getbuffer()) 
+                    f.write(f_nova.getbuffer())
+                
+                # 3. Define o caminho padrão com a barra inicial para gravação
+                caminho_banco = f"/{c_completo}"
+                
+                try:
+                    # 4. Grava o novo caminho no banco de dados de forma estável
+                    conn_foto = obter_conexao_eficiente()
+                    cursor_foto = conn_foto.cursor() 
+                    cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (caminho_banco, int(id_limpo))) 
+                    conn_foto.commit()
+                    cursor_foto.close()
+                    
+                    # 5. Atualiza a memória da sessão atual para atualizar a interface
+                    st.session_state.foto_perfil = caminho_banco
+                    
+                    # 6. Limpa o cache da barra lateral para forçar a releitura imediata
+                    st.cache_data.clear()
+                    
+                    st.toast("📷 Foto de perfil atualizada com sucesso!")
+                    time.sleep(1)
+                    st.rerun() 
+                    
+                except Exception as e:
+                    st.error(f"Erro ao salvar caminho da foto no banco: {e}")
+
                     
                 try:
                     conn = obter_conexao_eficiente()
@@ -1441,16 +1471,17 @@ else:
                         # Estrutura em colunas equilibradas para reduzir o tamanho do retângulo
                         c_av_c, c_nm_c, c_go_c, c_del_c = st.columns([0.6, 2, 1, 1])
                         
-                        with c_av_c:
-                            caminho_par_img = str(m_foto).strip().lstrip('/')
-                            if m_foto and os.path.exists(caminho_par_img):
-                                try:
-                                    with open(caminho_par_img, "rb") as image_file:
-                                        enc_str = base64.b64encode(image_file.read()).decode()
-                                    st.markdown(f'<img src="data:image/jpeg;base64,{enc_str}" class="foto-match-central">', unsafe_allow_html=True)
-                                except Exception: st.write("👩" if m_gen == 'F' else "👨")
-                            else:
-                                st.subheader("👩" if m_gen == 'F' else "👨")
+                       with c_av_c:
+                        # Limpa o caminho para o sistema operacional encontrar o arquivo
+                        caminho_par_img = str(m_foto).strip().lstrip('/')
+                        
+                        if m_foto and os.path.exists(caminho_par_img):
+                            # Desenha a foto de forma nativa e ultra veloz
+                            st.image(caminho_par_img, width=50)
+                        else:
+                            # Fallback limpo com layout alinhado caso não possua foto
+                            st.markdown(f'<div style="font-size: 35px; margin-top: 5px;">{"👩" if m_gen == "F" else "👨"}</div>', unsafe_allow_html=True)
+
                                 
                         with c_nm_c:
                             # Fonte aumentada para 15px e em negrito igual ao botão entrar
