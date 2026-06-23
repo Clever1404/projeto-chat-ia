@@ -271,7 +271,7 @@ def processar_match_lucy(dados_m):
 
 
 # ==============================================================================
-# FUNÇÃO ISOLADA COM FILA DE RENDERIZAÇÃO (MENSAGENS SEMPRE ACIMA DO INPUT)
+# FUNÇÃO ISOLADA COM BUFFER DE MEMÓRIA (INPUT EMBAIXO E MENSAGENS EM CIMA)
 # ==============================================================================
 @st.fragment
 def renderizar_chat_lucy_isolado():
@@ -281,25 +281,23 @@ def renderizar_chat_lucy_isolado():
 
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
-    # 1. Busca o histórico de mensagens do banco de dados
-    historico_banco = buscar_memoria(meu_id_limpo, limite=20)
-    
-    # Captura o clique ou texto do input do rodapé IMEDIATAMENTE (Sem desenhar nada ainda)
-    prompt = st.chat_input("Digite sua mensagem para a Lucy...")
-
-    # 2. SE O USUÁRIO DIGITOU ALGO: Processa a inteligência artificial ANTES de renderizar a tela
-    # Isso garante que a nova interação seja salva e apareça dentro da caixa de histórico acima
-    if prompt:
+    # 1. PROCESSAMENTO EM SEGUNDO PLANO (Roda antes de desenhar a tela)
+    # Se houver uma mensagem guardada no buffer da rodada anterior, processa com a OpenAI
+    if st.session_state.get("prompt_buffer"):
+        prompt_atual = st.session_state.prompt_buffer
+        del st.session_state["prompt_buffer"] # Limpa o buffer para não processar duas vezes
+        
         try:
+            # Carrega o histórico para fornecer contexto à IA
+            historico_contexto = buscar_memoria(meu_id_limpo, limite=5)
             contexto_mensagens = [
                 {"role": "system", "content": "Você é a Lucy, uma IA psicóloga e assistente de relacionamentos altamente empática. Seu objetivo é entender o estilo de vida, gostos e rotina do usuário através de uma conversa natural. Seja acolhedora, faça perguntas abertas e ajude-o a se expressar para encontrar o par ideal."}
             ]
-            
-            for p, r in historico_banco[-5:]:
+            for p, r in historico_contexto:
                 contexto_mensagens.append({"role": "user", "content": p})
                 contexto_mensagens.append({"role": "assistant", "content": r})
             
-            contexto_mensagens.append({"role": "user", "content": prompt})
+            contexto_mensagens.append({"role": "user", "content": prompt_atual})
 
             resposta_openai = client.chat.completions.create(
                 model='gpt-4o-mini',
@@ -308,18 +306,18 @@ def renderizar_chat_lucy_isolado():
             )
             resposta_lucy = resposta_openai.choices[0].message.content
 
-            # Salva no histórico de forma eficiente utilizando a conexão estável
+            # Salva no histórico do banco de dados
             conn_salvar = obter_conexao_eficiente()
             cursor_salvar = conn_salvar.cursor()
             cursor_salvar.execute("""
                 INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta) 
                 VALUES (%s, %s, %s);
-            """, (meu_id_limpo, prompt, resposta_lucy))
+            """, (meu_id_limpo, prompt_atual, resposta_lucy))
             conn_salvar.commit()
             cursor_salvar.close()
 
             # Dispara o motor de afinidade
-            dados_match = processar_afinidade_e_match(meu_id_limpo, prompt)
+            dados_match = processar_afinidade_e_match(meu_id_limpo, prompt_atual)
             if dados_match and dados_match.get("match"):
                 st.session_state.alerta_match = {
                     "match_id": dados_match.get("match_id", random.randint(1000, 9999)),
@@ -329,20 +327,28 @@ def renderizar_chat_lucy_isolado():
                 }
                 processar_match_lucy(st.session_state.alerta_match)
 
-            # Recarrega imediatamente o fragmento para que a lista do passo 3 já inclua a nova mensagem
-            st.rerun()
-
         except Exception as e:
             st.error(f"Erro ao processar conversa com a IA: {e}")
 
-    # 3. ÁREA VISUAL SUPERIOR: Desenha o histórico antigo + a nova mensagem (se houver)
-    with st.container(height=480, border=False):
+    # 2. ÁREA VISUAL SUPERIOR (Área de rolagem das mensagens)
+    historico_banco = buscar_memoria(meu_id_limpo, limite=20)
+    
+    with st.container(height=450, border=False):
         for pergunta_antiga, resposta_antiga in historico_banco:
             with st.chat_message("user"):
                 st.markdown(pergunta_antiga)
             with st.chat_message("assistant", avatar="🤖"):
                 st.markdown(resposta_antiga)
 
+    # 3. ÁREA VISUAL INFERIOR (A caixa de texto fica obrigatoriamente no rodapé da página)
+    prompt_capturado = st.chat_input("Digite sua mensagem para a Lucy...")
+    
+    if prompt_capturado:
+        # Guarda o texto digitado no buffer e força o rerun
+        st.session_state.prompt_buffer = prompt_capturado
+        st.rerun()
+
+        
 
 @st.dialog("📅 Reserva de Encontro")
 def modal_agendamento_encontro(dados_r):
