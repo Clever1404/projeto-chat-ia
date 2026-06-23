@@ -408,15 +408,20 @@ def renderizar_chat_lucy_isolado():
                     match_id_real = None
             # ==================================================================================
 
-                # Só exibe o modal se tiver um ID real e persistido no banco
+                # ============== ENCONTRE ESTE BLOCO NO SEU CHAT ISOLADO ==============
                 if match_id_real:
                     st.session_state.alerta_match = {
-                        "match_id": match_id_real, # ID persistido do PostgreSQL
+                        "match_id": match_id_real, 
                         "id_par": id_par_encontrado,
                         "nome": dados_match.get("nome_par"),
                         "online": dados_match.get("online", False)
                     }
-                    processar_match_lucy(st.session_state.alerta_match)
+                    
+                    # ❌ ALTERE ESTA LINHA ANTIGA:
+                    # processar_match_lucy(st.session_state.alerta_match)
+                    
+                    #  PARA ESTA NOVA LINHA CORRIGIDA:
+                    registrar_e_exibir_modal(st.session_state.alerta_match, tipo_plano, saldo_moedas)
                 else:
                     st.error("Não foi possível gerar a sala: falha de sincronização do Match com o servidor.")
 
