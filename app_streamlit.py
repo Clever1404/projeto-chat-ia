@@ -1213,9 +1213,6 @@ else:
     # --- TELAS PRIVADAS (Com Barra Lateral de Usuário Logado) ---
     elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Gerenciar Conexões", "🤝 Sala Privada", "🛠️ Painel Admin"]:
         
-        # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
-        with st.sidebar: 
-
         #    st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
 
             # 1. Verifica os dados salvos na Sessão Atual do Navegador
@@ -1250,34 +1247,36 @@ else:
 
 
             #avatar_html = ""
+            # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
+        with st.sidebar: 
             # ==========================================================================
-            # --- PERFIL DO USUÁRIO & AVATAR NATIVO CORRIGIDO ---
+            # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO E MAIOR ---
             # ==========================================================================
             caminho_foto_perfil = str(st.session_state.get("foto_perfil", "")).strip()
                 
-            col_avatar_centro, _ = st.columns([2, 2]) # Mantém proporção limpa na barra lateral
-            with col_avatar_centro:
-                # Se for um link válido da nuvem (Supabase) ou um arquivo local válido
+            # Cria 3 colunas para forçar o alinhamento no centro absoluto da barra lateral
+            col_esq, col_centro, col_dir = st.columns([1, 2, 1])
+            with col_centro:
                 if caminho_foto_perfil and (caminho_foto_perfil.startswith("http") or os.path.exists(caminho_foto_perfil.lstrip('/'))):
-                    # O st.image consegue abrir URLs externas diretamente sem Base64!
-                    st.image(caminho_foto_perfil, width=80)
+                    # Aumentado para width=85 para dar mais destaque ao rosto
+                    st.image(caminho_foto_perfil, width=85)
                 else:
-                    # Caso o link esteja em branco, exibe o emoji centralizado padrão
-                    st.markdown('<div style="font-size: 50px; text-align:center; padding-bottom:10px; margin-left: 10px;">👩</div>', unsafe_allow_html=True)
+                    # Emoji centralizado e ampliado
+                    st.markdown('<div style="font-size: 65px; text-align:center; margin-top: -10px;">👩</div>', unsafe_allow_html=True)
 
             # Extração limpa do nome do usuário antes do '@'
             username_atual = st.session_state.get("username", "Usuário")
             nome_usuario_puro = str(username_atual).split('@')[0].capitalize()
 
             st.markdown(f"""
-                <div style="text-align: center; margin-bottom: 15px; margin-top: -5px;">
-                    <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: #f0f6fc;">{nome_usuario_puro}</h3>
-                    <p style="color: #48bb78; font-weight: bold; font-size: 12px; margin: 3px 0 0 0;">🟢 Online</p>
+                <div style="text-align: center; margin-bottom: 20px; margin-top: 5px;">
+                    <h3 style="margin: 0; font-size: 17px; font-weight: bold; color: #f0f6fc;">{nome_usuario_puro}</h3>
+                    <p style="color: #48bb78; font-weight: bold; font-size: 13px; margin: 4px 0 0 0;">🟢 Online</p>
                 </div>
             """, unsafe_allow_html=True)
 
             # ==========================================================================
-            # --- CONSULTA 1: PLANO E SALDO DE MOEDAS REAL (PROCESSO CACHED ULTRA RÁPIDO) ---
+            # --- CONSULTA 1: PLANO E SALDO REAL (PROCESSAMENTO CACHED TOTALMENTE BLINDADO) ---
             # ==========================================================================
             tipo_plano = "Grátis"
             saldo_moedas = 0
@@ -1285,13 +1284,22 @@ else:
 
             if id_usuario_logado is not None:
                 try:
-                    # Carrega o registro direto da memória cache otimizada
+                    # Carrega o registro direto da nossa função de memória cache
                     registro_banco = carregar_plano_e_moedas_cached(id_usuario_logado)
                     
-                    # Captura o plano e força uma string limpa
-                    plano_bruto = str(registro_banco.get("tipo_plano", "Grátis")).strip()
+                    # CORREÇÃO DA LEITURA: O Supabase com Service Key pode retornar uma lista ou dicionário direto
+                    # Esta lógica desempacota com segurança qualquer um dos dois formatos
+                    if isinstance(registro_banco, list) and len(registro_banco) > 0:
+                        dados_reais = registro_banco[0]
+                    elif isinstance(registro_banco, dict):
+                        dados_reais = registro_banco
+                    else:
+                        dados_reais = {}
+
+                    # Captura o plano bruto tratando valores nulos
+                    plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
                     
-                    # Normalização para evitar problemas de acentuação (Crédito vs Credito)
+                    # Normalização total de strings (elimina acentos, espaços e caixa alta)
                     plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
                     
                     if "credito" in plano_norm or "moedas" in plano_norm:
@@ -1301,81 +1309,82 @@ else:
                     else:
                         tipo_plano = "Grátis"
                         
-                    saldo_moedas = int(registro_banco.get("moedas", 0) or 0)
+                    saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
                         
                 except Exception as e:
                     st.error(f"Erro ao mapear cache de saldo: {e}")
             else:
                 st.warning("⚠️ Usuário não identificado na sessão.")
 
-            # Sincroniza de forma idêntica os estados globais da aplicação
+            # Sincroniza e trava os estados de forma idêntica para o Roteador e Telas
             st.session_state["tipo_plano"] = tipo_plano
             st.session_state["saldo_moedas"] = saldo_moedas
 
+            # Renderização do cabeçalho de cobrança na Sidebar
             st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
-                        
+                            
 
-            # ==========================================================================
-            # --- COMPONENTE: ALTERAR FOTO DE PERFIL (CORREÇÃO ANTI-LOOP) ---
-            # ==========================================================================
-            st.caption("📷 Enviar nova foto de perfil:")
-            
-            # Usamos uma chave dinâmica baseada no form_seed para resetar o uploader após o sucesso
-            f_nova = st.file_uploader(
-                "Alterar Foto", 
-                type=["png","jpg","jpeg"], 
-                key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
-                label_visibility="collapsed"
-            ) 
-            
-            if f_nova and id_usuario_logado: 
-                id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
-                nome_arquivo_storage = f"user_{id_limpo}.jpg"
+                # ==========================================================================
+                # --- COMPONENTE: ALTERAR FOTO DE PERFIL (CORREÇÃO ANTI-LOOP) ---
+                # ==========================================================================
+                st.caption("📷 Enviar nova foto de perfil:")
                 
-                try:
-                    # 1. Converte o arquivo enviado para bytes brutos
-                    dados_imagem_bytes = f_nova.getvalue()
+                # Usamos uma chave dinâmica baseada no form_seed para resetar o uploader após o sucesso
+                f_nova = st.file_uploader(
+                    "Alterar Foto", 
+                    type=["png","jpg","jpeg"], 
+                    key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
+                    label_visibility="collapsed"
+                ) 
+                
+                if f_nova and id_usuario_logado: 
+                    id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
+                    nome_arquivo_storage = f"user_{id_limpo}.jpg"
                     
-                    # 2. Faz o upload direto para o bucket 'perfis' (Ignorando RLS via Service Key)
-                    supabase.storage.from_("perfis").upload(
-                        path=nome_arquivo_storage,
-                        file=dados_imagem_bytes,
-                        file_options={"content-type": "image/jpeg", "upsert": "true"}
-                    )
-                    
-                    # 3. CORREÇÃO: Captura a string da URL pública de forma explícita
-                    resposta_url = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
-                    
-                    # Dependendo da versão da biblioteca, extrai a string pura do link
-                    if hasattr(resposta_url, "public_url"):
-                        url_publica_foto = str(resposta_url.public_url).strip()
-                    else:
-                        url_publica_foto = str(resposta_url).strip()
-                    
-                    # 4. Grava a URL estável no PostgreSQL
-                    conn_foto = obter_conexao_eficiente()
-                    cursor_foto = conn_foto.cursor() 
-                    cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
-                    conn_foto.commit()
-                    cursor_foto.close()
-                    
-                    # Atualiza a memória ativa do navegador
-                    st.session_state.foto_perfil = url_publica_foto
-                    st.cache_data.clear()
-                    
-                    # 🚨 O SEGREDO AQUI: Alteramos o ID da semente para resetar o componente st.file_uploader
-                    # Isso faz o arquivo "sumir" da memória do uploader, quebrando o loop de rerun
-                    if "form_seed" in st.session_state:
-                        st.session_state.form_seed += 1
-                    else:
-                        st.session_state.form_seed = 43
-                    
-                    st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
-                    time.sleep(1)
-                    st.rerun() 
-                    
-                except Exception as e:
-                    st.error(f"Erro ao salvar foto no Storage: {e}")   
+                    try:
+                        # 1. Converte o arquivo enviado para bytes brutos
+                        dados_imagem_bytes = f_nova.getvalue()
+                        
+                        # 2. Faz o upload direto para o bucket 'perfis' (Ignorando RLS via Service Key)
+                        supabase.storage.from_("perfis").upload(
+                            path=nome_arquivo_storage,
+                            file=dados_imagem_bytes,
+                            file_options={"content-type": "image/jpeg", "upsert": "true"}
+                        )
+                        
+                        # 3. CORREÇÃO: Captura a string da URL pública de forma explícita
+                        resposta_url = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
+                        
+                        # Dependendo da versão da biblioteca, extrai a string pura do link
+                        if hasattr(resposta_url, "public_url"):
+                            url_publica_foto = str(resposta_url.public_url).strip()
+                        else:
+                            url_publica_foto = str(resposta_url).strip()
+                        
+                        # 4. Grava a URL estável no PostgreSQL
+                        conn_foto = obter_conexao_eficiente()
+                        cursor_foto = conn_foto.cursor() 
+                        cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
+                        conn_foto.commit()
+                        cursor_foto.close()
+                        
+                        # Atualiza a memória ativa do navegador
+                        st.session_state.foto_perfil = url_publica_foto
+                        st.cache_data.clear()
+                        
+                        # 🚨 O SEGREDO AQUI: Alteramos o ID da semente para resetar o componente st.file_uploader
+                        # Isso faz o arquivo "sumir" da memória do uploader, quebrando o loop de rerun
+                        if "form_seed" in st.session_state:
+                            st.session_state.form_seed += 1
+                        else:
+                            st.session_state.form_seed = 43
+                        
+                        st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
+                        time.sleep(1)
+                        st.rerun() 
+                        
+                    except Exception as e:
+                        st.error(f"Erro ao salvar foto no Storage: {e}")   
                 
             # ==========================================================================
             # --- CONSULTA 2: MOTOR DE BUSCA DA NOTIFICAÇÃO ---
