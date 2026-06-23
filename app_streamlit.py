@@ -1471,7 +1471,6 @@ else:
                 # 3. Executa o recarregamento definitivo da página saindo do contexto do sidebar
                 st.rerun()
 
-
        
         # Renderiza estritamente a tela selecionada no miolo da página
         if menu_atual == "💬 Conversar com Lucy":   
