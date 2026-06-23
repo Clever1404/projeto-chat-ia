@@ -1248,7 +1248,7 @@ else:
         #        st.error(f"Erro ao listar diretório: {e}")
 
 
-            avatar_html = ""
+            #avatar_html = ""
             # ==========================================================================
             # --- PERFIL DO USUÁRIO & AVATAR NATIVO (ULTRA RÁPIDO) ---
             # ==========================================================================
@@ -1439,26 +1439,36 @@ else:
 
             st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
                 
-            # ==========================================================================
-            # --- BOTÃO: ENCERRAR SESSÃO (LOGOUT) ---
+           # ==========================================================================
+            # --- BOTÃO: ENCERRAR SESSÃO (LOGOUT 100% GARANTIDO) ---
             # ==========================================================================
             if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema"):
                 if id_usuario_logado:
                     try:
+                        # Limpeza profunda do ID do usuário logado
                         id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
+                        
+                        # Usa uma conexão nova dedicada estritamente para fechar a sessão com segurança
                         conn_logout = conectar_supabase()
                         cursor_logout = conn_logout.cursor()
                         cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (int(id_limpo),))
                         conn_logout.commit()
                         cursor_logout.close()
-                       
+                        conn_logout.close() # Garante o fechamento para liberar o pool do banco
                     except Exception: 
                         pass
+                
+                # 1. Deleta TODAS as chaves salvas na memória de sessão do navegador de uma vez só
+                # Isso limpa dados_usuario, tipo_plano, moedas, e o histórico volátil
+                for chave in list(st.session_state.keys()):
+                    del st.session_state[chave]
                     
-                # Limpeza completa dos estados de login
+                # 2. Força o estado padrão inicial de usuário deslogado
                 st.session_state.usuario_id = None
                 st.session_state.username = None
                 st.session_state.opcao_menu = "login"
+                
+                # 3. Executa o recarregamento definitivo da página saindo do contexto do sidebar
                 st.rerun()
 
 
