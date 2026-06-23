@@ -343,7 +343,7 @@ def renderizar_chat_lucy_isolado():
                 }
                 processar_match_lucy(st.session_state.alerta_match)
 
-       except Exception as e:
+        except Exception as e:
             # DESTRAVA A TRANSAÇÃO NO CHAT
             if 'conn_salvar' in locals() and conn_salvar:
                 try:
