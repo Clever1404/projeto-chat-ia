@@ -110,7 +110,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 url: str = st.secrets.get("SUPABASE_URL")
 key: str = st.secrets.get("SUPABASE_KEY")
-supabase = None
+supabase = create_client(url, key)
 
 if url and key:
     try:
