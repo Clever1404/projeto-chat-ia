@@ -1251,26 +1251,26 @@ else:
 
             #avatar_html = ""
             # ==========================================================================
-            # --- PERFIL DO USUÁRIO & AVATAR NATIVO (ULTRA RÁPIDO) ---
+            # --- PERFIL DO USUÁRIO & AVATAR NATIVO CORRIGIDO ---
             # ==========================================================================
-            caminho_minha_foto = str(st.session_state.get("foto_perfil", "")).strip().lstrip('/')
+            caminho_foto_perfil = str(st.session_state.get("foto_perfil", "")).strip()
                 
-            # Centralização visual usando colunas nativas para o componente do avatar
-            col_avatar_centro, _ = st.columns([1, 2])
+            col_avatar_centro, _ = st.columns([1, 1]) # Mantém proporção limpa na barra lateral
             with col_avatar_centro:
-                if caminho_minha_foto and os.path.exists("/static/uploads/perfis/user_{id_do_usuario}.jpg"):
-                    # O st.image lê o caminho do arquivo direto no servidor de forma instantânea
-                    st.image("/static/uploads/perfis/user_{id_do_usuario}.jpg", width=65)
+                # Se for um link válido da nuvem (Supabase) ou um arquivo local válido
+                if caminho_foto_perfil and (caminho_foto_perfil.startswith("http") or os.path.exists(caminho_foto_perfil.lstrip('/'))):
+                    # O st.image consegue abrir URLs externas diretamente sem Base64!
+                    st.image(caminho_foto_perfil, width=65)
                 else:
-                    # Fallback simples usando texto/emoji nativo caso não tenha imagem cadastrada
-                    st.markdown('<div style="font-size: 50px; text-align:center; padding-bottom:10px;">👩</div>', unsafe_allow_html=True)
+                    # Caso o link esteja em branco, exibe o emoji centralizado padrão
+                    st.markdown('<div style="font-size: 50px; text-align:center; padding-bottom:10px; margin-left: 10px;">👩</div>', unsafe_allow_html=True)
 
             # Extração limpa do nome do usuário antes do '@'
             username_atual = st.session_state.get("username", "Usuário")
             nome_usuario_puro = str(username_atual).split('@')[0].capitalize()
 
             st.markdown(f"""
-                <div style="text-align: center; margin-bottom: 15px; margin-top: -10px;">
+                <div style="text-align: center; margin-bottom: 15px; margin-top: -5px;">
                     <h3 style="margin: 0; font-size: 16px; font-weight: bold; color: #f0f6fc;">{nome_usuario_puro}</h3>
                     <p style="color: #48bb78; font-weight: bold; font-size: 12px; margin: 3px 0 0 0;">🟢 Online</p>
                 </div>
