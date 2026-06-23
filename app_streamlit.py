@@ -858,7 +858,7 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
         st.session_state.tempo_inicio_sala = time.time()
         
     tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
-    tempo_restante = 15 - tempo_decorrido
+    tempo_restante = 600 - tempo_decorrido
     
     if tempo_restante > 0:
         st.warning(f"⏳ Tempo Restante: {int(tempo_restante // 60)}m {int(tempo_restante % 60)}s | Saldo: 🪙 {saldo_moedas_sala} moedas")
@@ -880,6 +880,7 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
                 st.error(f"Erro: {e}")
         else:
             st.error("🔒 Tempo esgotado e sem saldo.")
+            time.sleep(3)
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
             st.rerun()
 
@@ -898,7 +899,6 @@ def carregar_plano_e_moedas_cached(id_usuario):
     except Exception:
         pass
     return {"tipo_plano": "Grátis", "moedas": 0}
-
 
 
 # ==============================================================================
@@ -1316,61 +1316,47 @@ else:
                         
 
             # ==========================================================================
-            # --- COMPONENTE: ALTERAR FOTO DE PERFIL ---
+            # --- COMPONENTE: ALTERAR FOTO DE PERFIL (INTEGRAÇÃO SUPABASE STORAGE) ---
             # ==========================================================================
             st.caption("📷 Enviar nova foto de perfil:")
             f_nova = st.file_uploader("Alterar Foto", type=["png","jpg","jpeg"], key="side_f_up", label_visibility="collapsed") 
             
             if f_nova and id_usuario_logado: 
                 id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
-                
-                # 1. Garante que a pasta física exista no servidor
-                if not os.path.exists(UPLOAD_FOLDER): 
-                    os.makedirs(UPLOAD_FOLDER, exist_ok=True) 
-                
-                # 2. Salva o arquivo de imagem no disco do contêiner
-                c_completo = os.path.join(UPLOAD_FOLDER, f"user_{id_limpo}.jpg") 
-                with open(c_completo, "wb") as f: 
-                    f.write(f_nova.getbuffer())
-                
-                # 3. Define o caminho padrão com a barra inicial para gravação
-                caminho_banco = f"/{c_completo}"
+                nome_arquivo_storage = f"user_{id_limpo}.jpg"
                 
                 try:
-                    # 4. Grava o novo caminho no banco de dados de forma estável
+                    # 1. Converte o arquivo enviado para bytes brutos
+                    dados_imagem_bytes = f_nova.getvalue()
+                    
+                    # 2. Faz o upload direto para o bucket 'perfis' do Supabase Storage
+                    # Nota: Garanta que você criou um bucket chamado "perfis" como PUBLIC no painel do Supabase
+                    supabase.storage.from_("perfis").upload(
+                        path=nome_arquivo_storage,
+                        file=dados_imagem_bytes,
+                        file_options={"content-type": "image/jpeg", "upsert": "true"} # 'upsert' sobrescreve a foto antiga
+                    )
+                    
+                    # 3. Captura a URL pública definitiva da foto direto do servidor deles
+                    url_publica_foto = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
+                    
+                    # 4. Grava a URL estável na coluna 'foto_perfil' do seu banco PostgreSQL
                     conn_foto = obter_conexao_eficiente()
                     cursor_foto = conn_foto.cursor() 
-                    cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (caminho_banco, int(id_limpo))) 
+                    cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
                     conn_foto.commit()
                     cursor_foto.close()
                     
-                    # 5. Atualiza a memória da sessão atual para atualizar a interface
-                    st.session_state.foto_perfil = caminho_banco
-                    
-                    # 6. Limpa o cache da barra lateral para forçar a releitura imediata
+                    # 5. Atualiza a sessão e limpa o cache para renderizar na hora
+                    st.session_state.foto_perfil = url_publica_foto
                     st.cache_data.clear()
                     
-                    st.toast("📷 Foto de perfil atualizada com sucesso!")
-                    time.sleep(1)
+                    st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
+                    time.sleep(1.2)
                     st.rerun() 
                     
                 except Exception as e:
-                    st.error(f"Erro ao salvar caminho da foto no banco: {e}")
-
-                    
-                try:
-                    conn = obter_conexao_eficiente()
-                    cursor = conn.cursor() 
-                    cursor.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s", (f"/{c_completo}", int(id_limpo))) 
-                    conn.commit()
-                    cursor.close()
-                   
-                    st.session_state.foto_perfil = f"/{c_completo}"
-                    st.rerun() 
-                except Exception as e:
-                    st.error(f"Erro ao salvar foto: {e}")
-
-                st.markdown("<div style='height: 5px;'></div>", unsafe_allow_html=True)    
+                    st.error(f"Erro ao salvar foto no Storage: {e}")   
                 
             # ==========================================================================
             # --- CONSULTA 2: MOTOR DE BUSCA DA NOTIFICAÇÃO ---
