@@ -918,7 +918,7 @@ def template_painel_admin():
     total_salas_ativas = 0
 
     try:
-       conn = obter_conexao_eficiente()
+        conn = obter_conexao_eficiente()
         cursor = conn.cursor()
         cursor.execute("SELECT id, username, email, genero, idade, procura_por, status FROM usuarios ORDER BY id ASC;")
         usuarios_bd = cursor.fetchall()
@@ -1178,7 +1178,7 @@ else:
         
         # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
         with st.sidebar: 
-            
+
         st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
 
         # 1. Verifica os dados salvos na Sessão Atual do Navegador
