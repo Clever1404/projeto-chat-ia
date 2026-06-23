@@ -1343,17 +1343,23 @@ else:
                         file_options={"content-type": "image/jpeg", "upsert": "true"}
                     )
                     
-                    # 3. Captura a URL pública definitiva da foto
-                    url_publica_foto = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
+                    # 3. CORREÇÃO: Captura a string da URL pública de forma explícita
+                    resposta_url = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
                     
-                    # 4. Grava a URL estável na coluna 'foto_perfil' do seu banco PostgreSQL
+                    # Dependendo da versão da biblioteca, extrai a string pura do link
+                    if hasattr(resposta_url, "public_url"):
+                        url_publica_foto = str(resposta_url.public_url).strip()
+                    else:
+                        url_publica_foto = str(resposta_url).strip()
+                    
+                    # 4. Grava a URL estável no PostgreSQL
                     conn_foto = obter_conexao_eficiente()
                     cursor_foto = conn_foto.cursor() 
                     cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
                     conn_foto.commit()
                     cursor_foto.close()
                     
-                    # 5. Atualiza a sessão e limpa o cache para renderizar na hora
+                    # Atualiza a memória ativa do navegador
                     st.session_state.foto_perfil = url_publica_foto
                     st.cache_data.clear()
                     
