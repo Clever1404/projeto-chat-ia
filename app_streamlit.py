@@ -381,16 +381,29 @@ def renderizar_chat_lucy_isolado():
 def modal_agendamento_encontro(dados_r):
     st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
     
+    # 1. Configuração dos eixos de tempo
     dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
     dia_s = st.selectbox("Escolha o Dia da Semana:", dias, key="dg_res_dia")
     
-    opcoes_periodo = ["🌅 Manhã (06:00 às 11:59)", "☀️ Tarde (12:00 às 17:59)", "🌙 Noite (18:00 às 23:59)"]
+    opcoes_periodo = [
+        "🌅 Manhã (06:00 às 11:59)", 
+        "☀️ Tarde (12:00 às 17:59)", 
+        "🌙 Noite (18:00 às 23:59)"
+    ]
     per_exibicao = st.selectbox("Escolha o Período:", opcoes_periodo, key="dg_res_per")
-    per_s = "manha" if "Manhã" in per_exibicao else "tarde" if "Tarde" in per_exibicao else "noite"
     
-    horario_sugestao = datetime.strptime("09:00" if per_s=="manha" else "14:00" if per_s=="tarde" else "20:00", "%H:%M").time()
-    hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
+    # Mapeamento limpo para os IDs do banco
+    if "Manhã" in per_exibicao:
+        per_s = "manha"
+        horario_sugestao = datetime.strptime("09:00", "%H:%M").time()
+    elif "Tarde" in per_exibicao:
+        per_s = "tarde"
+        horario_sugestao = datetime.strptime("14:00", "%H:%M").time()
+    else:
+        per_s = "noite"
+        horario_sugestao = datetime.strptime("20:00", "%H:%M").time()
 
+    hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
 
     if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True):
         hora_int = hor_s.hour
