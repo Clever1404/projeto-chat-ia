@@ -271,7 +271,7 @@ def processar_match_lucy(dados_m):
 
 
 # ==============================================================================
-# FUNÇÃO ISOLADA COM CONTAINER DE ROLAGEM (INPUT INFERIOR GARANTIDO)
+# FUNÇÃO ISOLADA COM FILA DE RENDERIZAÇÃO (MENSAGENS SEMPRE ACIMA DO INPUT)
 # ==============================================================================
 @st.fragment
 def renderizar_chat_lucy_isolado():
@@ -284,71 +284,64 @@ def renderizar_chat_lucy_isolado():
     # 1. Busca o histórico de mensagens do banco de dados
     historico_banco = buscar_memoria(meu_id_limpo, limite=20)
     
-    # SOLUÇÃO CRÍTICA: Cria uma área de rolagem vertical isolada para as mensagens
-    # Isso impede que o histórico empurre a barra de texto para fora da tela
-    with st.container(height=450, border=False):
+    # Captura o clique ou texto do input do rodapé IMEDIATAMENTE (Sem desenhar nada ainda)
+    prompt = st.chat_input("Digite sua mensagem para a Lucy...")
+
+    # 2. SE O USUÁRIO DIGITOU ALGO: Processa a inteligência artificial ANTES de renderizar a tela
+    # Isso garante que a nova interação seja salva e apareça dentro da caixa de histórico acima
+    if prompt:
+        try:
+            contexto_mensagens = [
+                {"role": "system", "content": "Você é a Lucy, uma IA psicóloga e assistente de relacionamentos altamente empática. Seu objetivo é entender o estilo de vida, gostos e rotina do usuário através de uma conversa natural. Seja acolhedora, faça perguntas abertas e ajude-o a se expressar para encontrar o par ideal."}
+            ]
+            
+            for p, r in historico_banco[-5:]:
+                contexto_mensagens.append({"role": "user", "content": p})
+                contexto_mensagens.append({"role": "assistant", "content": r})
+            
+            contexto_mensagens.append({"role": "user", "content": prompt})
+
+            resposta_openai = client.chat.completions.create(
+                model='gpt-4o-mini',
+                messages=contexto_mensagens,
+                temperature=0.7
+            )
+            resposta_lucy = resposta_openai.choices[0].message.content
+
+            # Salva no histórico de forma eficiente utilizando a conexão estável
+            conn_salvar = obter_conexao_eficiente()
+            cursor_salvar = conn_salvar.cursor()
+            cursor_salvar.execute("""
+                INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta) 
+                VALUES (%s, %s, %s);
+            """, (meu_id_limpo, prompt, resposta_lucy))
+            conn_salvar.commit()
+            cursor_salvar.close()
+
+            # Dispara o motor de afinidade
+            dados_match = processar_afinidade_e_match(meu_id_limpo, prompt)
+            if dados_match and dados_match.get("match"):
+                st.session_state.alerta_match = {
+                    "match_id": dados_match.get("match_id", random.randint(1000, 9999)),
+                    "id_par": dados_match.get("id_par"),
+                    "nome": dados_match.get("nome_par"),
+                    "online": dados_match.get("online", False)
+                }
+                processar_match_lucy(st.session_state.alerta_match)
+
+            # Recarrega imediatamente o fragmento para que a lista do passo 3 já inclua a nova mensagem
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"Erro ao processar conversa com a IA: {e}")
+
+    # 3. ÁREA VISUAL SUPERIOR: Desenha o histórico antigo + a nova mensagem (se houver)
+    with st.container(height=480, border=False):
         for pergunta_antiga, resposta_antiga in historico_banco:
             with st.chat_message("user"):
                 st.markdown(pergunta_antiga)
             with st.chat_message("assistant", avatar="🤖"):
                 st.markdown(resposta_antiga)
-
-    # 2. Caixa de Entrada declarada no final absoluto (Forçada para o rodapé do Streamlit)
-    prompt = st.chat_input("Digite sua mensagem para a Lucy...")
-    
-    # 3. Processamento da nova mensagem enviado pelo rodapé
-    if prompt:
-        # Abre o contêiner temporário apenas para simular a resposta imediata na tela
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant", avatar="🤖"):
-            with st.spinner("Lucy está pensando..."):
-                try:
-                    contexto_mensagens = [
-                        {"role": "system", "content": "Você é a Lucy, uma IA psicóloga e assistente de relacionamentos altamente empática. Seu objetivo é entender o estilo de vida, gostos e rotina do usuário através de uma conversa natural. Seja acolhedora, faça perguntas abertas e ajude-o a se expressar para encontrar o par ideal."}
-                    ]
-                    
-                    for p, r in historico_banco[-5:]:
-                        contexto_mensagens.append({"role": "user", "content": p})
-                        contexto_mensagens.append({"role": "assistant", "content": r})
-                    
-                    contexto_mensagens.append({"role": "user", "content": prompt})
-
-                    resposta_openai = client.chat.completions.create(
-                        model='gpt-4o-mini',
-                        messages=contexto_mensagens,
-                        temperature=0.7
-                    )
-                    resposta_lucy = resposta_openai.choices[0].message.content # Ajustado índice para gpt-4o-mini estável
-                    st.markdown(resposta_lucy)
-
-                    # Salva no histórico de forma eficiente
-                    conn_salvar = obter_conexao_eficiente()
-                    cursor_salvar = conn_salvar.cursor()
-                    cursor_salvar.execute("""
-                        INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta) 
-                        VALUES (%s, %s, %s);
-                    """, (meu_id_limpo, prompt, resposta_lucy))
-                    conn_salvar.commit()
-                    cursor_salvar.close()
-
-                    # Dispara o motor de afinidade
-                    dados_match = processar_afinidade_e_match(meu_id_limpo, prompt)
-                    if dados_match and dados_match.get("match"):
-                        st.session_state.alerta_match = {
-                            "match_id": dados_match.get("match_id", random.randint(1000, 9999)),
-                            "id_par": dados_match.get("id_par"),
-                            "nome": dados_match.get("nome_par"),
-                            "online": dados_match.get("online", False)
-                        }
-                        processar_match_lucy(st.session_state.alerta_match)
-
-                except Exception as e:
-                    st.error(f"Erro ao processar conversa com a IA: {e}")
-                
-                # Força o fragmento a reler o histórico inserindo os novos balões no contêiner de cima
-                st.rerun()
 
 
 @st.dialog("📅 Reserva de Encontro")
@@ -1187,39 +1180,39 @@ else:
     elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Gerenciar Conexões", "🤝 Sala Privada", "🛠️ Painel Admin"]:
         
         # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
-        with st.sidebar: 
+        #with st.sidebar: 
 
-            st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
+        #    st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
 
             # 1. Verifica os dados salvos na Sessão Atual do Navegador
-            id_usuario_logado = st.session_state.get("usuario_id")
-            foto_sessao = st.session_state.get("foto_perfil")
+        #    id_usuario_logado = st.session_state.get("usuario_id")
+        #    foto_sessao = st.session_state.get("foto_perfil")
 
-            st.write(f"🔹 **Seu ID de Usuário:** `{id_usuario_logado}`")
-            st.write(f"🔹 **Caminho salvo na Session State:** `{foto_sessao}`")
+        #    st.write(f"🔹 **Seu ID de Usuário:** `{id_usuario_logado}`")
+        #    st.write(f"🔹 **Caminho salvo na Session State:** `{foto_sessao}`")
 
             # 2. Testa a limpeza da barra que o sistema operacional exige
-            if foto_sessao:
-                caminho_limpo = str(foto_sessao).strip().lstrip('/')
-                st.write(f"🥾 **Caminho convertido para o Servidor:** `{caminho_limpo}`")
-                st.write(f"📂 **O arquivo existe fisicamente no servidor?** `{'✅ SIM' if os.path.exists(caminho_limpo) else '❌ NÃO'}`")
+        #    if foto_sessao:
+        #        caminho_limpo = str(foto_sessao).strip().lstrip('/')
+        #        st.write(f"🥾 **Caminho convertido para o Servidor:** `{caminho_limpo}`")
+        #        st.write(f"📂 **O arquivo existe fisicamente no servidor?** `{'✅ SIM' if os.path.exists(caminho_limpo) else '❌ NÃO'}`")
 
             # 3. Faz uma varredura real na pasta física para listar TODAS as fotos salvas
-            st.markdown("#### 📁 Arquivos encontrados na pasta `static/uploads/perfis/`:")
-            try:
-                if os.path.exists(UPLOAD_FOLDER):
-                    arquivos = os.listdir(UPLOAD_FOLDER)
-                    if arquivos:
-                        for arq in arquivos:
-                            caminho_completo_arquivo = os.path.join(UPLOAD_FOLDER, arq)
-                            tamanho_kb = os.path.getsize(caminho_completo_arquivo) / 1024
-                            st.code(f"📄 {arq} ({tamanho_kb:.1f} KB) -> Caminho para ler no st.image: '{caminho_completo_arquivo}'")
-                    else:
-                        st.info("A pasta existe, mas está vazia. Nenhum usuário fez upload de foto ainda.")
-                else:
-                    st.warning("⚠️ A pasta de uploads ainda não foi criada fisicamente no servidor remoto.")
-            except Exception as e:
-                st.error(f"Erro ao listar diretório: {e}")
+        #    st.markdown("#### 📁 Arquivos encontrados na pasta `static/uploads/perfis/`:")
+        #    try:
+        #        if os.path.exists(UPLOAD_FOLDER):
+        #            arquivos = os.listdir(UPLOAD_FOLDER)
+        #            if arquivos:
+        #                for arq in arquivos:
+        #                    caminho_completo_arquivo = os.path.join(UPLOAD_FOLDER, arq)
+        #                    tamanho_kb = os.path.getsize(caminho_completo_arquivo) / 1024
+        #                    st.code(f"📄 {arq} ({tamanho_kb:.1f} KB) -> Caminho para ler no st.image: '{caminho_completo_arquivo}'")
+        #            else:
+        #                st.info("A pasta existe, mas está vazia. Nenhum usuário fez upload de foto ainda.")
+        #        else:
+        #            st.warning("⚠️ A pasta de uploads ainda não foi criada fisicamente no servidor remoto.")
+        #    except Exception as e:
+        #        st.error(f"Erro ao listar diretório: {e}")
 
 
             avatar_html = ""
