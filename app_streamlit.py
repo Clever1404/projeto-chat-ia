@@ -1248,21 +1248,42 @@ else:
 
             #avatar_html = ""
             # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
+        # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
         with st.sidebar: 
             # ==========================================================================
-            # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO E MAIOR ---
+            # --- PERFIL DO USUÁRIO & AVATAR ARREDONDADO E CENTRADO (BLINDADO) ---
             # ==========================================================================
             caminho_foto_perfil = str(st.session_state.get("foto_perfil", "")).strip()
                 
-            # Cria 3 colunas para forçar o alinhamento no centro absoluto da barra lateral
-            col_esq, col_centro, col_dir = st.columns([1, 2, 1])
-            with col_centro:
-                if caminho_foto_perfil and (caminho_foto_perfil.startswith("http") or os.path.exists(caminho_foto_perfil.lstrip('/'))):
-                    # Aumentado para width=85 para dar mais destaque ao rosto
-                    st.image(caminho_foto_perfil, width=85)
-                else:
-                    # Emoji centralizado e ampliado
-                    st.markdown('<div style="font-size: 65px; text-align:center; margin-top: -10px;">👩</div>', unsafe_allow_html=True)
+            # Estilização cirúrgica para forçar alinhamento e formato circular perfeito da foto
+            st.markdown("""
+                <style>
+                .container-avatar-global {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    width: 100%;
+                    margin-bottom: 10px;
+                }
+                .container-avatar-global img {
+                    border-radius: 50% !important;
+                    object-fit: cover !important;
+                    border: 2px solid #30363d !important;
+                    width: 85px !important;
+                    height: 85px !important;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+
+            # Renderização do Avatar usando contêiner CSS controlado
+            if caminho_foto_perfil and (caminho_foto_perfil.startswith("http") or os.path.exists(caminho_foto_perfil.lstrip('/'))):
+                st.markdown(f"""
+                    <div class="container-avatar-global">
+                        <img src="{caminho_foto_perfil}">
+                    </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown('<div style="font-size: 65px; text-align:center; margin-bottom: 10px;">👩</div>', unsafe_allow_html=True)
 
             # Extração limpa do nome do usuário antes do '@'
             username_atual = st.session_state.get("username", "Usuário")
@@ -1276,7 +1297,7 @@ else:
             """, unsafe_allow_html=True)
 
             # ==========================================================================
-            # --- CONSULTA 1: PLANO E SALDO REAL (PROCESSAMENTO CACHED TOTALMENTE BLINDADO) ---
+            # --- CONSULTA 1: PLANO E SALDO REAL (RETRABALHADO COM BACKUP DIRETO) ---
             # ==========================================================================
             tipo_plano = "Grátis"
             saldo_moedas = 0
@@ -1284,11 +1305,16 @@ else:
 
             if id_usuario_logado is not None:
                 try:
-                    # Carrega o registro direto da nossa função de memória cache
+                    # 1. Força a leitura chamando a função cached
                     registro_banco = carregar_plano_e_moedas_cached(id_usuario_logado)
                     
-                    # CORREÇÃO DA LEITURA: O Supabase com Service Key pode retornar uma lista ou dicionário direto
-                    # Esta lógica desempacota com segurança qualquer um dos dois formatos
+                    # 2. SE O CACHE FALHAR OU RETORNAR PREENCHIDO ERRADO, FAZEMOS UM BYPASS SEGURO DIRETO NO SUPABASE
+                    if not registro_banco or registro_banco.get("tipo_plano") == "Grátis":
+                        user_data_direto = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_usuario_logado)).execute()
+                        if user_data_direto.data and len(user_data_direto.data) > 0:
+                            registro_banco = user_data_direto.data[0]
+
+                    # Desempacota os dados brutos de forma segura
                     if isinstance(registro_banco, list) and len(registro_banco) > 0:
                         dados_reais = registro_banco[0]
                     elif isinstance(registro_banco, dict):
@@ -1296,10 +1322,10 @@ else:
                     else:
                         dados_reais = {}
 
-                    # Captura o plano bruto tratando valores nulos
+                    # Captura o plano bruto e trata strings nulas
                     plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
                     
-                    # Normalização total de strings (elimina acentos, espaços e caixa alta)
+                    # Normalização total para ignorar acentos e maiúsculas
                     plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
                     
                     if "credito" in plano_norm or "moedas" in plano_norm:
@@ -1312,15 +1338,14 @@ else:
                     saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
                         
                 except Exception as e:
-                    st.error(f"Erro ao mapear cache de saldo: {e}")
+                    st.error(f"Erro ao processar plano: {e}")
             else:
                 st.warning("⚠️ Usuário não identificado na sessão.")
 
-            # Sincroniza e trava os estados de forma idêntica para o Roteador e Telas
+            # Sincroniza os estados globais para o restante da aplicação
             st.session_state["tipo_plano"] = tipo_plano
             st.session_state["saldo_moedas"] = saldo_moedas
 
-            # Renderização do cabeçalho de cobrança na Sidebar
             st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
                             
 
