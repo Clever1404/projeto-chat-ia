@@ -192,10 +192,26 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
                 porcentagem_match = max(0.0, min(100.0, (similaridade_bruta - 0.75) / (0.88 - 0.75) * 100))
                 conn.commit(); cursor.close(); 
                 return {"match": True, "id_par": int(id_par), "nome_par": nome_par, "online": "🟢" in str(status_par) or "Online" in str(status_par), "afinidade_porcentagem": round(porcentagem_match, 1)}
-        conn.commit(); cursor.close()
+        # ... (seu código de verificação de resultado)
+        conn.commit()
+        cursor.close()
+        # REMOVIDO: conn.close() se estiver usando o modo eficiente
+        return {"match": False}
+
     except Exception as e:
-        if 'conn' in locals() and conn: conn.rollback(); cursor.close()
-    return {"match": False}
+        # DESTRAVA A TRANSAÇÃO: Se a query de busca ou atualização falhar, cancela a transação pendente
+        if 'conn' in locals() and conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        if 'cursor' in locals() and cursor:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+        st.error(f"Erro no motor de afinidade: {e}")
+        return {"match": False}
 
 
 
@@ -327,7 +343,18 @@ def renderizar_chat_lucy_isolado():
                 }
                 processar_match_lucy(st.session_state.alerta_match)
 
-        except Exception as e:
+       except Exception as e:
+            # DESTRAVA A TRANSAÇÃO NO CHAT
+            if 'conn_salvar' in locals() and conn_salvar:
+                try:
+                    conn_salvar.rollback()
+                except Exception:
+                    pass
+            if 'cursor_salvar' in locals() and cursor_salvar:
+                try:
+                    cursor_salvar.close()
+                except Exception:
+                    pass
             st.error(f"Erro ao processar conversa com a IA: {e}")
 
     # 2. ÁREA VISUAL SUPERIOR (Área de rolagem das mensagens)
@@ -348,7 +375,7 @@ def renderizar_chat_lucy_isolado():
         st.session_state.prompt_buffer = prompt_capturado
         st.rerun()
 
-        
+
 
 @st.dialog("📅 Reserva de Encontro")
 def modal_agendamento_encontro(dados_r):
