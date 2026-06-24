@@ -432,7 +432,7 @@ def modal_agendamento_encontro(dados_r):
             # Realiza as validações de disponibilidade padrão
             cursor.execute("""
                 SELECT COUNT(*) FROM disponibilidade_usuarios 
-                WHERE usuario_id = %s AND LOWER(TRIM(id)) = LOWER(TRIM(%s)) AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+                WHERE usuario_id = %s AND LOWER(TRIM(id)) = LOWER('valor') AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
             """, (meu_id_limpo, str(m_id_limpo), str(dia_s), str(per_s)))
             meu_registro_existe = cursor.fetchone()[0] > 0
             
