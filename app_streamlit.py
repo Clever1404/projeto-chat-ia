@@ -478,7 +478,6 @@ def modal_agendamento_encontro(dados_r):
                 st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
             
       
-
             elif not meu_registro_existe:
                 erro_validacao = True
                 mensagem_erro = f"❌ **Agendamento Recusado:** Você ({st.session_state.get('username', 'Usuário')}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar."
@@ -1558,7 +1557,16 @@ else:
                 
         elif menu_atual == "🤝 Gerenciar Conexões":
             st.title("🤝 Gestão de Relacionamentos") 
-                    
+
+            # 🌟 CORREÇÃO 1: Captura dinamicamente o dia da semana atual do servidor para o filtro de ativos
+            dia_ingles = datetime.datetime.now().strftime("%A")
+            mapeamento_dias = {
+                "Monday": "segunda-feira", "Tuesday": "terça-feira", "Wednesday": "quarta-feira",
+                "Thursday": "quinta-feira", "Friday": "sexta-feira", "Saturday": "sábado", "Sunday": "domingo"
+            }
+            dia_atual_servidor = mapeamento_dias.get(dia_ingles, "segunda-feira")
+
+
             if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
                 st.session_state.opcao_menu = "💬 Conversar com Lucy"
                 st.rerun()
