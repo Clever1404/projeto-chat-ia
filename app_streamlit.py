@@ -404,6 +404,11 @@ def modal_agendamento_encontro(dados_r):
     meu_registro_existe = False
     parceiro_registro_existe = False
     parceiro_tem_algum_horario = False
+    # 4. REGRAS DE NEGÓCIO E VALIDAÇÕES DE TRAVA
+            
+    erro_validacao = False
+    mensagem_erro = ""
+
 
     if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True, key="btn_confirmar_reserva_click"):
         try:
@@ -472,10 +477,7 @@ def modal_agendamento_encontro(dados_r):
             elif per_s == 'noite' and (hora_int < 18 or hora_int > 23): 
                 st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
             
-            # 4. REGRAS DE NEGÓCIO E VALIDAÇÕES DE TRAVA
-            
-            erro_validacao = False
-            mensagem_erro = ""
+      
 
             elif not meu_registro_existe:
                 erro_validacao = True
