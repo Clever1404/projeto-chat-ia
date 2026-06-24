@@ -400,6 +400,12 @@ def modal_agendamento_encontro(dados_r):
     meu_id_limpo = limpar_id_absoluto(st.session_state.get("usuario_id"))
     parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
 
+
+    # --- 2. TRAVA DE DISPONIBILIDADE DIRETA NO POSTGRESQL (CRUZAMENTO SEGURO) ---
+    meu_registro_existe = False
+    parceiro_registro_existe = False
+    parceiro_tem_algum_horario = False
+
     if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True, key="btn_confirmar_reserva_click"):
         try:
             conn = obter_conexao_eficiente()
@@ -441,13 +447,13 @@ def modal_agendamento_encontro(dados_r):
             
 
              # Verifica se o parceiro possui ESTE horário específico na grade
-            cursor_check.execute("""
+            cursor.execute("""
                 SELECT COUNT(*) FROM disponibilidade_usuarios 
                 WHERE usuario_id = %s 
                   AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
                   AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
             """, (parceiro_id_limpo, str(dia_s), str(per_s)))
-            parceiro_count = cursor_check.fetchone()[0]
+            parceiro_count = cursor.fetchone()[0]
             parceiro_registro_existe = (parceiro_count > 0)
 
 
