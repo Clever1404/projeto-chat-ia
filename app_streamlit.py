@@ -432,15 +432,35 @@ def modal_agendamento_encontro(dados_r):
             # Realiza as validações de disponibilidade padrão
             cursor.execute("""
                 SELECT COUNT(*) FROM disponibilidade_usuarios 
-                WHERE usuario_id = %s AND LOWER(TRIM(id)) = LOWER('valor') AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-            """, (meu_id_limpo, str(m_id_limpo), str(dia_s), str(per_s)))
+                WHERE usuario_id = %s AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+            """, (meu_id_limpo, str(dia_s), str(per_s)))
             meu_registro_existe = cursor.fetchone()[0] > 0
             
             cursor.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
             parceiro_tem_algum_horario = cursor_check.fetchone()[0] > 0 if 'cursor_check' in locals() else cursor.fetchone()[0] > 0
             
+
+             # Verifica se o parceiro possui ESTE horário específico na grade
+            cursor_check.execute("""
+                SELECT COUNT(*) FROM disponibilidade_usuarios 
+                WHERE usuario_id = %s 
+                  AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
+                  AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+            """, (parceiro_id_limpo, str(dia_s), str(per_s)))
+            parceiro_count = cursor_check.fetchone()[0]
+            parceiro_registro_existe = (parceiro_count > 0)
+
+
             cursor.close(); 
             
+            # Painel de depuração limpo
+            with st.expander("🔍 Depurador de Agenda (Debug)"):
+                st.write(f"**Seu ID ({st.session_state.username}):** {meu_id_limpo} | Possui este horário? `{'Sim' if meu_registro_existe else 'Não'}`")
+                st.write(f"**ID do Par ({dados_r['nome_par']}):** {parceiro_id_limpo} | Possui este horário? `{'Sim' if parceiro_registro_existe else 'Não'}`")
+                st.write(f"**O parceiro já preencheu a grade alguma vez?** `{'Sim' if parceiro_tem_algum_horario else 'Não'}`")
+
+
+
             # Validação simples de segurança horária
             hora_int = hor_s.hour
             if per_s == 'manha' and (hora_int < 6 or hora_int >= 12): 
