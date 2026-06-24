@@ -494,16 +494,7 @@ def modal_agendamento_encontro(dados_r):
                     st.session_state.opcao_menu = "💬 Conversar com Lucy"
                     st.session_state.abrir_reserva_fluxo = None  # Fecha o estado do modal
                     st.rerun()
-
-
-            # Alerta de recusa: Se você não marcou o dia na sua própria grade
-            elif not meu_registro_existe:
-                st.error(f"❌ **Agendamento Recusado:** Você ({st.session_state.get('username', 'Usuário')}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar.")
-                
-            # Alerta de recusa: Se o parceiro NÃO possui este horário específico na grade dele
-            elif not parceiro_registro_existe:
-                st.error(f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado.")
-            
+           
             else:
                 # 5. SALVAMENTO FINAL DO AGENDAMENTO
                 conn_salvar = obter_conexao_eficiente()
