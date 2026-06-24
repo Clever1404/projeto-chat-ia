@@ -6,3 +6,5 @@ textColor = "#fafafa"
 font = "sans serif"
 [browser]
 gatherUsageStats = false
+[server]
+fileWatcherType = "none"
