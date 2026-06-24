@@ -479,7 +479,7 @@ def modal_agendamento_encontro(dados_r):
             
       
 
-           elif not meu_registro_existe:
+            elif not meu_registro_existe:
                 erro_validacao = True
                 mensagem_erro = f"❌ **Agendamento Recusado:** Você ({st.session_state.get('username', 'Usuário')}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar."
                 
