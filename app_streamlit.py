@@ -479,7 +479,7 @@ def modal_agendamento_encontro(dados_r):
             
       
 
-            elif not meu_registro_existe:
+           elif not meu_registro_existe:
                 erro_validacao = True
                 mensagem_erro = f"❌ **Agendamento Recusado:** Você ({st.session_state.get('username', 'Usuário')}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar."
                 
@@ -487,24 +487,25 @@ def modal_agendamento_encontro(dados_r):
                 erro_validacao = True
                 mensagem_erro = f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado."       
             
-            # SE HOUVER RECUSA/ERRO: Exibe o erro e cria o botão de redirecionamento
+            # SE HOUVER RECUSA/ERRO: Exibe o erro e redireciona automaticamente
             if erro_validacao:
                 st.error(mensagem_erro)
+                st.warning("🔄 Redirecionando de volta para o chat em 3 segundos...")
                 
-                # Botão para fechar o modal e voltar ao chat de forma limpa
-                #if st.button("💬 Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_recusa"):
-                #    st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                #    st.session_state.abrir_reserva_fluxo = None  # Fecha o estado do modal
-                #    st.rerun()
-           
-                # Renderiza estritamente a tela selecionada no miolo da página
-                if menu_atual == "💬 Conversar com Lucy":   
-                    # Apenas invoca o fragmento global de forma ultra eficiente
-                    renderizar_chat_lucy_isolado()    
-
-
+                # Modifica os estados antes de fechar
+                st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                st.session_state.abrir_reserva_fluxo = None  # Reseta o controle manual do modal
+                
+                # Aguarda o usuário ler a mensagem
+                time.sleep(3.0)
+                
+                # Executa o fechamento nativo do modal e reinicia a tela principal
+                if hasattr(st, "dialog_close"):
+                    st.dialog_close()
+                st.rerun()
+            
             else:
-                # 5. SALVAMENTO FINAL DO AGENDAMENTO
+                # 5. SALVAMENTO FINAL DO AGENDAMENTO (Executa apenas se passar em todas as travas)
                 conn_salvar = obter_conexao_eficiente()
                 cursor_salvar = conn_salvar.cursor()
                 
@@ -519,9 +520,13 @@ def modal_agendamento_encontro(dados_r):
                 
                 st.success("🎉 Convite enviado com sucesso!")
                 st.session_state.abrir_reserva_fluxo = None
-                time.sleep(1.9)
-                st.rerun()
                 
+                time.sleep(1.9)
+                if hasattr(st, "dialog_close"):
+                    st.dialog_close()
+                st.rerun()
+           
+             
         except Exception as e: 
             st.error(f"Erro crítico ao salvar agendamento no banco: {e}")
 
