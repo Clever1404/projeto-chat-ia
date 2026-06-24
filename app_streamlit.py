@@ -473,16 +473,14 @@ def modal_agendamento_encontro(dados_r):
                 st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
             
 
-            # Alerta de recusa: Se o parceiro tem horários configurados mas não marcou este dia específico
-            elif parceiro_tem_algum_horario and not parceiro_registro_existe:
-                st.error(f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado.") 
-
-
             # Alerta de recusa: Se você não marcou o dia na sua própria grade
             elif not meu_registro_existe:
                 st.error(f"❌ **Agendamento Recusado:** Você ({st.session_state.get('username', 'Usuário')}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar.")
                 
-      
+                  # Alerta de recusa: Se o parceiro tem horários configurados mas não marcou este dia específico
+            elif parceiro_tem_algum_horario and parceiro_registro_existe:
+                st.error(f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado.") 
+
             
             else:
                 # 5. SALVAMENTO FINAL DO AGENDAMENTO
