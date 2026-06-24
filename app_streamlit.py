@@ -429,35 +429,41 @@ def modal_agendamento_encontro(dados_r):
         
         try:
             conn_check = obter_conexao_eficiente()
-            cursor_check = conn_check.cursor()
-            
-            # Verifica se você possui o horário na grade
-            cursor_check.execute("""
-                SELECT COUNT(*) FROM disponibilidade_usuarios 
-                WHERE usuario_id = %s 
-                  AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
-                  AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-            """, (meu_id_limpo, str(dia_s), str(per_s)))
-            meu_count = cursor_check.fetchone()[0]
-            meu_registro_existe = (meu_count > 0)
-            
-            # Verifica se o parceiro possui ALGUNS horários cadastrados no banco (para saber se a grade dele está vazia)
-            cursor_check.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
-            total_parceiro = cursor_check.fetchone()[0]
-            parceiro_tem_algum_horario = (total_parceiro > 0)
-            
-            # Verifica se o parceiro possui ESTE horário específico na grade
-            cursor_check.execute("""
-                SELECT COUNT(*) FROM disponibilidade_usuarios 
-                WHERE usuario_id = %s 
-                  AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
-                  AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-            """, (parceiro_id_limpo, str(dia_s), str(per_s)))
-            parceiro_count = cursor_check.fetchone()[0]
-            parceiro_registro_existe = (parceiro_count > 0)
-            
-            cursor_check.close()
-           
+            # Usar 'with' garante o fechamento do cursor e isola a transação
+            with conn_check.cursor() as cursor_check:
+                try:
+                    # 1. Verifica se você possui o horário na grade
+                    cursor_check.execute("""
+                        SELECT COUNT(*) FROM disponibilidade_usuarios 
+                        WHERE usuario_id = %s 
+                        AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
+                        AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+                    """, (meu_id_limpo, str(dia_s), str(per_s)))
+                    meu_count = cursor_check.fetchone()[0]
+                    meu_registro_existe = (meu_count > 0)
+                    
+                    # 2. Verifica se o parceiro possui ALGUNS horários cadastrados
+                    cursor_check.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
+                    total_parceiro = cursor_check.fetchone()[0]
+                    parceiro_tem_algum_horario = (total_parceiro > 0)
+                    
+                    # 3. Verifica se o parceiro possui ESTE horário específico
+                    cursor_check.execute("""
+                        SELECT COUNT(*) FROM disponibilidade_usuarios 
+                        WHERE usuario_id = %s 
+                        AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
+                        AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+                    """, (parceiro_id_limpo, str(dia_s), str(per_s)))
+                    parceiro_count = cursor_check.fetchone()[0]
+                    parceiro_registro_existe = (parceiro_count > 0)
+                    
+                    # Se tudo deu certo, confirma a leitura
+                    conn_check.commit()
+
+                except Exception as query_error:
+                    # Se qualquer query falhar, desfaz para destravar a conexão
+                    conn_check.rollback()
+                    raise query_error
             
             # Painel de depuração limpo
             with st.expander("🔍 Depurador de Agenda (Debug)"):
@@ -466,7 +472,8 @@ def modal_agendamento_encontro(dados_r):
                 st.write(f"**O parceiro já preencheu a grade alguma vez?** `{'Sim' if parceiro_tem_algum_horario else 'Não'}`")
             
         except Exception as e:
-            st.error(f"Erro ao consultar o banco de dados: {e}")
+            st.error(f"Erro real ao consultar o banco de dados: {e}")
+
 
         # --- 3. EXECUÇÃO DAS TRAVAS DE HORÁRIO ---
         if per_s == 'manha' and (hora_int < 6 or hora_int >= 12):
