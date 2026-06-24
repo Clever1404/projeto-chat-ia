@@ -424,6 +424,22 @@ def modal_agendamento_encontro(dados_r):
     parceiro_registro_existe = False
     parceiro_tem_algum_horario = False
     
+
+    # --- VALIDAÇÃO: Verifica se o Match existe usando a coluna correta ---
+    match_valido = False
+    try:
+        conn_match = obter_conexao_eficiente()
+        with conn_match.cursor() as cursor_match:
+            # Ajustado de 'id' para 'match_id' com base na estrutura da sua tabela
+            cursor_match.execute("SELECT COUNT(*) FROM matches WHERE match_id = %s;", (m_id_limpo,))
+            match_valido = (cursor_match.fetchone()[0] > 0)
+    except Exception as e:
+        st.error(f"Erro ao verificar integridade do match: {e}")
+
+    if not match_valido:
+        st.error(f"❌ **Erro de Vínculo:** O código de pareamento ({m_id_limpo}) não foi encontrado na tabela de matches. Recarregue a página.")
+        st.stop()
+
     try:
         conn_check = obter_conexao_eficiente()
         with conn_check.cursor() as cursor_check:
@@ -453,7 +469,7 @@ def modal_agendamento_encontro(dados_r):
                 conn_check.commit()
             except Exception as query_error:
                 conn_check.rollback()
-                raise query_error
+                raise query_error 
         
         # Painel de depuração visível de forma persistente na tela
         with st.expander("🔍 Depurador de Agenda (Debug)"):
