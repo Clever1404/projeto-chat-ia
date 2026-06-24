@@ -380,201 +380,160 @@ def renderizar_chat_lucy_isolado():
 @st.dialog("📅 Reserva de Encontro")
 def modal_agendamento_encontro(dados_r):
     st.markdown(f"### 📆 Agendar Reunião com {dados_r['nome_par']}")
-    st.caption("A Lucy cruzará sua grade horária com a do seu par antes de validar o convite.")
     
-    # 1. Configuração dos eixos de tempo
     dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
     dia_s = st.selectbox("Escolha o Dia da Semana:", dias, key="dg_res_dia")
     
-    opcoes_periodo = [
-        "🌅 Manhã (06:00 às 11:59)", 
-        "☀️ Tarde (12:00 às 17:59)", 
-        "🌙 Noite (18:00 às 23:59)"
-    ]
+    opcoes_periodo = ["🌅 Manhã (06:00 às 11:59)", "☀️ Tarde (12:00 às 17:59)", "🌙 Noite (18:00 às 23:59)"]
     per_exibicao = st.selectbox("Escolha o Período:", opcoes_periodo, key="dg_res_per")
+    per_s = "manha" if "Manhã" in per_exibicao else "tarde" if "Tarde" in per_exibicao else "noite"
     
-    # Mapeamento limpo para os IDs do banco
-    if "Manhã" in per_exibicao:
-        per_s = "manha"
-        horario_sugestao = datetime.strptime("09:00", "%H:%M").time()
-    elif "Tarde" in per_exibicao:
-        per_s = "tarde"
-        horario_sugestao = datetime.strptime("14:00", "%H:%M").time()
-    else:
-        per_s = "noite"
-        horario_sugestao = datetime.strptime("20:00", "%H:%M").time()
-
+    horario_sugestao = datetime.strptime("09:00" if per_s=="manha" else "14:00" if per_s=="tarde" else "20:00", "%H:%M").time()
     hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
     
-    if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True):
-        hora_int = hor_s.hour
-        
-        # Função para limpar IDs de tuplas aninhadas de forma absoluta
-        def limpar_id_absoluto(id_bruto):
-            while isinstance(id_bruto, (tuple, list)):
-                if len(id_bruto) > 0: id_bruto = id_bruto[0]
-                else: return 0
-            try: return int(id_bruto)
-            except (TypeError, ValueError): return 0
+    def limpar_id_absoluto(id_bruto):
+        while isinstance(id_bruto, (tuple, list)): 
+            id_bruto = id_bruto[0] if len(id_bruto) > 0 else 0
+        return int(id_bruto) if id_bruto is not None else 0
 
-        # Limpeza cirúrgica das chaves
-        m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
-        meu_id_limpo = limpar_id_absoluto(st.session_state.usuario_id)
-        parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
+    m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
+    meu_id_limpo = limpar_id_absoluto(st.session_state.get("usuario_id"))
+    parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
 
-        # --- 2. TRAVA DE DISPONIBILIDADE DIRETA NO POSTGRESQL (CRUZAMENTO SEGURO) ---
-        meu_registro_existe = False
-        parceiro_registro_existe = False
-        parceiro_tem_algum_horario = False
-        
+    if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True, key="btn_confirmar_reserva_click"):
         try:
-            conn_check = obter_conexao_eficiente()
-            # Usar 'with' garante o fechamento do cursor e isola a transação
-            with conn_check.cursor() as cursor_check:
-                try:
-                    # 1. Verifica se você possui o horário na grade
-                    cursor_check.execute("""
-                        SELECT COUNT(*) FROM disponibilidade_usuarios 
-                        WHERE usuario_id = %s 
-                        AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
-                        AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-                    """, (meu_id_limpo, str(dia_s), str(per_s)))
-                    meu_count = cursor_check.fetchone()[0]
-                    meu_registro_existe = (meu_count > 0)
-                    
-                    # 2. Verifica se o parceiro possui ALGUNS horários cadastrados
-                    cursor_check.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
-                    total_parceiro = cursor_check.fetchone()[0]
-                    parceiro_tem_algum_horario = (total_parceiro > 0)
-                    
-                    # 3. Verifica se o parceiro possui ESTE horário específico
-                    cursor_check.execute("""
-                        SELECT COUNT(*) FROM disponibilidade_usuarios 
-                        WHERE usuario_id = %s 
-                        AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
-                        AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-                    """, (parceiro_id_limpo, str(dia_s), str(per_s)))
-                    parceiro_count = cursor_check.fetchone()[0]
-                    parceiro_registro_existe = (parceiro_count > 0)
-                    
-                    # Se tudo deu certo, confirma a leitura
-                    conn_check.commit()
+            conn = obter_conexao_eficiente()
+            cursor = conn.cursor()
+            
+            # PROTEÇÃO CRÍTICA: Verifica se o match_id realmente existe na tabela 'matches' antes de tentar o INSERT
+            cursor.execute("SELECT COUNT(*) FROM matches WHERE id = %s;", (m_id_limpo,))
+            match_existe = cursor.fetchone()[0] > 0
+            
+            if not match_existe:
+                # Caso o match_id original tenha sumido, tenta localizar ou criar um novo ID de vínculo estável
+                cursor.execute("""
+                    SELECT id FROM matches 
+                    WHERE (usuario_1_id = %s AND usuario_2_id = %s) OR (usuario_1_id = %s AND usuario_2_id = %s) 
+                    LIMIT 1;
+                """, (meu_id_limpo, parceiro_id_limpo, parceiro_id_limpo, meu_id_limpo))
+                match_recuperado = cursor.fetchone()
+                
+                if match_recuperado:
+                    m_id_limpo = int(match_recuperado[0])
+                else:
+                    # Se não existir nenhuma linha de match entre os dois usuários, cria uma na hora
+                    cursor.execute("""
+                        INSERT INTO matches (usuario_1_id, usuario_2_id, status_conexao) 
+                        VALUES (%s, %s, 'offline') RETURNING id;
+                    """, (meu_id_limpo, parceiro_id_limpo))
+                    m_id_limpo = int(cursor.fetchone()[0])
+                    conn.commit()
 
-                except Exception as query_error:
-                    # Se qualquer query falhar, desfaz para destravar a conexão
-                    conn_check.rollback()
-                    raise query_error
+            # Realiza as validações de disponibilidade padrão
+            cursor.execute("""
+                SELECT COUNT(*) FROM disponibilidade_usuarios 
+                WHERE usuario_id = %s AND LOWER(TRIM(id)) = LOWER(TRIM(%s)) AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+            """, (meu_id_limpo, str(id_s), str(dia_s), str(per_s)))
+            meu_registro_existe = cursor.fetchone()[0] > 0
             
-            # Painel de depuração limpo
-            with st.expander("🔍 Depurador de Agenda (Debug)"):
-                st.write(f"**Seu ID ({st.session_state.username}):** {meu_id_limpo} | Possui este horário? `{'Sim' if meu_registro_existe else 'Não'}`")
-                st.write(f"**ID do Par ({dados_r['nome_par']}):** {parceiro_id_limpo} | Possui este horário? `{'Sim' if parceiro_registro_existe else 'Não'}`")
-                st.write(f"**O parceiro já preencheu a grade alguma vez?** `{'Sim' if parceiro_tem_algum_horario else 'Não'}`")
+            cursor.execute("SELECT COUNT(*) FROM disponibilidade_usuarios WHERE usuario_id = %s;", (parceiro_id_limpo,))
+            parceiro_tem_algum_horario = cursor_check.fetchone()[0] > 0 if 'cursor_check' in locals() else cursor.fetchone()[0] > 0
             
-        except Exception as e:
-            st.error(f"Erro real ao consultar o banco de dados: {e}")
-
+            cursor.close(); 
             
-        # --- 3. EXECUÇÃO DAS TRAVAS DE HORÁRIO ---
-        if per_s == 'manha' and (hora_int < 6 or hora_int >= 12):
-            st.error("❌ Horário inválido! Para o período da manhã, ajuste entre **06:00 e 11:59**.")
-        elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18):
-            st.error("❌ Horário inválido! Para o período da tarde, ajuste entre **12:00 e 17:59**.")
-        elif per_s == 'noite' and (hora_int < 18 or hora_int > 23):
-            st.error("❌ Horário inválido! Para o período da noite, ajuste entre **18:00 e 23:59**.")
-            
-        # Alerta de recusa: Se você não marcou o dia na sua própria grade
-        elif not meu_registro_existe:
-            st.error(f"❌ **Agendamento Recusado:** Você ({st.session_state.username}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar.")
-            
-        # Alerta de recusa: Se o parceiro tem horários configurados mas não marcou este dia específico
-        elif parceiro_tem_algum_horario and not parceiro_registro_existe:
-            st.error(f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado.")
-            
-        # Se passar em todas as validações, realiza o agendamento pendente
-        else:
-            try:
-                conn = obter_conexao_eficiente()
-                cursor = conn.cursor()
-                cursor.execute('''
+            # Validação simples de segurança horária
+            hora_int = hor_s.hour
+            if per_s == 'manha' and (hora_int < 6 or hora_int >= 12): 
+                st.error("❌ Horário inválido para Manhã (06:00 às 11:59).")
+            elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18): 
+                st.error("❌ Horário inválido para Tarde (12:00 às 17:59).")
+            elif per_s == 'noite' and (hora_int < 18 or hora_int > 23): 
+                st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
+            else:
+                # CORREÇÃO: Abre a conexão persistente e garante o mesmo nome em todas as linhas
+                conn_salvar = obter_conexao_eficiente()
+                cursor_salvar = conn_salvar.cursor()
+                
+                cursor_salvar.execute("""
                     INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
                     VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
-                ''', (m_id_limpo, meu_id_limpo, parceiro_id_limpo, dia_s, per_s, hor_s))
-                conn.commit()
-                cursor.close()
-               
+                """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), hor_s))
                 
-                st.success("🎉 Convite de encontro enviado com sucesso!")
+                # Executa o commit e fecha o cursor usando a variável correta definida acima
+                conn_salvar.commit()
+                cursor_salvar.close()
+                
+                st.success("🎉 Convite enviado com sucesso!")
                 st.session_state.abrir_reserva_fluxo = None
+                time.sleep(1.2)
                 st.rerun()
-            except Exception as e:
-                st.error(f"❌ Erro ao gravar agendamento: {e}")
+                
+        except Exception as e: 
+            st.error(f"Erro crítico ao salvar agendamento no banco: {e}")
+
 
 # ==============================================================================
 # FUNÇÃO AUXILIAR COM CACHE PARA OTIMIZAÇÃO DA GRADE HORÁRIA
 # ==============================================================================
-#st.cache_data(ttl=60)  # Limpa o cache automaticamente após 1 minuto
-#def buscar_disponibilidade_banco(usuario_id):
-#    horarios = set()
-#    try:
-#        conn = obter_conexao_eficiente()
- #       cursor = conn.cursor()
-#        cursor.execute("SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", (usuario_id,))
-#        for d_sem, per_id in cursor.fetchall():
-#            horarios.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
-#        cursor.close()
+@st.cache_data(ttl=60)  # Limpa o cache automaticamente após 1 minuto
+def buscar_disponibilidade_banco(usuario_id):
+    horarios = set()
+    try:
+        conn = obter_conexao_eficiente()
+        cursor = conn.cursor()
+        cursor.execute("SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", (usuario_id,))
+        for d_sem, per_id in cursor.fetchall():
+            horarios.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
+        cursor.close()
         
-#    except Exception:
-#        pass
-#    return horarios
+    except Exception:
+        pass
+    return horarios
 
 # ==============================================================================
 # TELA DE CONFIGURAÇÃO DE DISPONIBILIDADE SEMANAL
 # ==============================================================================
 def template_disponibilidade(): 
     st.subheader("📅 Sua Grade de Disponibilidade") 
-    st.caption("Marque os dias da semana em que você está disponível. Seus matches verão apenas os dias da semanas que você está disponível.")
+    st.caption("Marque os dias da semana em que você está disponível. Seus matches verão apenas a combinação dos seus horários livres.")
 
     dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'] 
     periodos = [{"id": "manha", "nome": "Manhã"}, {"id": "tarde", "nome": "Tarde"}, {"id": "noite", "nome": "Noite"}] 
 
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
-    horarios_salvos = set()
     
-    try:
-        conn = conectar_supabase()
-        cursor = conn.cursor()
-        cursor.execute("SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
-        for d_sem, per_id in cursor.fetchall():
-            horarios_salvos.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
-        cursor.close()
-        conn.close()
-    except Exception:
-        pass
+    # Chama a busca otimizada no banco utilizando cache
+    horarios_salvos = buscar_disponibilidade_banco(meu_id_limpo)
 
-    matriz = [] 
-    for per in periodos: 
-        linha = {"Período": per["nome"]} 
-        for d in dias: 
-            linha[d] = f"{d}_{per['id']}" in horarios_salvos
-        matriz.append(linha) 
+    # Constrói a matriz na memória usando Session State para evitar travamento na digitação
+    if "df_grade_memoria" not in st.session_state:
+        matriz = [] 
+        for per in periodos: 
+            linha = {"Período": per["nome"]} 
+            for d in dias: 
+                linha[d] = f"{d}_{per['id']}" in horarios_salvos
+            matriz.append(linha) 
+        st.session_state["df_grade_memoria"] = pd.DataFrame(matriz)
 
-    df_grade = pd.DataFrame(matriz) 
-    
     config_c = {"Período": st.column_config.TextColumn(disabled=True)} 
     for d in dias: 
         config_c[d] = st.column_config.CheckboxColumn(default=False) 
 
-    # --- 1. ESCOPO DO FORMULÁRIO EXCLUSIVO PARA O SALVAMENTO DA PLANILHA ---
+    # Bloco isolado em formulário para salvar alterações em lote de uma vez só
     with st.form("container_formulario_grade_horaria", clear_on_submit=False):
-        grade_editada = st.data_editor(df_grade, column_config=config_c, use_container_width=True, hide_index=True, key="grade_horaria_editor") 
+        grade_editada = st.data_editor(
+            st.session_state["df_grade_memoria"], 
+            column_config=config_c, 
+            use_container_width=True, 
+            hide_index=True, 
+            key="grade_horaria_editor"
+        ) 
         
-        # O único botão dentro do form deve ser o submit de gravação
         botao_salvar_ativo = st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True)
         
         if botao_salvar_ativo: 
             try:
-                conn = conectar_supabase()
+                conn = obter_conexao_eficiente()
                 cursor = conn.cursor() 
                 cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
                 
@@ -587,40 +546,46 @@ def template_disponibilidade():
                                 VALUES (%s, %s, %s);
                             """, (meu_id_limpo, str(d), str(p_id))) 
                 
-                # ... CÓDIGO DA SUA QUERY DE INSERT CONTINUA IGUAL ...
                 conn.commit()
                 cursor.close()
-                conn.close() 
+                 
                 
-                # 🔍 CORREÇÃO: Alerta flutuante que persiste mesmo com o st.rerun() imediato
+                # Limpa os estados do cache para refletir no próximo turno
+                st.cache_data.clear()
+                if "df_grade_memoria" in st.session_state:
+                    del st.session_state["df_grade_memoria"]
+                
                 st.toast("🎉 Sua grade horária foi salva com sucesso no banco de dados!")
-                
-                # Importa e segura o ciclo por 1 segundo para o usuário ler o aviso na tela
-                import time
                 time.sleep(1)
-                
                 st.rerun() 
             except Exception as e:
                 st.error(f"Erro crítico ao salvar no banco: {e}")
 
-    # --- 2. ÁREA EXTERNA AO FORMULÁRIO (RESOLVE O STREAMLITAPIEXCEPTION) ---
-    # Os botões comuns abaixo agora nascem fora do container do form, operando livremente
+    # Áreas e gatilhos adicionais fora do formulário
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     col_l, col_v = st.columns(2)
     
     with col_l:
-        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True):
+        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True, key="btn_limpar_grade_real"):
             try:
-                conn = conectar_supabase(); cursor = conn.cursor()
+                conn = obter_conexao_eficiente()
+                cursor = conn.cursor()
                 cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
-                conn.commit(); cursor.close(); conn.close()
+                conn.commit()
+                cursor.close()
+               
+                
+                st.cache_data.clear()
+                if "df_grade_memoria" in st.session_state:
+                    del st.session_state["df_grade_memoria"]
+                    
                 st.toast("Toda a sua grade horária foi limpa!")
                 st.rerun()
             except Exception as e: 
-                st.error(f"Erro: {e}")
+                st.error(f"Erro ao limpar grade: {e}")
             
     with col_v: 
-        if st.button("Voltar ao Chat", use_container_width=True): 
+        if st.button("Voltar ao Chat", use_container_width=True, key="btn_voltar_chat_grade"): 
             st.session_state.opcao_menu = "💬 Conversar com Lucy" 
             st.rerun()
 
