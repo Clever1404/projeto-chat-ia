@@ -491,7 +491,7 @@ def modal_agendamento_encontro(dados_r):
                 
                 st.success("🎉 Convite enviado com sucesso!")
                 st.session_state.abrir_reserva_fluxo = None
-                time.sleep(1.2)
+                time.sleep(1.9)
                 st.rerun()
                 
         except Exception as e: 
