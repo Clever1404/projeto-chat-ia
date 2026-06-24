@@ -527,45 +527,48 @@ def buscar_disponibilidade_banco(usuario_id):
 # ==============================================================================
 def template_disponibilidade(): 
     st.subheader("📅 Sua Grade de Disponibilidade") 
-    st.caption("Marque os dias da semana em que você está disponível. Seus matches verão apenas a combinação dos seus horários livres.")
+    st.caption("Marque os dias da semana em que você está disponível. Seus matches verão apenas os dias da semanas que você está disponível.")
 
     dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'] 
     periodos = [{"id": "manha", "nome": "Manhã"}, {"id": "tarde", "nome": "Tarde"}, {"id": "noite", "nome": "Noite"}] 
 
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
+    horarios_salvos = set()
     
-    # Chama a busca otimizada no banco utilizando cache
-    horarios_salvos = buscar_disponibilidade_banco(meu_id_limpo)
+    try:
+        conn = conectar_supabase()
+        cursor = conn.cursor()
+        cursor.execute("SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
+        for d_sem, per_id in cursor.fetchall():
+            horarios_salvos.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
+        cursor.close()
+        conn.close()
+    except Exception:
+        pass
 
-    # Constrói a matriz na memória usando Session State para evitar travamento na digitação
-    if "df_grade_memoria" not in st.session_state:
-        matriz = [] 
-        for per in periodos: 
-            linha = {"Período": per["nome"]} 
-            for d in dias: 
-                linha[d] = f"{d}_{per['id']}" in horarios_salvos
-            matriz.append(linha) 
-        st.session_state["df_grade_memoria"] = pd.DataFrame(matriz)
+    matriz = [] 
+    for per in periodos: 
+        linha = {"Período": per["nome"]} 
+        for d in dias: 
+            linha[d] = f"{d}_{per['id']}" in horarios_salvos
+        matriz.append(linha) 
 
+    df_grade = pd.DataFrame(matriz) 
+    
     config_c = {"Período": st.column_config.TextColumn(disabled=True)} 
     for d in dias: 
         config_c[d] = st.column_config.CheckboxColumn(default=False) 
 
-    # Bloco isolado em formulário para salvar alterações em lote de uma vez só
+    # --- 1. ESCOPO DO FORMULÁRIO EXCLUSIVO PARA O SALVAMENTO DA PLANILHA ---
     with st.form("container_formulario_grade_horaria", clear_on_submit=False):
-        grade_editada = st.data_editor(
-            st.session_state["df_grade_memoria"], 
-            column_config=config_c, 
-            use_container_width=True, 
-            hide_index=True, 
-            key="grade_horaria_editor"
-        ) 
+        grade_editada = st.data_editor(df_grade, column_config=config_c, use_container_width=True, hide_index=True, key="grade_horaria_editor") 
         
+        # O único botão dentro do form deve ser o submit de gravação
         botao_salvar_ativo = st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True)
         
         if botao_salvar_ativo: 
             try:
-                conn = obter_conexao_eficiente()
+                conn = conectar_supabase()
                 cursor = conn.cursor() 
                 cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
                 
@@ -578,46 +581,40 @@ def template_disponibilidade():
                                 VALUES (%s, %s, %s);
                             """, (meu_id_limpo, str(d), str(p_id))) 
                 
+                # ... CÓDIGO DA SUA QUERY DE INSERT CONTINUA IGUAL ...
                 conn.commit()
                 cursor.close()
-                 
+                conn.close() 
                 
-                # Limpa os estados do cache para refletir no próximo turno
-                st.cache_data.clear()
-                if "df_grade_memoria" in st.session_state:
-                    del st.session_state["df_grade_memoria"]
-                
+                # 🔍 CORREÇÃO: Alerta flutuante que persiste mesmo com o st.rerun() imediato
                 st.toast("🎉 Sua grade horária foi salva com sucesso no banco de dados!")
+                
+                # Importa e segura o ciclo por 1 segundo para o usuário ler o aviso na tela
+                import time
                 time.sleep(1)
+                
                 st.rerun() 
             except Exception as e:
                 st.error(f"Erro crítico ao salvar no banco: {e}")
 
-    # Áreas e gatilhos adicionais fora do formulário
+    # --- 2. ÁREA EXTERNA AO FORMULÁRIO (RESOLVE O STREAMLITAPIEXCEPTION) ---
+    # Os botões comuns abaixo agora nascem fora do container do form, operando livremente
     st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
     col_l, col_v = st.columns(2)
     
     with col_l:
-        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True, key="btn_limpar_grade_real"):
+        if st.button("🗑️ Limpar Grade Horária", type="secondary", use_container_width=True):
             try:
-                conn = obter_conexao_eficiente()
-                cursor = conn.cursor()
+                conn = conectar_supabase(); cursor = conn.cursor()
                 cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
-                conn.commit()
-                cursor.close()
-               
-                
-                st.cache_data.clear()
-                if "df_grade_memoria" in st.session_state:
-                    del st.session_state["df_grade_memoria"]
-                    
+                conn.commit(); cursor.close(); conn.close()
                 st.toast("Toda a sua grade horária foi limpa!")
                 st.rerun()
             except Exception as e: 
-                st.error(f"Erro ao limpar grade: {e}")
+                st.error(f"Erro: {e}")
             
     with col_v: 
-        if st.button("Voltar ao Chat", use_container_width=True, key="btn_voltar_chat_grade"): 
+        if st.button("Voltar ao Chat", use_container_width=True): 
             st.session_state.opcao_menu = "💬 Conversar com Lucy" 
             st.rerun()
 
