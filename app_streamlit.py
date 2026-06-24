@@ -472,6 +472,29 @@ def modal_agendamento_encontro(dados_r):
             elif per_s == 'noite' and (hora_int < 18 or hora_int > 23): 
                 st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
             
+            # 4. REGRAS DE NEGÓCIO E VALIDAÇÕES DE TRAVA
+            
+            erro_validacao = False
+            mensagem_erro = ""
+
+            elif not meu_registro_existe:
+                erro_validacao = True
+                mensagem_erro = f"❌ **Agendamento Recusado:** Você ({st.session_state.get('username', 'Usuário')}) configurou este dia/período como indisponível na sua grade. Acesse 'MINHA GRADE HORÁRIA' para liberar."
+                
+            elif not parceiro_registro_existe:
+                erro_validacao = True
+                mensagem_erro = f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado."       
+            
+            # SE HOUVER RECUSA/ERRO: Exibe o erro e cria o botão de redirecionamento
+            if erro_validacao:
+                st.error(mensagem_erro)
+                
+                # Botão para fechar o modal e voltar ao chat de forma limpa
+                if st.button("💬 Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_recusa"):
+                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                    st.session_state.abrir_reserva_fluxo = None  # Fecha o estado do modal
+                    st.rerun()
+
 
             # Alerta de recusa: Se você não marcou o dia na sua própria grade
             elif not meu_registro_existe:
