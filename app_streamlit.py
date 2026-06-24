@@ -492,11 +492,17 @@ def modal_agendamento_encontro(dados_r):
                 st.error(mensagem_erro)
                 
                 # Botão para fechar o modal e voltar ao chat de forma limpa
-                if st.button("💬 Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_recusa"):
-                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                    st.session_state.abrir_reserva_fluxo = None  # Fecha o estado do modal
-                    st.rerun()
+                #if st.button("💬 Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_recusa"):
+                #    st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                #    st.session_state.abrir_reserva_fluxo = None  # Fecha o estado do modal
+                #    st.rerun()
            
+                # Renderiza estritamente a tela selecionada no miolo da página
+                if menu_atual == "💬 Conversar com Lucy":   
+                    # Apenas invoca o fragmento global de forma ultra eficiente
+                    renderizar_chat_lucy_isolado()    
+
+
             else:
                 # 5. SALVAMENTO FINAL DO AGENDAMENTO
                 conn_salvar = obter_conexao_eficiente()
