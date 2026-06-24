@@ -441,6 +441,13 @@ def modal_agendamento_encontro(dados_r):
             
             cursor.close(); 
             
+            # Painel de depuração limpo
+            with st.expander("🔍 Depurador de Agenda (Debug)"):
+                st.write(f"**Seu ID ({st.session_state.username}):** {meu_id_limpo} | Possui este horário? `{'Sim' if meu_registro_existe else 'Não'}`")
+                st.write(f"**ID do Par ({dados_r['nome_par']}):** {parceiro_id_limpo} | Possui este horário? `{'Sim' if parceiro_registro_existe else 'Não'}`")
+                st.write(f"**O parceiro já preencheu a grade alguma vez?** `{'Sim' if parceiro_tem_algum_horario else 'Não'}`")
+
+
             # Validação simples de segurança horária
             hora_int = hor_s.hour
             if per_s == 'manha' and (hora_int < 6 or hora_int >= 12): 
