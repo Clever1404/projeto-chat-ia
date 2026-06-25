@@ -59,10 +59,10 @@ if st.session_state.get("usuario_id") is not None:
     # com st.sidebar:
     #     st.write(f"Olá, {st.session_state.username}")
     #     ... seu menu de navegação interna ...
-    
-    # Se o chat ou outra tela interna estiver aqui, ela roda isolada
-    st.session_state.opcao_menu = "💬 Conversar com Lucy"
-    
+      
+    if menu_atual == "💬 Conversar com Lucy":   
+        # Apenas invoca o fragmento global de forma ultra eficiente
+        renderizar_chat_lucy_isolado()    
     # O comando abaixo impede o Python de continuar descendo para as telas públicas
     st.stop()
 
