@@ -891,46 +891,46 @@ def verificar_status_pix(id_pagamento):
 # ==============================================================================
 # MODAL DA LOJA DO APP (CORRIGIDO E FECHADO)
 # ==============================================================================
-@st.dialog("🛒 Loja do App")
-def mostrar_popup_loja(id_usuario):
-    opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"])
+#@st.dialog("🛒 Loja do App")
+#def mostrar_popup_loja(id_usuario):
+#    opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"])
 
-    if st.button("Gerar Pix de Pagamento"):
-        valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
-        id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
-       
-        payment_data = {
-            "transaction_amount": valor, 
-            "description": desc, 
-            "payment_method_id": "pix",
-            "payer": {"email": "cliente@email.com"}, 
-            "external_reference": f"{id_limpo}:{tipo}"
-        }
+#    if st.button("Gerar Pix de Pagamento"):
+#        valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
+#        id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
+#       
+#        payment_data = {
+#            "transaction_amount": valor, 
+#            "description": desc, 
+#            "payment_method_id": "pix",
+#            "payer": {"email": "cliente@email.com"}, 
+#            "external_reference": f"{id_limpo}:{tipo}"
+#        }
         
-        try:
-            payment_response = sdk.payment().create(payment_data)
-            payment = payment_response["response"]
+    #     try:
+    #         payment_response = sdk.payment().create(payment_data)
+    #         payment = payment_response["response"]
             
-            if "point_of_interaction" in payment:
-                st.session_state.id_pagamento_pendente = payment["id"]
-                st.session_state.tipo_pagamento_pendente = tipo
-                st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
-                st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
-                st.success("Pix gerado com sucesso!")
-                st.rerun()
-        except Exception as e: 
-            st.error(f"Erro ao gerar pagamento: {e}")
+    #         if "point_of_interaction" in payment:
+    #             st.session_state.id_pagamento_pendente = payment["id"]
+    #             st.session_state.tipo_pagamento_pendente = tipo
+    #             st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+    #             st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+    #             st.success("Pix gerado com sucesso!")
+    #             st.rerun()
+    #     except Exception as e: 
+    #         st.error(f"Erro ao gerar pagamento: {e}")
 
-    # Renderiza o QR Code caso ele já exista na sessão ativa
-    if st.session_state.get("qr_code_img"):
-        st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
-        st.image(base64.b64decode(st.session_state.qr_code_img), width=250)
-        st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=70)
+    # # Renderiza o QR Code caso ele já exista na sessão ativa
+    # if st.session_state.get("qr_code_img"):
+    #     st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
+    #     st.image(base64.b64decode(st.session_state.qr_code_img), width=250)
+    #     st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=70)
         
-        if st.button("🔄 Já realizei o pagamento", type="primary"):
-            st.toast("Verificando compensação do Pix...")
-            st.session_state.abrir_popup_loja = False
-            st.rerun()
+    #     if st.button("🔄 Já realizei o pagamento", type="primary"):
+    #         st.toast("Verificando compensação do Pix...")
+    #         st.session_state.abrir_popup_loja = False
+    #         st.rerun()
 
 
 
@@ -1528,10 +1528,10 @@ if st.session_state.get("abrir_reserva_fluxo"):
     # Importante: Não deixe o script continuar executando telas no fundo enquanto o modal está ativo
     # Isso impede que o miolo chame outros blocos visuais concorrentes
 
-elif st.session_state.get("abrir_popup_loja"):
-    if st.session_state.get("usuario_id"):
-        mostrar_popup_loja(st.session_state.usuario_id)
-    st.session_state.abrir_popup_loja = False
+# elif st.session_state.get("abrir_popup_loja"):
+#     if st.session_state.get("usuario_id"):
+#         mostrar_popup_loja(st.session_state.usuario_id)
+#     st.session_state.abrir_popup_loja = False
 
 
 
