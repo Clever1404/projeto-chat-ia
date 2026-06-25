@@ -1539,41 +1539,41 @@ def template_painel_admin():
 #else:
 #    if menu_atual == "home":  
     # --- TELAS PÚBLICAS (Sem Barra Lateral de Usuário) ---
-    def template home():
-        st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
-        st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>", unsafe_allow_html=True)
-        st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
+def template home():
+    st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
 
-        st.markdown("""
-            <div style='text-align: center;'>
-            🔒 **Ambiente 100% Seguro:** Suas mensagens e chamadas são privadas.<br>
-            🎥 **Videochamada Integrada:** Conecte-se por vídeo com um clique.<br>
-            📬 **Suporte Dedicado:** Canal direto via Fale Conosco.<br>
-            </div>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+        <div style='text-align: center;'>
+        🔒 **Ambiente 100% Seguro:** Suas mensagens e chamadas são privadas.<br>
+        🎥 **Videochamada Integrada:** Conecte-se por vídeo com um clique.<br>
+        📬 **Suporte Dedicado:** Canal direto via Fale Conosco.<br>
+        </div>
+    """, unsafe_allow_html=True)
 
-        st.markdown("""
-            <div style="background-color: #004085; padding: 20px; border-radius: 5px; text-align: center; border-left: 5px solid #0066cc; margin-bottom: 20px;">
-                <h1 style="margin: 0; color: #ffffff; font-size: 24px;">
-                            💡 CADASTRE-SE AGORA EM NOSSO SITE ENCONTRE SEU MATCH E MARQUE UM ENCONTRO VIRTUAL!!
-                </h1>
-            </div>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+        <div style="background-color: #004085; padding: 20px; border-radius: 5px; text-align: center; border-left: 5px solid #0066cc; margin-bottom: 20px;">
+            <h1 style="margin: 0; color: #ffffff; font-size: 24px;">
+                        💡 CADASTRE-SE AGORA EM NOSSO SITE ENCONTRE SEU MATCH E MARQUE UM ENCONTRO VIRTUAL!!
+            </h1>
+        </div>
+    """, unsafe_allow_html=True)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
-                st.session_state.opcao_menu = "login"
-                st.rerun()
-                        
-        with col2:
-            with stylable_container(
-                key="green_button", 
-                css_styles="button { background-color: #28a745; color: white; }"
-            ):
-                if st.button("📝 Cadastre-se", use_container_width=True):
-                    st.session_state.opcao_menu = "cadastro"
-                    st.rerun()        
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
+            st.session_state.opcao_menu = "login"
+            st.rerun()
+                    
+    with col2:
+        with stylable_container(
+            key="green_button", 
+            css_styles="button { background-color: #28a745; color: white; }"
+        ):
+            if st.button("📝 Cadastre-se", use_container_width=True):
+                st.session_state.opcao_menu = "cadastro"
+                st.rerun()        
 
 #elif menu_atual == "cadastro":
     def template cadastro():
@@ -1629,118 +1629,118 @@ def template_painel_admin():
             st.rerun()
 
 
-    #elif menu_atual == "planos":
-    def template planos():
-        st.session_state.opcao_menu = "planos"
-        # Inicializa a sub-visão caso ela não exista
-        if "sub_visao" not in st.session_state:
-            st.session_state.sub_visao = "planos"
+#elif menu_atual == "planos":
+def template planos():
+    st.session_state.opcao_menu = "planos"
+    # Inicializa a sub-visão caso ela não exista
+    if "sub_visao" not in st.session_state:
+        st.session_state.sub_visao = "planos"
 
-        # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
-        if st.session_state.sub_visao == "planos":
-            st.markdown('<h1 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
-                
-            # Texto descritivo dos planos centralizado
-            st.html(
-                """
-                <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
-                    <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
-                        
-                    <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
-                        <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
-                        <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
-                    </div>
-                        
-                    <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
-                        <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
-                        <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
-                    </div>
-                        
-                    <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
-                        <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
-                        <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
-                    </div>
+    # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
+    if st.session_state.sub_visao == "planos":
+        st.markdown('<h1 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
+            
+        # Texto descritivo dos planos centralizado
+        st.html(
+            """
+            <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
+                <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
+                    
+                <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
+                    <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+                    <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
                 </div>
-                """        
-            )
-                
-
-
-                
-        with st.sidebar:
-            # CORREÇÃO: Captura o ID do usuário da sessão
-            id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
-            
-            opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"])
-            
-            if st.button("Gerar Pix de Pagamento"):
-                valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
-                id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
-                
-                payment_data = {
-                    "transaction_amount": valor, 
-                    "description": desc, 
-                    "payment_method_id": "pix",
-                    "payer": {"email": "cliente@email.com"}, 
-                    "external_reference": f"{id_limpo}:{tipo}"
-                }
                     
-                try:
-                    payment_response = sdk.payment().create(payment_data)
-                    payment = payment_response["response"]
-                        
-                    if "point_of_interaction" in payment:
-                        st.session_state.id_pagamento_pendente = payment["id"]
-                        st.session_state.tipo_pagamento_pendente = tipo
-                        st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
-                        st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
-                        st.success("Pix gerado com sucesso!")
-                        st.rerun()
-                except Exception as e: 
-                    st.error(f"Erro ao gerar pagamento: {e}")
-
-            # Renderiza o QR Code caso ele já exista na sessão ativa
-            if st.session_state.get("qr_code_img"):
-                st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
-                st.image(base64.b64decode(st.session_state.qr_code_img), width=250)
-                st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=70)
-                        
-                # BOTÃO CORRIGIDO: Agora ele realmente valida o Pix
-                if st.button("🔄 Já realizei o pagamento", type="primary"):
-                    id_pagamento = st.session_state.get("id_pagamento_pendente")
+                <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
+                    <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+                    <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
+                </div>
                     
-                    if id_pagamento:
-                        with st.spinner("Verificando compensação do Pix..."):
-                            status = verificar_status_pix(id_pagamento)
-                        
-                        if status == "approved":
-                            st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
-                            
-                            # --- AQUI VOCÊ ADICIONA A SUA LÓGICA DE LIBERAÇÃO ---
-                            # Exemplo: salvar no banco de dados que o id_usuario agora é VIP
-                            # liberar_beneficio_no_banco(id_usuario, st.session_state.tipo_pagamento_pendente)
-                            
-                            # Limpa as variáveis de pagamento da sessão para sumir com o QR code
-                            del st.session_state.qr_code_img
-                            del st.session_state.qr_code_texto
-                            del st.session_state.id_pagamento_pendente
-                            
-                            st.session_state.abrir_popup_loja = False
-                            st.rerun()
-                        elif status == "pending":
-                            st.warning("⏳ O pagamento ainda consta como pendente. Aguarde um instante e tente novamente.")
-                        else:
-                            st.error(f"❌ O status do pagamento é: {status}. Se houve algum problema, contate o suporte.")
-                    else:
-                        st.error("Nenhum ID de pagamento encontrado na sessão.")
-          
-        if st.button("← Voltar para o Chat", use_container_width=True):
-                st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                st.rerun() 
+                <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+                    <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+                    <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+                </div>
+            </div>
+            """        
+        )
+            
+
+
+            
+    with st.sidebar:
+        # CORREÇÃO: Captura o ID do usuário da sessão
+        id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
         
-        if st.button("← Voltar para o Login", use_container_width=True):
-                st.session_state.opcao_menu = "login"
-                st.rerun() 
+        opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"])
+        
+        if st.button("Gerar Pix de Pagamento"):
+            valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
+            id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
+            
+            payment_data = {
+                "transaction_amount": valor, 
+                "description": desc, 
+                "payment_method_id": "pix",
+                "payer": {"email": "cliente@email.com"}, 
+                "external_reference": f"{id_limpo}:{tipo}"
+            }
+                
+            try:
+                payment_response = sdk.payment().create(payment_data)
+                payment = payment_response["response"]
+                    
+                if "point_of_interaction" in payment:
+                    st.session_state.id_pagamento_pendente = payment["id"]
+                    st.session_state.tipo_pagamento_pendente = tipo
+                    st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+                    st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+                    st.success("Pix gerado com sucesso!")
+                    st.rerun()
+            except Exception as e: 
+                st.error(f"Erro ao gerar pagamento: {e}")
+
+        # Renderiza o QR Code caso ele já exista na sessão ativa
+        if st.session_state.get("qr_code_img"):
+            st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
+            st.image(base64.b64decode(st.session_state.qr_code_img), width=250)
+            st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=70)
+                    
+            # BOTÃO CORRIGIDO: Agora ele realmente valida o Pix
+            if st.button("🔄 Já realizei o pagamento", type="primary"):
+                id_pagamento = st.session_state.get("id_pagamento_pendente")
+                
+                if id_pagamento:
+                    with st.spinner("Verificando compensação do Pix..."):
+                        status = verificar_status_pix(id_pagamento)
+                    
+                    if status == "approved":
+                        st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
+                        
+                        # --- AQUI VOCÊ ADICIONA A SUA LÓGICA DE LIBERAÇÃO ---
+                        # Exemplo: salvar no banco de dados que o id_usuario agora é VIP
+                        # liberar_beneficio_no_banco(id_usuario, st.session_state.tipo_pagamento_pendente)
+                        
+                        # Limpa as variáveis de pagamento da sessão para sumir com o QR code
+                        del st.session_state.qr_code_img
+                        del st.session_state.qr_code_texto
+                        del st.session_state.id_pagamento_pendente
+                        
+                        st.session_state.abrir_popup_loja = False
+                        st.rerun()
+                    elif status == "pending":
+                        st.warning("⏳ O pagamento ainda consta como pendente. Aguarde um instante e tente novamente.")
+                    else:
+                        st.error(f"❌ O status do pagamento é: {status}. Se houve algum problema, contate o suporte.")
+                else:
+                    st.error("Nenhum ID de pagamento encontrado na sessão.")
+        
+    if st.button("← Voltar para o Chat", use_container_width=True):
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun() 
+    
+    if st.button("← Voltar para o Login", use_container_width=True):
+            st.session_state.opcao_menu = "login"
+            st.rerun() 
 
 
 
