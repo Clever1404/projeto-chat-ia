@@ -296,10 +296,8 @@ def renderizar_chat_lucy_isolado():
     st.markdown("### 🤖 Conversar com Lucy")
     st.caption("Fale sobre sua rotina, hobbies e o que procura. Lucy usa IA para analisar seu perfil e encontrar pessoas compatíveis.")
     st.markdown("<hr style='border-color: #30363d; margin: 10px 0 20px 0;'>", unsafe_allow_html=True)
-    st.button("✉️ Fale Conosco", type="tertiary")
-    st.session_state.opcao_menu = "✉️ Fale Conosco"
+   
     
-
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
     # 1. PROCESSAMENTO EM SEGUNDO PLANO (Roda antes de desenhar a tela)
