@@ -35,6 +35,56 @@ st.set_page_config(
     initial_sidebar_state=st.session_state.sidebar_state
 )
 
+
+# --- 2. TRAVA DE ISOLAMENTO CRÍTICA (KILL SWITCH) ---
+# Se o usuário JÁ ESTIVER LOGADO, executa APENAS o ambiente interno e para o script
+if st.session_state.get("usuario_id") is not None:
+    
+    # Impede que o usuário logado fique preso em rotas públicas
+    if st.session_state.get("opcao_menu") in ["home", "login", "cadastro"]:
+        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+
+    # Gestão centralizada de modais privados
+    if st.session_state.get("abrir_reserva_fluxo"):
+        modal_agendamento_encontro(st.session_state.abrir_reserva_fluxo)
+        st.stop()
+
+    if st.session_state.get("abrir_popup_loja"):
+        mostrar_popup_loja(st.session_state.usuario_id)
+        st.session_state.abrir_popup_loja = False
+        st.stop()
+
+    # --- AQUI VOCÊ COLOCA O CÓDIGO DA SUA SIDEBAR E DO CHAT ---
+    # Exemplo:
+    # com st.sidebar:
+    #     st.write(f"Olá, {st.session_state.username}")
+    #     ... seu menu de navegação interna ...
+    
+    # Se o chat ou outra tela interna estiver aqui, ela roda isolada
+    st.write(f"Visualizando: {st.session_state.opcao_menu = "💬 Conversar com Lucy"}")
+    
+    # O comando abaixo impede o Python de continuar descendo para as telas públicas
+    st.stop()
+
+
+# --- 3. AMBIENTE PÚBLICO (SÓ EXECUTA SE O USUÁRIO NÃO ESTIVER LOGADO) ---
+menu_atual = st.session_state.get("opcao_menu", "home")
+
+if menu_atual == "home":
+    st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
+    # ... restando do seu código da Home ...
+
+elif menu_atual == "login":
+    st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
+    with st.form("form_login"):
+        # ... seu formulário de login igual ao anterior ...
+        if st.form_submit_button("login", type="primary", use_container_width=True):
+            # ... sua validação de banco igual ...
+            # Ao final do sucesso:
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun() # O rerun vai voltar para o topo e cair no 'if' do usuário logado
+
+
 # Estilização Padrão Global (Sem rolagem dupla)
 st.markdown("""
     <style>
@@ -1095,21 +1145,7 @@ def template_painel_admin():
 #        mostrar_popup_loja(st.session_state.usuario_id)
 #    st.session_state.abrir_popup_loja = False
 
-menu_atual = st.session_state.get("opcao_menu", "home")
 
-# --- CORREÇÃO DA SOBREPOSIÇÃO: ISOLAMENTO DE MODAIS PRIVADOS ---
-# Só permite gerenciar os modais de agendamento/loja se o usuário estiver logado
-if st.session_state.get("usuario_id"):
-    
-    if st.session_state.get("abrir_reserva_fluxo"):
-        modal_agendamento_encontro(st.session_state.abrir_reserva_fluxo)
-        # Trava a execução para não duplicar componentes no fundo
-        st.stop() 
-
-    elif st.session_state.get("abrir_popup_loja"):
-        mostrar_popup_loja(st.session_state.usuario_id)
-        st.session_state.abrir_popup_loja = False
-        st.stop()
 
 # --- 2. SEGUIDO PELO SEU IF/ELIF NORMAL DE TELAS ---
 # Agora este bloco roda de forma limpa, sem risco de ser bloqueado por modais fantasmas
