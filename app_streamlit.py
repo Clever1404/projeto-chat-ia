@@ -860,31 +860,6 @@ def template_sala_privada():
                     st.rerun()
 
 
-# ==============================================================================
-# TELA PRIVADA 2: TEMPLATE FALE CONOSCO (SUPORTE TÉCNICO VIA EMAIL)
-# ==============================================================================
-def template_fale_conosco():
-    st.markdown("<h2>✉️ Fale Conosco</h2>", unsafe_allow_html=True)
-    st.caption("Envie suas dúvidas, críticas ou sugestões de melhoria para a equipe de suporte Lucy IA.")
-    st.markdown("<hr style='border-color: #30363d; margin: 10px 0 25px 0;'>", unsafe_allow_html=True)
-    
-    with st.form("form_fale_conosco", clear_on_submit=True):
-        nome_contato = st.text_input("Seu Nome:", value=st.session_state.username if st.session_state.username else "")
-        email_contato = st.text_input("Seu E-mail de Contato:")
-        descricao_contato = st.text_area("Escreva sua Mensagem / Sugestão:")
-        
-        if st.form_submit_button("Enviar para o Suporte", type="primary", use_container_width=True):
-            if not email_contato or not descricao_contato: 
-                st.error("❌ Por favor, preencha seu e-mail e a descrição da mensagem.") 
-            else: 
-                st.success("🎉 Sua mensagem foi enviada para o e-mail de suporte (suporte@lucyia.com) com sucesso!") 
-
-    if st.button("← Voltar para o Chat Principal", type="secondary"): 
-        st.session_state.opcao_menu = "💬 Conversar com Lucy" 
-        st.rerun() 
-
-
-
 
 # ==============================================================================
 # MODAL DA LOJA DO APP (CORRIGIDO E FECHADO)
@@ -1483,6 +1458,31 @@ def template_painel_admin():
     if st.button("← Voltar para o Chat", use_container_width=True):
         st.session_state.opcao_menu = "💬 Conversar com Lucy"
         st.rerun()
+
+
+# ==============================================================================
+# TELA PRIVADA 2: TEMPLATE FALE CONOSCO (SUPORTE TÉCNICO VIA EMAIL)
+# ==============================================================================
+def template_fale_conosco():
+    st.markdown("<h2>✉️ Fale Conosco</h2>", unsafe_allow_html=True)
+    st.caption("Envie suas dúvidas, críticas ou sugestões de melhoria para a equipe de suporte Lucy IA.")
+    st.markdown("<hr style='border-color: #30363d; margin: 10px 0 25px 0;'>", unsafe_allow_html=True)
+    
+    with st.form("form_fale_conosco", clear_on_submit=True):
+        nome_contato = st.text_input("Seu Nome:", value=st.session_state.username if st.session_state.username else "")
+        email_contato = st.text_input("Seu E-mail de Contato:")
+        descricao_contato = st.text_area("Escreva sua Mensagem / Sugestão:")
+        
+        if st.form_submit_button("Enviar para o Suporte", type="primary", use_container_width=True):
+            if not email_contato or not descricao_contato: 
+                st.error("❌ Por favor, preencha seu e-mail e a descrição da mensagem.") 
+            else: 
+                st.success("🎉 Sua mensagem foi enviada para o e-mail de suporte (suporte@lucyia.com) com sucesso!") 
+
+    if st.button("← Voltar para o Chat Principal", type="secondary"): 
+        st.session_state.opcao_menu = "💬 Conversar com Lucy" 
+        st.rerun() 
+
 
 
 # ==============================================================================
@@ -2121,6 +2121,8 @@ else:
                     
         elif menu_atual == "🛠️ Painel Admin":
             template_painel_admin()
+        elif st.session_state.opcao_menu == "✉️ Fale Conosco":
+            template_fale_conosco()
 
     # ==============================================================================
     # FALLBACK DE SEGURANÇA SEGURO (FIM DO ARQUIVO)
