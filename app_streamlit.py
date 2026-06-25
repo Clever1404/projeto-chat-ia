@@ -61,7 +61,7 @@ if st.session_state.get("usuario_id") is not None:
     #     ... seu menu de navegação interna ...
     
     # Se o chat ou outra tela interna estiver aqui, ela roda isolada
-    st.write(f"Visualizando: {st.session_state.opcao_menu = "💬 Conversar com Lucy"}")
+    st.write(f"Visualizando: {renderizar_chat_lucy_isolado}")
     
     # O comando abaixo impede o Python de continuar descendo para as telas públicas
     st.stop()
