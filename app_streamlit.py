@@ -1559,12 +1559,7 @@ else:
         elif menu_atual == "🤝 Gerenciar Conexões":
             st.title("🤝 Gestão de Relacionamentos") 
 
-            dias_semana_map = {0: 'Segunda-feira', 1: 'Terça-feira', 2: 'Quarta-feira', 3: 'Quinta-feira', 4: 'Sexta-feira', 5: 'Sábado', 6: 'Domingo'}
-
-            # 🌟 CORREÇÃO: Adicionado .datetime. antes do .now()
-            dia_atual_servidor = dias_semana_map[datetime.datetime.now().weekday()]
-
-
+          
             if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
                 st.session_state.opcao_menu = "💬 Conversar com Lucy"
                 st.rerun()
@@ -1646,9 +1641,12 @@ else:
                     """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
                     encontros = cursor.fetchall(); cursor.close(); 
                     
-                    # Separa registros Ativos e Passados baseado no dia do servidor
-                    encontros_ativos = [e for e in encontros if str(e[1]).lower() == str(dia_atual_servidor).lower() or str(e[4]).lower() == 'pendente']
-                    encontros_passados = [e for e in encontros if str(e[1]).lower() != str(dia_atual_servidor).lower() and str(e[4]).lower() == 'aceito']
+                    # --- CORREÇÃO DA SEPARAÇÃO: Baseado estritamente no status do convite ---
+                    # Ativos: Qualquer um que ainda esteja Pendente ou que já foi Aceito (independente do dia ser hoje ou futuro)
+                    encontros_ativos = [e for e in encontros if str(e[4]).lower() in ['pendente', 'aceito']]
+                    
+                    # Passados: Apenas registros explicitamente arquivados, concluídos, rejeitados ou cancelados
+                    encontros_passados = [e for e in encontros if str(e[4]).lower() in ['concluido', 'recusado', 'cancelado']]
                     
                     if not encontros_ativos:
                         st.caption("Nenhum convite pendente ou encontro ativo para hoje.")
