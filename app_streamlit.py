@@ -298,7 +298,7 @@ def renderizar_chat_lucy_isolado():
     st.markdown("<hr style='border-color: #30363d; margin: 10px 0 20px 0;'>", unsafe_allow_html=True)
     st.button("✉️ Fale Conosco", type="tertiary")
     st.session_state.opcao_menu = "✉️ Fale Conosco"
-    st.rerun()  
+    
 
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
