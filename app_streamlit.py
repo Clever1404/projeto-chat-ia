@@ -1539,7 +1539,7 @@ def template_painel_admin():
 #else:
 #    if menu_atual == "home":  
     # --- TELAS PÚBLICAS (Sem Barra Lateral de Usuário) ---
-def template home():
+def template_home():
     st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
     st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
@@ -1630,7 +1630,7 @@ def template home():
 
 
 #elif menu_atual == "planos":
-def template planos():
+def template_planos():
     st.session_state.opcao_menu = "planos"
     # Inicializa a sub-visão caso ela não exista
     if "sub_visao" not in st.session_state:
