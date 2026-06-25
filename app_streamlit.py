@@ -880,12 +880,12 @@ def template_sala_privada():
 # ==============================================================================
 @st.dialog("🛒 Loja do App")
 def mostrar_popup_loja(id_usuario):
-    opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP (R$ 19,90)", "10 Moedas (R$ 5,00)"])
+    opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"])
 
     if st.button("Gerar Pix de Pagamento"):
-        valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (5.00, "Pacote de 10 Moedas", "moedas")
+        valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
         id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
-        
+       
         payment_data = {
             "transaction_amount": valor, 
             "description": desc, 
@@ -1697,10 +1697,17 @@ else:
                 """        
             )
                 
-            # Botão para ir para a loja (Troca a tela inteira)
-            if st.button("🛒 Ir para a Loja de Moedas e Assinaturas", type="primary", use_container_width=True):
-                id_usuario = st.session_state.get("id_usuario", "usuario_teste")
-                mostrar_popup_loja(id_usuario)
+
+
+                
+            with st.sidebar:
+                st.session_state.abrir_popup_loja = "Ir para a Loja 🛒"
+                opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"])
+
+             
+            if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_ir_loja"):
+                            st.session_state.abrir_popup_loja = True
+                            st.rerun()
 
             if st.button("← Voltar para o Login", use_container_width=True):
                 st.session_state.opcao_menu = "login"
