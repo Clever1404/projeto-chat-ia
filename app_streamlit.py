@@ -1082,6 +1082,8 @@ def template_painel_admin():
             help="Total de encontros simultâneos em andamento monitorados em tempo real pela tabela matches"
         )
 
+    # Exibe Métricas Rápidas
+    st.metric(label="Salas Privadas com Atividade Recente (5m)", value=int(total_salas_ativas))
     st.markdown("<br>", unsafe_allow_html=True)
 
     # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
