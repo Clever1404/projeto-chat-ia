@@ -1666,9 +1666,9 @@ else:
                                 cursor.close()
                                     
 
-            if st.button("← Voltar para o Login", use_container_width=True):
-                st.session_state.opcao_menu = "login"
-                st.rerun()
+        if st.button("← Voltar para o Login", use_container_width=True):
+            st.session_state.opcao_menu = "login"
+            st.rerun()
 
 
     elif menu_atual == "planos":
