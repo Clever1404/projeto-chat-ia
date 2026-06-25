@@ -1130,7 +1130,9 @@ def template_painel_admin():
 
 
 # --- 3. AMBIENTE PÚBLICO (SÓ EXECUTA SE O USUÁRIO NÃO ESTIVER LOGADO) ---
-menu_atual = st.session_state.get("opcao_menu", "home")  
+menu_atual = st.session_state.get("opcao_menu", "home")
+# Agora este bloco roda de forma limpa, sem risco de ser bloqueado por modais fantasmas
+if menu_atual == "home":  
     # --- TELAS PÚBLICAS (Sem Barra Lateral de Usuário) ---
     st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
     # ... (restante do seu código da Home continua exatamente igual) ...
