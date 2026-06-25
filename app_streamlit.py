@@ -1576,57 +1576,57 @@ def template_home():
                 st.rerun()        
 
 #elif menu_atual == "cadastro":
-    def template cadastro():
-        st.html('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>')
-        with st.form(key=f"form_cad_unico_{st.session_state.form_seed}"):
-            usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
-            email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed")
-            senha = st.text_input("Senha", placeholder="Escolha uma Senha", type="password", label_visibility="collapsed")
-            genero = st.selectbox("Gênero", options=["M", "F"], index=0, label_visibility="collapsed")
+def template_cadastro():
+    st.html('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>')
+    with st.form(key=f"form_cad_unico_{st.session_state.form_seed}"):
+        usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
+        email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed")
+        senha = st.text_input("Senha", placeholder="Escolha uma Senha", type="password", label_visibility="collapsed")
+        genero = st.selectbox("Gênero", options=["M", "F"], index=0, label_visibility="collapsed")
 
-            with stylable_container(
-                        key="green_button_cad",
-                        css_styles="""
-                            button { background-color: #28a745; color: white; border-radius: 5px; }
-                            button:hover { background-color: #218838; color: white; }
-                        """,
-                    ):
+        with stylable_container(
+                    key="green_button_cad",
+                    css_styles="""
+                        button { background-color: #28a745; color: white; border-radius: 5px; }
+                        button:hover { background-color: #218838; color: white; }
+                    """,
+                ):
 
-                if st.form_submit_button("Cadastre-se", use_container_width=True):
-                    if not usuario.strip() or not email.strip() or not senha.strip():
-                        st.warning("⚠️ Por favor, preencha todos os campos.")
-                    elif len(senha) < 6:
-                        st.warning("⚠️ A senha deve ter pelo menos 6 caracteres.")
-                    else:
-                        conn = None
-                        try:
-                            conn = obter_conexao_eficiente()
-                            cursor = conn.cursor()
-                            cursor.execute("SELECT username, email FROM usuarios WHERE username = %s OR email = %s;", (usuario.strip(), email.strip()))
-                            existente = cursor.fetchone()
-                            if existente:
-                                st.error("❌ Usuário ou E-mail já cadastrado.")
-                            else:
-                                senha_final = generate_password_hash(senha)
-                                cursor.execute("INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", (usuario.strip(), email.strip(), senha_final, genero))
-                                st.session_state.usuario_id = int(cursor.fetchone()[0])
-                                st.session_state.username = usuario.strip()
-                                st.session_state.genero = genero
-                                conn.commit()
-                                    
-                                # Atualiza para a tela de planos e limpa estados residuais
-                                st.session_state.opcao_menu = "planos"
-                                st.rerun()
-                        except Exception as e: 
-                            st.error(f"Erro ao processar cadastro: {e}")
-                        finally:
-                            if conn:
-                                cursor.close()
-                                    
+            if st.form_submit_button("Cadastre-se", use_container_width=True):
+                if not usuario.strip() or not email.strip() or not senha.strip():
+                    st.warning("⚠️ Por favor, preencha todos os campos.")
+                elif len(senha) < 6:
+                    st.warning("⚠️ A senha deve ter pelo menos 6 caracteres.")
+                else:
+                    conn = None
+                    try:
+                        conn = obter_conexao_eficiente()
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT username, email FROM usuarios WHERE username = %s OR email = %s;", (usuario.strip(), email.strip()))
+                        existente = cursor.fetchone()
+                        if existente:
+                            st.error("❌ Usuário ou E-mail já cadastrado.")
+                        else:
+                            senha_final = generate_password_hash(senha)
+                            cursor.execute("INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", (usuario.strip(), email.strip(), senha_final, genero))
+                            st.session_state.usuario_id = int(cursor.fetchone()[0])
+                            st.session_state.username = usuario.strip()
+                            st.session_state.genero = genero
+                            conn.commit()
+                                
+                            # Atualiza para a tela de planos e limpa estados residuais
+                            st.session_state.opcao_menu = "planos"
+                            st.rerun()
+                    except Exception as e: 
+                        st.error(f"Erro ao processar cadastro: {e}")
+                    finally:
+                        if conn:
+                            cursor.close()
+                                
 
-        if st.button("← Voltar para o Login", use_container_width=True):
-            st.session_state.opcao_menu = "login"
-            st.rerun()
+    if st.button("← Voltar para o Login", use_container_width=True):
+        st.session_state.opcao_menu = "login"
+        st.rerun()
 
 
 #elif menu_atual == "planos":
