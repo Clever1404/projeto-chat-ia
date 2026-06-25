@@ -844,7 +844,7 @@ def template_sala_privada():
         st.divider()
         st.write(f"**ID ({st.session_state.get('id', 'matches')}):** {id_match_atual}")
         st.write(f"**Ultima atividade ({st.session_state.get('ultima_atividade', 'matches')}):** {agora_iso}")
-
+        st.write(f"**status ({st.session_state.get('status_conexao', 'matches')}):** {" "}")
 
         if st.button("🎥 Iniciar Videochamada Privada"): 
             nome_da_sala_unica = f"Atendimento_FaleConosco_SalaPrivada_{id_match_int}" 
@@ -1085,7 +1085,7 @@ def template_painel_admin():
 
         cursor.execute("""
             SELECT COUNT(id) FROM matches 
-            WHERE status_conexao = 'online' AND ultima_atividade >= NOW() - INTERVAL '5 minutes';
+            WHERE status_conexao = 'online' OR ultima_atividade >= NOW() - INTERVAL '5 minutes';
         """)
         total_salas_ativas = cursor.fetchone()[0]
 
