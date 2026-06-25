@@ -1082,197 +1082,221 @@ def template_painel_admin():
 # ==============================================================================
 # 8. ROTEADOR DE FLUXO GLOBAL (CORREÇÃO DE DIALOGS DUPLICADOS)
 # ==============================================================================
-menu_atual = st.session_state.get("opcao_menu", "home")
+#menu_atual = st.session_state.get("opcao_menu", "home")
 
 # 1. GESTÃO CENTRALIZADA DE MODAIS (Chame o modal aqui e use 'pass' ou 'return' para bloquear o miolo)
-if st.session_state.get("abrir_reserva_fluxo"):
-    modal_agendamento_encontro(st.session_state.abrir_reserva_fluxo)
+#if st.session_state.get("abrir_reserva_fluxo"):
+#    modal_agendamento_encontro(st.session_state.abrir_reserva_fluxo)
     # Importante: Não deixe o script continuar executando telas no fundo enquanto o modal está ativo
     # Isso impede que o miolo chame outros blocos visuais concorrentes
 
-elif st.session_state.get("abrir_popup_loja"):
-    if st.session_state.get("usuario_id"):
+#elif st.session_state.get("abrir_popup_loja"):
+#    if st.session_state.get("usuario_id"):
+#        mostrar_popup_loja(st.session_state.usuario_id)
+#    st.session_state.abrir_popup_loja = False
+
+menu_atual = st.session_state.get("opcao_menu", "home")
+
+# --- CORREÇÃO DA SOBREPOSIÇÃO: ISOLAMENTO DE MODAIS PRIVADOS ---
+# Só permite gerenciar os modais de agendamento/loja se o usuário estiver logado
+if st.session_state.get("usuario_id"):
+    
+    if st.session_state.get("abrir_reserva_fluxo"):
+        modal_agendamento_encontro(st.session_state.abrir_reserva_fluxo)
+        # Trava a execução para não duplicar componentes no fundo
+        st.stop() 
+
+    elif st.session_state.get("abrir_popup_loja"):
         mostrar_popup_loja(st.session_state.usuario_id)
-    st.session_state.abrir_popup_loja = False
+        st.session_state.abrir_popup_loja = False
+        st.stop()
+
+# --- 2. SEGUIDO PELO SEU IF/ELIF NORMAL DE TELAS ---
+# Agora este bloco roda de forma limpa, sem risco de ser bloqueado por modais fantasmas
+if menu_atual == "home":  
+    # --- TELAS PÚBLICAS (Sem Barra Lateral de Usuário) ---
+    st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
+    # ... (restante do seu código da Home continua exatamente igual) ...
+
+
 
 # 2. SEGUIDO PELO SEU IF/ELIF NORMAL DE TELAS (Apenas se nenhum modal acima capturar o fluxo)
-else:
-    if menu_atual == "home":  
+#else:
+#    if menu_atual == "home":  
     # --- TELAS PÚBLICAS (Sem Barra Lateral de Usuário) ---
-        st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
-        st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>", unsafe_allow_html=True)
-        st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
+#        st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
 
-        st.markdown("""
-            <div style='text-align: center;'>
-            🔒 **Ambiente 100% Seguro:** Suas mensagens e chamadas são privadas.<br>
-            🎥 **Videochamada Integrada:** Conecte-se por vídeo com um clique.<br>
-            📬 **Suporte Dedicado:** Canal direto via Fale Conosco.<br>
-            </div>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+        <div style='text-align: center;'>
+        🔒 **Ambiente 100% Seguro:** Suas mensagens e chamadas são privadas.<br>
+        🎥 **Videochamada Integrada:** Conecte-se por vídeo com um clique.<br>
+        📬 **Suporte Dedicado:** Canal direto via Fale Conosco.<br>
+        </div>
+    """, unsafe_allow_html=True)
 
-        st.markdown("""
-            <div style="background-color: #004085; padding: 20px; border-radius: 5px; text-align: center; border-left: 5px solid #0066cc; margin-bottom: 20px;">
-                <h1 style="margin: 0; color: #ffffff; font-size: 24px;">
+    st.markdown("""
+        <div style="background-color: #004085; padding: 20px; border-radius: 5px; text-align: center; border-left: 5px solid #0066cc; margin-bottom: 20px;">
+            <h1 style="margin: 0; color: #ffffff; font-size: 24px;">
                         💡 CADASTRE-SE AGORA EM NOSSO SITE ENCONTRE SEU MATCH E MARQUE UM ENCONTRO VIRTUAL!!
-                </h1>
-            </div>
-        """, unsafe_allow_html=True)
+            </h1>
+        </div>
+    """, unsafe_allow_html=True)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
-                st.session_state.opcao_menu = "login"
-                st.rerun()
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
+            st.session_state.opcao_menu = "login"
+            st.rerun()
                     
-        with col2:
-            with stylable_container(
-                key="green_button", 
-                css_styles="button { background-color: #28a745; color: white; }"
-            ):
-                if st.button("📝 Cadastre-se", use_container_width=True):
-                    st.session_state.opcao_menu = "cadastro"
-                    st.rerun()        
+    with col2:
+        with stylable_container(
+            key="green_button", 
+            css_styles="button { background-color: #28a745; color: white; }"
+        ):
+            if st.button("📝 Cadastre-se", use_container_width=True):
+                st.session_state.opcao_menu = "cadastro"
+                st.rerun()        
 
-    elif menu_atual == "login":
-        st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
-        with st.form("form_login"):
-            user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed")
-            pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed")
+elif menu_atual == "login":
+    st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
+    with st.form("form_login"):
+        user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed")
+        pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed")
                 
-            if st.form_submit_button("login", type="primary", use_container_width=True):
+        if st.form_submit_button("login", type="primary", use_container_width=True):
+            try:
+                conn = obter_conexao_eficiente()
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
+                res = cursor.fetchone()
+                if res:
+                    st.session_state.usuario_id = int(res[0])
+                    st.session_state.username = res[1]
+                    st.session_state.foto_perfil = res[2]
+                    st.session_state.eh_admin = bool(res[3])
+                    st.session_state.genero = res[4]
+                    st.session_state.dados_usuario = {
+                        "username": res[1], "foto_perfil": res[2], "genero": res[4],
+                        "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", "moedas": res[6] if res[6] else 0
+                    }
+                    cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (int(res[0]),))
+                    conn.commit(); cursor.close(); 
+                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                    st.rerun()
+                else:
+                    st.error("Usuário não encontrado.")
+                cursor.close(); 
+            except Exception as e: 
+                st.error(f"Erro: {e}")       
+
+    col_voltar, col_esqueceu = st.columns(2)
+    with col_voltar:
+        if st.button("⬅️ Voltar para a Home", use_container_width=True):
+            st.session_state.opcao_menu = "home"
+            st.rerun()
+    with col_esqueceu:
+        # CORREÇÃO AQUI: Removemos o st.rerun() daqui de dentro. 
+        # Agora o Streamlit consegue renderizar o modal sem sofrer interrupção imediata.
+        if st.button("🔑 Esqueceu a senha?", use_container_width=True):
+            modal_recuperar_senha()
+
+            
+
+elif menu_atual == "cadastro":
+    st.html('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>')
+    with st.form(key=f"form_cad_unico_{st.session_state.form_seed}"):
+        usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
+        email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed")
+        senha = st.text_input("Senha", placeholder="Escolha uma Senha", type="password", label_visibility="collapsed")
+        genero = st.selectbox("Gênero", options=["M", "F"], index=0, label_visibility="collapsed")
+                
+        if st.form_submit_button("Cadastre-se", use_container_width=True):
+            if not usuario.strip() or not email.strip() or not senha.strip():
+                st.warning("⚠️ Por favor, preencha todos os campos.")
+            elif len(senha) < 6:
+                st.warning("⚠️ A senha deve ter pelo menos 6 caracteres.")
+            else:
+                conn = None
                 try:
                     conn = obter_conexao_eficiente()
                     cursor = conn.cursor()
-                    cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
-                    res = cursor.fetchone()
-                    if res:
-                        st.session_state.usuario_id = int(res[0])
-                        st.session_state.username = res[1]
-                        st.session_state.foto_perfil = res[2]
-                        st.session_state.eh_admin = bool(res[3])
-                        st.session_state.genero = res[4]
-                        st.session_state.dados_usuario = {
-                            "username": res[1], "foto_perfil": res[2], "genero": res[4],
-                            "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", "moedas": res[6] if res[6] else 0
-                        }
-                        cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (int(res[0]),))
-                        conn.commit(); cursor.close(); 
-                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                        st.rerun()
+                    cursor.execute("SELECT username, email FROM usuarios WHERE username = %s OR email = %s;", (usuario.strip(), email.strip()))
+                    existente = cursor.fetchone()
+                    if existente:
+                        st.error("❌ Usuário ou E-mail já cadastrado.")
                     else:
-                        st.error("Usuário não encontrado.")
-                    cursor.close(); 
+                        senha_final = generate_password_hash(senha)
+                        cursor.execute("INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", (usuario.strip(), email.strip(), senha_final, genero))
+                        st.session_state.usuario_id = int(cursor.fetchone()[0])
+                        st.session_state.username = usuario.strip()
+                        st.session_state.genero = genero
+                        conn.commit()
+                            
+                        # Atualiza para a tela de planos e limpa estados residuais
+                        st.session_state.opcao_menu = "planos"
+                        st.rerun()
                 except Exception as e: 
-                    st.error(f"Erro: {e}")       
+                    st.error(f"Erro ao processar cadastro: {e}")
+                finally:
+                    if conn:
+                        cursor.close()
+                            
 
-        col_voltar, col_esqueceu = st.columns(2)
-        with col_voltar:
-            if st.button("⬅️ Voltar para a Home", use_container_width=True):
-                st.session_state.opcao_menu = "home"
-                st.rerun()
-        with col_esqueceu:
-            # CORREÇÃO AQUI: Removemos o st.rerun() daqui de dentro. 
-            # Agora o Streamlit consegue renderizar o modal sem sofrer interrupção imediata.
-            if st.button("🔑 Esqueceu a senha?", use_container_width=True):
-                modal_recuperar_senha()
+    if st.button("← Voltar para o Login", use_container_width=True):
+        st.session_state.opcao_menu = "login"
+        st.rerun()
 
+
+elif menu_atual == "planos":
+    st.session_state.opcao_menu = "planos"
+    # Inicializa a sub-visão caso ela não exista
+    if "sub_visao" not in st.session_state:
+        st.session_state.sub_visao = "planos"
+
+    # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
+    if st.session_state.sub_visao == "planos":
+        st.markdown('<h1 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
             
-
-    elif menu_atual == "cadastro":
-        st.html('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>')
-        with st.form(key=f"form_cad_unico_{st.session_state.form_seed}"):
-            usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
-            email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed")
-            senha = st.text_input("Senha", placeholder="Escolha uma Senha", type="password", label_visibility="collapsed")
-            genero = st.selectbox("Gênero", options=["M", "F"], index=0, label_visibility="collapsed")
-                
-            if st.form_submit_button("Cadastre-se", use_container_width=True):
-                if not usuario.strip() or not email.strip() or not senha.strip():
-                    st.warning("⚠️ Por favor, preencha todos os campos.")
-                elif len(senha) < 6:
-                    st.warning("⚠️ A senha deve ter pelo menos 6 caracteres.")
-                else:
-                    conn = None
-                    try:
-                        conn = obter_conexao_eficiente()
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT username, email FROM usuarios WHERE username = %s OR email = %s;", (usuario.strip(), email.strip()))
-                        existente = cursor.fetchone()
-                        if existente:
-                            st.error("❌ Usuário ou E-mail já cadastrado.")
-                        else:
-                            senha_final = generate_password_hash(senha)
-                            cursor.execute("INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", (usuario.strip(), email.strip(), senha_final, genero))
-                            st.session_state.usuario_id = int(cursor.fetchone()[0])
-                            st.session_state.username = usuario.strip()
-                            st.session_state.genero = genero
-                            conn.commit()
-                            
-                            # Atualiza para a tela de planos e limpa estados residuais
-                            st.session_state.opcao_menu = "planos"
-                            st.rerun()
-                    except Exception as e: 
-                        st.error(f"Erro ao processar cadastro: {e}")
-                    finally:
-                        if conn:
-                            cursor.close()
-                            
+        # Texto descritivo dos planos centralizado
+        st.html(
+            """
+            <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
+                <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
+                    
+                <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
+                    <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+                    <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
+                </div>
+                    
+                <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
+                    <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+                    <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
+                </div>
+                    
+                <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+                    <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+                    <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+                </div>
+            </div>
+            """        
+        )
+            
+        # Botão para ir para a loja (Troca a tela inteira)
+        if st.button("🛒 Ir para a Loja de Moedas e Assinaturas", type="primary", use_container_width=True):
+            id_usuario = st.session_state.get("id_usuario", "usuario_teste")
+            mostrar_popup_loja(id_usuario)
 
         if st.button("← Voltar para o Login", use_container_width=True):
             st.session_state.opcao_menu = "login"
-            st.rerun()
-
-
-    elif menu_atual == "planos":
-        st.session_state.opcao_menu = "planos"
-        # Inicializa a sub-visão caso ela não exista
-        if "sub_visao" not in st.session_state:
-            st.session_state.sub_visao = "planos"
-
-        # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
-        if st.session_state.sub_visao == "planos":
-            st.markdown('<h1 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
-            
-            # Texto descritivo dos planos centralizado
-            st.html(
-                """
-                <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
-                    <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
-                    
-                    <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
-                        <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
-                        <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
-                    </div>
-                    
-                    <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
-                        <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
-                        <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
-                    </div>
-                    
-                    <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
-                        <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
-                        <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
-                    </div>
-                </div>
-                """        
-            )
-            
-            # Botão para ir para a loja (Troca a tela inteira)
-            if st.button("🛒 Ir para a Loja de Moedas e Assinaturas", type="primary", use_container_width=True):
-                id_usuario = st.session_state.get("id_usuario", "usuario_teste")
-                mostrar_popup_loja(id_usuario)
-
-            if st.button("← Voltar para o Login", use_container_width=True):
-                st.session_state.opcao_menu = "login"
-                st.rerun() 
+            st.rerun() 
                 
       
 
-    # --- TELAS PRIVADAS (Com Barra Lateral de Usuário Logado) ---
-    elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Gerenciar Conexões", "🤝 Sala Privada", "🛠️ Painel Admin"]:
-        
-        #    st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
+# --- TELAS PRIVADAS (Com Barra Lateral de Usuário Logado) ---
+elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Gerenciar Conexões", "🤝 Sala Privada", "🛠️ Painel Admin"]:
+#    st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
 
             # 1. Verifica os dados salvos na Sessão Atual do Navegador
         #    id_usuario_logado = st.session_state.get("usuario_id")
@@ -1303,407 +1327,450 @@ else:
         #            st.warning("⚠️ A pasta de uploads ainda não foi criada fisicamente no servidor remoto.")
         #    except Exception as e:
         #        st.error(f"Erro ao listar diretório: {e}")
-
+        
+        
 
             #avatar_html = ""
             # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
-        with st.sidebar: 
-            # ==========================================================================
-            # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO E MAIOR ---
-            # ==========================================================================
-            caminho_foto_perfil = str(st.session_state.get("foto_perfil", "")).strip()
+
+    with st.sidebar: 
+        # ==========================================================================
+        # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO E MAIOR ---
+        # ==========================================================================
+        caminho_foto_perfil = str(st.session_state.get("foto_perfil", "")).strip()
                 
-            # Cria 3 colunas para forçar o alinhamento no centro absoluto da barra lateral
-            col_esq, col_centro, col_dir = st.columns([1, 2, 1])
-            with col_centro:
-                if caminho_foto_perfil and (caminho_foto_perfil.startswith("http") or os.path.exists(caminho_foto_perfil.lstrip('/'))):
-                    # Aumentado para width=85 para dar mais destaque ao rosto
-                    st.image(caminho_foto_perfil, width=85)
-                else:
-                    # Emoji centralizado e ampliado
-                    st.markdown('<div style="font-size: 65px; text-align:center; margin-top: -10px;">👩</div>', unsafe_allow_html=True)
-
-            # Extração limpa do nome do usuário antes do '@'
-            username_atual = st.session_state.get("username", "Usuário")
-            nome_usuario_puro = str(username_atual).split('@')[0].capitalize()
-
-            st.markdown(f"""
-                <div style="text-align: center; margin-bottom: 20px; margin-top: 5px;">
-                    <h3 style="margin: 0; font-size: 17px; font-weight: bold; color: #f0f6fc;">{nome_usuario_puro}</h3>
-                    <p style="color: #48bb78; font-weight: bold; font-size: 13px; margin: 4px 0 0 0;">🟢 Online</p>
-                </div>
-            """, unsafe_allow_html=True)
-
-            # ==========================================================================
-            # --- CONSULTA 1: PLANO E SALDO REAL (PROCESSAMENTO CACHED TOTALMENTE BLINDADO) ---
-            # ==========================================================================
-            tipo_plano = "Grátis"
-            saldo_moedas = 0
-            id_usuario_logado = st.session_state.get("usuario_id")
-
-            if id_usuario_logado is not None:
-                try:
-                    # Carrega o registro direto da nossa função de memória cache
-                    registro_banco = carregar_plano_e_moedas_cached(id_usuario_logado)
-                    
-                    # CORREÇÃO DA LEITURA: O Supabase com Service Key pode retornar uma lista ou dicionário direto
-                    # Esta lógica desempacota com segurança qualquer um dos dois formatos
-                    if isinstance(registro_banco, list) and len(registro_banco) > 0:
-                        dados_reais = registro_banco[0]
-                    elif isinstance(registro_banco, dict):
-                        dados_reais = registro_banco
-                    else:
-                        dados_reais = {}
-
-                    # Captura o plano bruto tratando valores nulos
-                    plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
-                    
-                    # Normalização total de strings (elimina acentos, espaços e caixa alta)
-                    plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
-                    
-                    if "credito" in plano_norm or "moedas" in plano_norm:
-                        tipo_plano = "Plano Crédito de Moedas"
-                    elif "vip" in plano_norm or "assinante" in plano_norm:
-                        tipo_plano = "vip"
-                    else:
-                        tipo_plano = "Grátis"
-                        
-                    saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
-                        
-                except Exception as e:
-                    st.error(f"Erro ao mapear cache de saldo: {e}")
+        # Cria 3 colunas para forçar o alinhamento no centro absoluto da barra lateral
+        col_esq, col_centro, col_dir = st.columns([1, 2, 1])
+        with col_centro:
+            if caminho_foto_perfil and (caminho_foto_perfil.startswith("http") or os.path.exists(caminho_foto_perfil.lstrip('/'))):
+                # Aumentado para width=85 para dar mais destaque ao rosto
+                st.image(caminho_foto_perfil, width=85)
             else:
-                st.warning("⚠️ Usuário não identificado na sessão.")
+                # Emoji centralizado e ampliado
+                st.markdown('<div style="font-size: 65px; text-align:center; margin-top: -10px;">👩</div>', unsafe_allow_html=True)
 
-            # Sincroniza e trava os estados de forma idêntica para o Roteador e Telas
-            st.session_state["tipo_plano"] = tipo_plano
-            st.session_state["saldo_moedas"] = saldo_moedas
+        # Extração limpa do nome do usuário antes do '@'
+        username_atual = st.session_state.get("username", "Usuário")
+        nome_usuario_puro = str(username_atual).split('@')[0].capitalize()
 
-            # Renderização do cabeçalho de cobrança na Sidebar
-            st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+        st.markdown(f"""
+            <div style="text-align: center; margin-bottom: 20px; margin-top: 5px;">
+                <h3 style="margin: 0; font-size: 17px; font-weight: bold; color: #f0f6fc;">{nome_usuario_puro}</h3>
+                <p style="color: #48bb78; font-weight: bold; font-size: 13px; margin: 4px 0 0 0;">🟢 Online</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # ==========================================================================
+        # --- CONSULTA 1: PLANO E SALDO REAL (PROCESSAMENTO CACHED TOTALMENTE BLINDADO) ---
+        # ==========================================================================
+        tipo_plano = "Grátis"
+        saldo_moedas = 0
+        id_usuario_logado = st.session_state.get("usuario_id")
+
+        if id_usuario_logado is not None:
+            try:
+                # Carrega o registro direto da nossa função de memória cache
+                registro_banco = carregar_plano_e_moedas_cached(id_usuario_logado)
+                    
+                # CORREÇÃO DA LEITURA: O Supabase com Service Key pode retornar uma lista ou dicionário direto
+                # Esta lógica desempacota com segurança qualquer um dos dois formatos
+                if isinstance(registro_banco, list) and len(registro_banco) > 0:
+                    dados_reais = registro_banco[0]
+                elif isinstance(registro_banco, dict):
+                    dados_reais = registro_banco
+                else:
+                    dados_reais = {}
+
+                # Captura o plano bruto tratando valores nulos
+                plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
+                    
+                # Normalização total de strings (elimina acentos, espaços e caixa alta)
+                plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
+                    
+                if "credito" in plano_norm or "moedas" in plano_norm:
+                    tipo_plano = "Plano Crédito de Moedas"
+                elif "vip" in plano_norm or "assinante" in plano_norm:
+                    tipo_plano = "vip"
+                else:
+                    tipo_plano = "Grátis"
+                        
+                saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
+                        
+            except Exception as e:
+                st.error(f"Erro ao mapear cache de saldo: {e}")
+        else:
+            st.warning("⚠️ Usuário não identificado na sessão.")
+
+        # Sincroniza e trava os estados de forma idêntica para o Roteador e Telas
+        st.session_state["tipo_plano"] = tipo_plano
+        st.session_state["saldo_moedas"] = saldo_moedas
+
+        # Renderização do cabeçalho de cobrança na Sidebar
+        st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
                             
 
-            # ==========================================================================
-            # --- COMPONENTE: ALTERAR FOTO DE PERFIL (CORREÇÃO ANTI-LOOP) ---
-            # ==========================================================================
-            st.caption("📷 Enviar nova foto de perfil:")
+        # ==========================================================================
+        # --- COMPONENTE: ALTERAR FOTO DE PERFIL (CORREÇÃO ANTI-LOOP) ---
+        # ==========================================================================
+        st.caption("📷 Enviar nova foto de perfil:")
+            
+        # Usamos uma chave dinâmica baseada no form_seed para resetar o uploader após o sucesso
+        f_nova = st.file_uploader(
+            "Alterar Foto", 
+            type=["png","jpg","jpeg"], 
+            key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
+            label_visibility="collapsed"
+        ) 
+            
+        if f_nova and id_usuario_logado: 
+            id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
+            nome_arquivo_storage = f"user_{id_limpo}.jpg"
                 
-            # Usamos uma chave dinâmica baseada no form_seed para resetar o uploader após o sucesso
-            f_nova = st.file_uploader(
-                "Alterar Foto", 
-                type=["png","jpg","jpeg"], 
-                key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
-                label_visibility="collapsed"
-            ) 
-                
-            if f_nova and id_usuario_logado: 
-                id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
-                nome_arquivo_storage = f"user_{id_limpo}.jpg"
+            try:
+                # 1. Converte o arquivo enviado para bytes brutos
+                dados_imagem_bytes = f_nova.getvalue()
                     
-                try:
-                    # 1. Converte o arquivo enviado para bytes brutos
-                    dados_imagem_bytes = f_nova.getvalue()
-                        
-                    # 2. Faz o upload direto para o bucket 'perfis' (Ignorando RLS via Service Key)
-                    supabase.storage.from_("perfis").upload(
-                        path=nome_arquivo_storage,
-                        file=dados_imagem_bytes,
-                        file_options={"content-type": "image/jpeg", "upsert": "true"}
-                    )
-                        
-                    # 3. CORREÇÃO: Captura a string da URL pública de forma explícita
-                    resposta_url = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
-                        
-                    # Dependendo da versão da biblioteca, extrai a string pura do link
-                    if hasattr(resposta_url, "public_url"):
-                        url_publica_foto = str(resposta_url.public_url).strip()
-                    else:
-                        url_publica_foto = str(resposta_url).strip()
-                        
-                    # 4. Grava a URL estável no PostgreSQL
-                    conn_foto = obter_conexao_eficiente()
-                    cursor_foto = conn_foto.cursor() 
-                    cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
-                    conn_foto.commit()
-                    cursor_foto.close()
-                        
-                    # Atualiza a memória ativa do navegador
-                    st.session_state.foto_perfil = url_publica_foto
-                    st.cache_data.clear()
-                        
-                    # 🚨 O SEGREDO AQUI: Alteramos o ID da semente para resetar o componente st.file_uploader
-                    # Isso faz o arquivo "sumir" da memória do uploader, quebrando o loop de rerun
-                    if "form_seed" in st.session_state:
-                        st.session_state.form_seed += 1
-                    else:
-                        st.session_state.form_seed = 43
-                        
-                    st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
-                    time.sleep(1)
-                    st.rerun() 
-                        
-                except Exception as e:
-                    st.error(f"Erro ao salvar foto no Storage: {e}")   
+                # 2. Faz o upload direto para o bucket 'perfis' (Ignorando RLS via Service Key)
+                supabase.storage.from_("perfis").upload(
+                    path=nome_arquivo_storage,
+                    file=dados_imagem_bytes,
+                    file_options={"content-type": "image/jpeg", "upsert": "true"}
+                )
+                    
+                # 3. CORREÇÃO: Captura a string da URL pública de forma explícita
+                resposta_url = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
+                    
+                # Dependendo da versão da biblioteca, extrai a string pura do link
+                if hasattr(resposta_url, "public_url"):
+                    url_publica_foto = str(resposta_url.public_url).strip()
+                else:
+                    url_publica_foto = str(resposta_url).strip()
+                    
+                # 4. Grava a URL estável no PostgreSQL
+                conn_foto = obter_conexao_eficiente()
+                cursor_foto = conn_foto.cursor() 
+                cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
+                conn_foto.commit()
+                cursor_foto.close()
+                    
+                # Atualiza a memória ativa do navegador
+                st.session_state.foto_perfil = url_publica_foto
+                st.cache_data.clear()
+                    
+                # 🚨 O SEGREDO AQUI: Alteramos o ID da semente para resetar o componente st.file_uploader
+                # Isso faz o arquivo "sumir" da memória do uploader, quebrando o loop de rerun
+                if "form_seed" in st.session_state:
+                    st.session_state.form_seed += 1
+                else:
+                    st.session_state.form_seed = 43
+                    
+                st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
+                time.sleep(1)
+                st.rerun() 
+                    
+            except Exception as e:
+                st.error(f"Erro ao salvar foto no Storage: {e}")   
+            
+        # ==========================================================================
+        # --- CONSULTA 2: MOTOR DE BUSCA DA NOTIFICAÇÃO ---
+        # ==========================================================================
+        possui_convite_pendente = False
+        if id_usuario_logado:
+            try:
+                meu_id_limpo = int(id_usuario_logado[0]) if isinstance(id_usuario_logado, (tuple, list)) else int(id_usuario_logado)
+                conn_b = obter_conexao_eficiente()
+                cursor_b = conn_b.cursor()
+                cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
+                count_res = cursor_b.fetchone()
+                if count_res and count_res[0] > 0: 
+                    possui_convite_pendente = True
+                cursor_b.close()
                 
-            # ==========================================================================
-            # --- CONSULTA 2: MOTOR DE BUSCA DA NOTIFICAÇÃO ---
-            # ==========================================================================
-            possui_convite_pendente = False
+            except Exception: 
+                pass
+
+        # Configura o rótulo do botão baseado na presença de convites
+        if possui_convite_pendente:
+            label_gestao = "🤝 ABRIR GESTÃO 🔴"
+            st.markdown("""
+                <div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'>
+                    <span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span>
+            </div>
+                """, unsafe_allow_html=True)
+        else:
+            label_gestao = "🤝 ABRIR GESTÃO"
+
+        # ==========================================================================
+        # --- BOTÕES DE NAVEGAÇÃO INTERNA ---
+        # ==========================================================================
+        if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel"):
+            st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
+            st.rerun()
+                
+        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria"): 
+            st.session_state.opcao_menu = "📅 Disponibilidade"
+            st.rerun()
+                
+        if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_ir_loja"):
+            st.session_state.abrir_popup_loja = True
+            st.rerun()
+                
+        # Validação de privilégios administrativos
+        eh_admin = st.session_state.get("eh_admin", False)
+        if eh_admin or username_atual in ['admin', 'Clever1404']:
+            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm"):
+                st.session_state.opcao_menu = "🛠️ Painel Admin"
+                st.rerun()     
+
+        if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True, key="btn_limpar_ia"):
             if id_usuario_logado:
                 try:
-                    meu_id_limpo = int(id_usuario_logado[0]) if isinstance(id_usuario_logado, (tuple, list)) else int(id_usuario_logado)
-                    conn_b = obter_conexao_eficiente()
-                    cursor_b = conn_b.cursor()
-                    cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
-                    count_res = cursor_b.fetchone()
-                    if count_res and count_res[0] > 0: 
-                        possui_convite_pendente = True
-                    cursor_b.close()
+                    id_limpo = id_usuario_logado[0] if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
+                    conn = obter_conexao_eficiente()
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(id_limpo),))
+                    conn.commit()
+                    cursor.close()
                     
-                except Exception: 
-                    pass
+                    st.toast("Histórico limpo!")
+                    st.rerun()
+                except Exception as e: 
+                    st.error(f"Erro: {e}")
 
-            # Configura o rótulo do botão baseado na presença de convites
-            if possui_convite_pendente:
-                label_gestao = "🤝 ABRIR GESTÃO 🔴"
-                st.markdown("""
-                    <div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'>
-                        <span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span>
-                </div>
-                    """, unsafe_allow_html=True)
-            else:
-                label_gestao = "🤝 ABRIR GESTÃO"
-
-            # ==========================================================================
-            # --- BOTÕES DE NAVEGAÇÃO INTERNA ---
-            # ==========================================================================
-            if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel"):
-                st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
-                st.rerun()
-                    
-            if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria"): 
-                st.session_state.opcao_menu = "📅 Disponibilidade"
-                st.rerun()
-                    
-            if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_ir_loja"):
-                st.session_state.abrir_popup_loja = True
-                st.rerun()
-                    
-            # Validação de privilégios administrativos
-            eh_admin = st.session_state.get("eh_admin", False)
-            if eh_admin or username_atual in ['admin', 'Clever1404']:
-                if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm"):
-                    st.session_state.opcao_menu = "🛠️ Painel Admin"
-                    st.rerun()     
-
-            if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True, key="btn_limpar_ia"):
-                if id_usuario_logado:
-                    try:
-                        id_limpo = id_usuario_logado[0] if isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
-                        conn = obter_conexao_eficiente()
-                        cursor = conn.cursor()
-                        cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(id_limpo),))
-                        conn.commit()
-                        cursor.close()
-                       
-                        st.toast("Histórico limpo!")
-                        st.rerun()
-                    except Exception as e: 
-                        st.error(f"Erro: {e}")
-
-            st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
-                
-           
-            # ==========================================================================
-            # --- BOTÃO: ENCERRAR SESSÃO (LOGOUT 100% CORRIGIDO SEM ERRO DE INT) ---
-            # ==========================================================================
-            if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema"):
-                if id_usuario_logado:
-                    try:
-                        # Como st.session_state.usuario_id já guarda um inteiro puro do Login,
-                        # forçamos a conversão direta sem tentar ler índices de lista/tupla
-                        id_limpo = int(id_usuario_logado)
-                        
-                        # Conecta e executa a atualização imediata no banco
-                        conn_logout = obter_conexao_eficiente()
-                        cursor_logout = conn_logout.cursor()
-                        cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (id_limpo,))
-                        conn_logout.commit()
-                        cursor_logout.close()
-                    except Exception as e:
-                        # Se falhar, limpa o canal de transação do PostgreSQL
-                        if 'conn_logout' in locals() and conn_logout:
-                            conn_logout.rollback()
-                        st.sidebar.error(f"Erro no banco ao deslogar: {e}")
-                
-                # Limpa absolutamente toda a memória do navegador do usuário
-                for chave in list(st.session_state.keys()):
-                    del st.session_state[chave]
-                    
-                # Restabelece os estados padrão iniciais para o roteador abrir a tela de login
-                st.session_state.usuario_id = None
-                st.session_state.username = None
-                st.session_state.opcao_menu = "login"
-                st.session_state.form_seed = 42
-                
-                st.rerun()
-       
-        # Renderiza estritamente a tela selecionada no miolo da página
-        if menu_atual == "💬 Conversar com Lucy":   
-            # Apenas invoca o fragmento global de forma ultra eficiente
-            renderizar_chat_lucy_isolado()    
-           
-        elif menu_atual == "📅 Disponibilidade":
-                template_disponibilidade()
-                
-        elif menu_atual == "🤝 Gerenciar Conexões":
-            st.title("🤝 Gestão de Relacionamentos") 
-
-          
-            if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
-                st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                st.rerun()
-                        
-            aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
-            meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
-
-            # 🔴 NOVA REGRA ULTRA SEGURA:
-            # Captura o plano, remove espaços e coloca tudo em letras minúsculas
-            plano_atual = str(st.session_state.get("tipo_plano", "grátis")).strip().lower()
-
-            # Verifica se o usuário possui um dos planos válidos para acesso
-            usuario_tem_acesso = (plano_atual == "vip") or ("crédito" in plano_atual) or ("credito" in plano_atual)
-
-            # O botão será bloqueado SE o usuário NÃO tiver acesso
-            bloquear_botoes = not usuario_tem_acesso
-
-
-            with aba_m:
-                st.markdown("### 👥 Suas Afinidades")
-                matches_dados = []
+        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
+            
+        
+        # ==========================================================================
+        # --- BOTÃO: ENCERRAR SESSÃO (LOGOUT 100% CORRIGIDO SEM ERRO DE INT) ---
+        # ==========================================================================
+        if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema"):
+            if id_usuario_logado:
                 try:
-                    conn = obter_conexao_eficiente(); cursor = conn.cursor()
-                    cursor.execute('SELECT m.id, u.username, u.foto_perfil, u.genero, u.id FROM matches m JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;', (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-                    matches_dados = cursor.fetchall(); cursor.close(); 
-                except Exception: pass
+                    # Como st.session_state.usuario_id já guarda um inteiro puro do Login,
+                    # forçamos a conversão direta sem tentar ler índices de lista/tupla
+                    id_limpo = int(id_usuario_logado)
+                    
+                    # Conecta e executa a atualização imediata no banco
+                    conn_logout = obter_conexao_eficiente()
+                    cursor_logout = conn_logout.cursor()
+                    cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (id_limpo,))
+                    conn_logout.commit()
+                    cursor_logout.close()
+                except Exception as e:
+                    # Se falhar, limpa o canal de transação do PostgreSQL
+                    if 'conn_logout' in locals() and conn_logout:
+                        conn_logout.rollback()
+                    st.sidebar.error(f"Erro no banco ao deslogar: {e}")
+            
+            # Limpa absolutamente toda a memória do navegador do usuário
+            for chave in list(st.session_state.keys()):
+                del st.session_state[chave]
+                
+            # Restabelece os estados padrão iniciais para o roteador abrir a tela de login
+            st.session_state.usuario_id = None
+            st.session_state.username = None
+            st.session_state.opcao_menu = "login"
+            st.session_state.form_seed = 42
+            
+            st.rerun()
+    
+    # Renderiza estritamente a tela selecionada no miolo da página
+    if menu_atual == "💬 Conversar com Lucy":   
+        # Apenas invoca o fragmento global de forma ultra eficiente
+        renderizar_chat_lucy_isolado()    
+        
+    elif menu_atual == "📅 Disponibilidade":
+            template_disponibilidade()
+            
+    elif menu_atual == "🤝 Gerenciar Conexões":
+        st.title("🤝 Gestão de Relacionamentos") 
 
-                if not matches_dados: st.info("Nenhum par localizado.")
-                for m_id, m_nome, m_foto, m_gen, par_id in matches_dados:
-                    with st.container(border=True):
-                        # Estrutura em colunas equilibradas para reduzir o tamanho do retângulo
-                        c_av_c, c_nm_c, c_go_c, c_del_c = st.columns([0.6, 2, 1, 1])
-                        
-                        with c_av_c:
-                            # Limpa o caminho para o sistema operacional encontrar o arquivo
-                            caminho_par_img = str(m_foto).strip().lstrip('/')
-                        
-                            if m_foto and os.path.exists(caminho_par_img):
-                                # Desenha a foto de forma nativa e ultra veloz
-                                st.image(caminho_par_img, width=50)
-                            else:
-                                # Fallback limpo com layout alinhado caso não possua foto
-                                st.markdown(f'<div style="font-size: 35px; margin-top: 5px;">{"👩" if m_gen == "F" else "👨"}</div>', unsafe_allow_html=True)
+        
+        if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun()
+                    
+        aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
+        meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
 
-                                
-                        with c_nm_c:
-                            # Fonte aumentada para 15px e em negrito igual ao botão entrar
-                            st.markdown(f"<p style='font-size:15px; font-weight:bold; margin-top:5px; color:#f0f6fc;'>{str(m_nome).split('@')[0].capitalize()}</p>", unsafe_allow_html=True)
+        # 🔴 NOVA REGRA ULTRA SEGURA:
+        # Captura o plano, remove espaços e coloca tudo em letras minúsculas
+        plano_atual = str(st.session_state.get("tipo_plano", "grátis")).strip().lower()
+
+        # Verifica se o usuário possui um dos planos válidos para acesso
+        usuario_tem_acesso = (plano_atual == "vip") or ("crédito" in plano_atual) or ("credito" in plano_atual)
+
+        # O botão será bloqueado SE o usuário NÃO tiver acesso
+        bloquear_botoes = not usuario_tem_acesso
+
+
+        with aba_m:
+            st.markdown("### 👥 Suas Afinidades")
+            matches_dados = []
+            try:
+                conn = obter_conexao_eficiente(); cursor = conn.cursor()
+                cursor.execute('SELECT m.id, u.username, u.foto_perfil, u.genero, u.id FROM matches m JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;', (meu_id_limpo, meu_id_limpo, meu_id_limpo))
+                matches_dados = cursor.fetchall(); cursor.close(); 
+            except Exception: pass
+
+            if not matches_dados: st.info("Nenhum par localizado.")
+            for m_id, m_nome, m_foto, m_gen, par_id in matches_dados:
+                with st.container(border=True):
+                    # Estrutura em colunas equilibradas para reduzir o tamanho do retângulo
+                    c_av_c, c_nm_c, c_go_c, c_del_c = st.columns([0.6, 2, 1, 1])
+                    
+                    with c_av_c:
+                        # Limpa o caminho para o sistema operacional encontrar o arquivo
+                        caminho_par_img = str(m_foto).strip().lstrip('/')
+                    
+                        if m_foto and os.path.exists(caminho_par_img):
+                            # Desenha a foto de forma nativa e ultra veloz
+                            st.image(caminho_par_img, width=50)
+                        else:
+                            # Fallback limpo com layout alinhado caso não possua foto
+                            st.markdown(f'<div style="font-size: 35px; margin-top: 5px;">{"👩" if m_gen == "F" else "👨"}</div>', unsafe_allow_html=True)
+
                             
-                        with c_go_c:
-                            if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                                help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                                st.session_state.match_id_atual = m_id
-                                st.session_state.opcao_menu = "🤝 Sala Privada"; st.rerun()
-                                
-                        with c_del_c:
-                            # RESTAURADO: Botão cinza para excluir afinidades indesejadas do banco
-                            if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", use_container_width=True):
-                                try:
-                                    conn = obter_conexao_eficiente(); cursor = conn.cursor()
-                                    cursor.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(m_id),))
-                                    cursor.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
-                                    cursor.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
-                                    conn.commit(); cursor.close(); 
-                                    st.toast("Match removido!")
+                    with c_nm_c:
+                        # Fonte aumentada para 15px e em negrito igual ao botão entrar
+                        st.markdown(f"<p style='font-size:15px; font-weight:bold; margin-top:5px; color:#f0f6fc;'>{str(m_nome).split('@')[0].capitalize()}</p>", unsafe_allow_html=True)
+                        
+                    with c_go_c:
+                        if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
+                            help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
+                            st.session_state.match_id_atual = m_id
+                            st.session_state.opcao_menu = "🤝 Sala Privada"; st.rerun()
+                            
+                    with c_del_c:
+                        # RESTAURADO: Botão cinza para excluir afinidades indesejadas do banco
+                        if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", use_container_width=True):
+                            try:
+                                conn = obter_conexao_eficiente(); cursor = conn.cursor()
+                                cursor.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(m_id),))
+                                cursor.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
+                                cursor.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
+                                conn.commit(); cursor.close(); 
+                                st.toast("Match removido!")
+                                st.rerun()
+                            except Exception as e: st.error(f"Erro: {e}")
+
+
+        with aba_e:
+            st.markdown("### 📩 Convites Ativos da Semana")
+            try:
+                conn = obter_conexao_eficiente(); cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
+                    CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
+                    FROM agendamentos_virtuais a JOIN matches m ON m.id = a.match_id JOIN usuarios u1 ON u1.id = m.usuario_1_id JOIN usuarios u2 ON u2.id = m.usuario_2_id
+                    WHERE a.remetente_id = %s OR a.destinatario_id = %s ORDER BY a.id DESC;
+                """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
+                encontros = cursor.fetchall(); cursor.close(); 
+                
+                # --- CORREÇÃO DA SEPARAÇÃO: Baseado estritamente no status do convite ---
+                # Ativos: Qualquer um que ainda esteja Pendente ou que já foi Aceito (independente do dia ser hoje ou futuro)
+                encontros_ativos = [e for e in encontros if str(e[4]).lower() in ['pendente', 'aceito']]
+                
+                # Passados: Apenas registros explicitamente arquivados, concluídos, rejeitados ou cancelados
+                encontros_passados = [e for e in encontros if str(e[4]).lower() in ['concluido', 'recusado', 'cancelado']]
+                
+                if not encontros_ativos:
+                    st.caption("Nenhum convite pendente ou encontro ativo para hoje.")
+                    
+                for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_ativos:
+                    eu_enviei = (int(rem_id) == meu_id_limpo)
+                    # 🔍 CORREÇÃO 2: Adicionado [0] no split do parceiro ativo
+                    parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize()
+                    
+                    with st.container(border=True):
+                        col_i, col_b = st.columns([3, 1])
+                        with col_i:
+                            st.write(f"📅 **Encontro com {parceiro_limpo}:** {dia} às {str(hora)[:5]}")
+                            st.caption(f"Status: {status.upper()}")
+                        with col_b:
+                            if status == 'pendente' and not eu_enviei:
+                                if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
+                                    help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
+                                    conn = obter_conexao_eficiente(); cursor = conn.cursor(); cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,)); conn.commit(); cursor.close(); st.rerun()
+                            elif status == 'aceito':
+                                if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
+                                    help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None
+                                ):
+                                    st.session_state.match_id_atual = m_id
+                                    st.session_state.opcao_menu = "🤝 Sala Privada"
                                     st.rerun()
-                                except Exception as e: st.error(f"Erro: {e}")
-
-
-            with aba_e:
-                st.markdown("### 📩 Convites Ativos da Semana")
-                try:
-                    conn = obter_conexao_eficiente(); cursor = conn.cursor()
-                    cursor.execute("""
-                        SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
-                        CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
-                        FROM agendamentos_virtuais a JOIN matches m ON m.id = a.match_id JOIN usuarios u1 ON u1.id = m.usuario_1_id JOIN usuarios u2 ON u2.id = m.usuario_2_id
-                        WHERE a.remetente_id = %s OR a.destinatario_id = %s ORDER BY a.id DESC;
-                    """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-                    encontros = cursor.fetchall(); cursor.close(); 
+                
+                # --- COMPONENTE: HISTÓRICO DE ENCONTROS PASSADOS ---
+                st.markdown("<br><hr style='border-color: #21262d;'>", unsafe_allow_html=True)
+                st.markdown("### 📚 Histórico de Encontros Concluídos")
+                if not encontros_passados:
+                    st.caption("Nenhum registro antigo arquivado.")
+                for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados:
+                    # 🔍 CORREÇÃO 3: Adicionado [0] no split do parceiro no histórico antigo
+                    parceiro_antigo_limpo = str(parceiro_nome).split('@')[0].capitalize()
+                    st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
                     
-                    # --- CORREÇÃO DA SEPARAÇÃO: Baseado estritamente no status do convite ---
-                    # Ativos: Qualquer um que ainda esteja Pendente ou que já foi Aceito (independente do dia ser hoje ou futuro)
-                    encontros_ativos = [e for e in encontros if str(e[4]).lower() in ['pendente', 'aceito']]
-                    
-                    # Passados: Apenas registros explicitamente arquivados, concluídos, rejeitados ou cancelados
-                    encontros_passados = [e for e in encontros if str(e[4]).lower() in ['concluido', 'recusado', 'cancelado']]
-                    
-                    if not encontros_ativos:
-                        st.caption("Nenhum convite pendente ou encontro ativo para hoje.")
-                        
-                    for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_ativos:
-                        eu_enviei = (int(rem_id) == meu_id_limpo)
-                        # 🔍 CORREÇÃO 2: Adicionado [0] no split do parceiro ativo
-                        parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize()
-                        
-                        with st.container(border=True):
-                            col_i, col_b = st.columns([3, 1])
-                            with col_i:
-                                st.write(f"📅 **Encontro com {parceiro_limpo}:** {dia} às {str(hora)[:5]}")
-                                st.caption(f"Status: {status.upper()}")
-                            with col_b:
-                                if status == 'pendente' and not eu_enviei:
-                                    if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                                        help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                                        conn = obter_conexao_eficiente(); cursor = conn.cursor(); cursor.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,)); conn.commit(); cursor.close(); st.rerun()
-                                elif status == 'aceito':
-                                    if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                                        help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None
-                                    ):
-                                        st.session_state.match_id_atual = m_id
-                                        st.session_state.opcao_menu = "🤝 Sala Privada"
-                                        st.rerun()
-                    
-                    # --- COMPONENTE: HISTÓRICO DE ENCONTROS PASSADOS ---
-                    st.markdown("<br><hr style='border-color: #21262d;'>", unsafe_allow_html=True)
-                    st.markdown("### 📚 Histórico de Encontros Concluídos")
-                    if not encontros_passados:
-                        st.caption("Nenhum registro antigo arquivado.")
-                    for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados:
-                        # 🔍 CORREÇÃO 3: Adicionado [0] no split do parceiro no histórico antigo
-                        parceiro_antigo_limpo = str(parceiro_nome).split('@')[0].capitalize()
-                        st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
-                        
-                except Exception as e: st.error(f"Erro: {e}")   
+            except Exception as e: st.error(f"Erro: {e}")   
 
 
 
-        elif menu_atual == "🤝 Sala Privada":
-            if st.session_state.get("match_id_atual"):
-                template_sala_privada()
-            else:
-                st.warning("Nenhuma sala ativa.")
-                st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                st.rerun()
-                    
-        elif menu_atual == "🛠️ Painel Admin":
-            template_painel_admin()
+    elif menu_atual == "🤝 Sala Privada":
+        if st.session_state.get("match_id_atual"):
+            template_sala_privada()
+        else:
+            st.warning("Nenhuma sala ativa.")
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun()
+                
+    elif menu_atual == "🛠️ Painel Admin":
+        template_painel_admin()
 
-    # ==============================================================================
-    # FALLBACK DE SEGURANÇA SEGURO (FIM DO ARQUIVO)
-    # ==============================================================================
-    else:
-        # Se o menu atual não corresponder a nenhuma tela, redefine para a home 
-        # e renderiza o layout visual imediatamente, quebrando loops de st.rerun()
-        st.session_state.opcao_menu = "home"
-        #template_home()
+# ==============================================================================
+# FALLBACK DE SEGURANÇA SEGURO (FIM DO ARQUIVO)
+# ==============================================================================
+else:
+    # Se o menu atual não corresponder a nenhuma tela, redefine para a home 
+    # e renderiza o layout visual imediatamente, quebrando loops de st.rerun()
+    st.session_state.opcao_menu = "home"
+    #template_home()        
+
+# ==============================================================================
+# RODAPÉ FIXO DISCRETO (TERMOS E POLÍTICAS)
+# ==============================================================================
+st.markdown("""
+    <style>
+    /* Cria uma barra fixa travada no fundo da tela */
+    .rodape-fixo-plataforma {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background-color: #0d1117; /* Mesma cor de fundo do seu site */
+        border-top: 1px solid #30363d;
+        text-align: center;
+        padding: 6px 0;
+        font-family: Arial, sans-serif;
+        font-size: 11px; /* Tamanho bem menor e discreto */
+        color: #8b949e;
+        z-index: 999999; /* Garante que fique acima de outros elementos */
+    }
+    .rodape-fixo-plataforma a {
+        color: #58a6ff;
+        text-decoration: none;
+        margin: 0 10px;
+    }
+    .rodape-fixo-plataforma a:hover {
+        text-decoration: underline;
+    }
+    /* Dá um pequeno respiro no fundo do app para o conteúdo não sumir atrás do rodapé */
+    .stApp {
+        padding-bottom: 30px !important;
+    }
+    </style>
+
+    <div class="rodape-fixo-plataforma">
+        <span>© 2026 Lucy Chat IA. Todos os direitos reservados.</span>
+        <a href="#termos" onclick="alert('Termos de Uso:\\nAo utilizar a plataforma, você concorda com o ambiente seguro e criptografado.')">Termos de Uso</a> | 
+        <a href="#politicas" onclick="alert('Políticas de Privacidade:\\nSeus dados de chat e vídeo são confidenciais e protegidos de ponta a ponta.')">Políticas de Privacidade</a>
+    </div>
+""", unsafe_allow_html=True)
