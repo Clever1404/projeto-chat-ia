@@ -296,6 +296,9 @@ def renderizar_chat_lucy_isolado():
     st.markdown("### 🤖 Conversar com Lucy")
     st.caption("Fale sobre sua rotina, hobbies e o que procura. Lucy usa IA para analisar seu perfil e encontrar pessoas compatíveis.")
     st.markdown("<hr style='border-color: #30363d; margin: 10px 0 20px 0;'>", unsafe_allow_html=True)
+    st.button("✉️ Fale Conosco", type="tertiary")
+    st.session_state.opcao_menu = "✉️ Fale Conosco"
+    st.rerun()  
 
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
@@ -1077,7 +1080,7 @@ def template_painel_admin():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-# --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
+    # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
     aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
 
     # ==============================================================================
@@ -1462,7 +1465,7 @@ def template_painel_admin():
                             st.error(f"Erro ao deletar usuário: {e}")
 
 
-    if st.button("← Voltar para o Chat", use_container_width=True, key="btn_voltar_admin"):
+    if st.button("← Voltar para o Chat", use_container_width=True):
         st.session_state.opcao_menu = "💬 Conversar com Lucy"
         st.rerun()
 
@@ -1956,10 +1959,7 @@ else:
         # Renderiza estritamente a tela selecionada no miolo da página
         if menu_atual == "💬 Conversar com Lucy":   
             # Apenas invoca o fragmento global de forma ultra eficiente
-            renderizar_chat_lucy_isolado() 
-            st.button("✉️ Fale Conosco", type="secondary")
-            st.form("form_fale_conosco", clear_on_submit=True)
-            st.rerun()        
+            renderizar_chat_lucy_isolado()   
             
         elif menu_atual == "📅 Disponibilidade":
                 template_disponibilidade()
