@@ -21,6 +21,7 @@ import random
 import plotly.graph_objects as go
 import plotly.express as px
 import altair as alt
+import datetime
 
 # ==============================================================================
 # 1. CONFIGURAÇÕES OBRIGATÓRIAS DE PÁGINA (Sempre no Topo Absoluto)
