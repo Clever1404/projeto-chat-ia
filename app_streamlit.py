@@ -1463,7 +1463,7 @@ def template_painel_admin():
 # ==============================================================================
 # TELA PRIVADA 2: TEMPLATE FALE CONOSCO (SUPORTE TÉCNICO VIA EMAIL)
 # ==============================================================================
-ddef template_fale_conosco():
+def template_fale_conosco():
     st.markdown("<h2>✉️ Fale Conosco</h2>", unsafe_allow_html=True)
     st.caption("Envie suas dúvidas, críticas ou sugestões de melhoria para a equipe de suporte Lucy IA.")
     st.markdown("<hr style='border-color: #30363d; margin: 10px 0 25px 0;'>", unsafe_allow_html=True)
