@@ -1790,6 +1790,10 @@ else:
                     else:
                         st.error("Nenhum ID de pagamento encontrado na sessão.")
           
+        if st.button("← Voltar para o Chat", use_container_width=True):
+                st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                st.rerun() 
+        
         if st.button("← Voltar para o Login", use_container_width=True):
                 st.session_state.opcao_menu = "login"
                 st.rerun() 
