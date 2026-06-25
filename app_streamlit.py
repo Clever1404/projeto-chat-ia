@@ -26,14 +26,14 @@ import altair as alt
 # ==============================================================================
 # 1. CONFIGURAÇÕES OBRIGATÓRIAS DE PÁGINA (Sempre no Topo Absoluto)
 # ==============================================================================
- if "sidebar_state" not in st.session_state:
-     st.session_state.sidebar_state = "expanded"
+if "sidebar_state" not in st.session_state:
+    st.session_state.sidebar_state = "expanded"
 
- st.set_page_config(
-     page_title="Lucy Chat IA - Plataforma", 
-     layout="wide", 
-     initial_sidebar_state=st.session_state.sidebar_state
- )
+st.set_page_config(
+    page_title="Lucy Chat IA - Plataforma", 
+    layout="wide", 
+    initial_sidebar_state=st.session_state.sidebar_state
+)
 
 
 # Estilização Padrão Global (Sem rolagem dupla)
