@@ -842,6 +842,9 @@ def template_sala_privada():
             except Exception: pass
             
         st.divider()
+        st.write(f"**ID ({st.session_state.get('id', 'matches')}):** {id_match_atual}")
+        st.write(f"**Ultima atividade ({st.session_state.get('ultima_atividade', 'matches')}):** {agora_iso}")
+
 
         if st.button("🎥 Iniciar Videochamada Privada"): 
             nome_da_sala_unica = f"Atendimento_FaleConosco_SalaPrivada_{id_match_int}" 
