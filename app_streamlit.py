@@ -295,7 +295,7 @@ def processar_match_lucy(dados_m):
 def renderizar_chat_lucy_isolado():
 
     if "opcao_menu" not in st.session_state:
-        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+        st.session_state.opcao_menu = "chat"
 
     # Roteamento de tela usando a variável de estado
     if st.session_state.opcao_menu == "✉️ Fale Conosco":
