@@ -1558,13 +1558,10 @@ else:
         elif menu_atual == "🤝 Gerenciar Conexões":
             st.title("🤝 Gestão de Relacionamentos") 
 
-            # 🌟 CORREÇÃO 1: Captura dinamicamente o dia da semana atual do servidor para o filtro de ativos
-            dia_ingles = datetime.datetime.now().strftime("%A")
-            mapeamento_dias = {
-                "Monday": "segunda-feira", "Tuesday": "terça-feira", "Wednesday": "quarta-feira",
-                "Thursday": "quinta-feira", "Friday": "sexta-feira", "Saturday": "sábado", "Sunday": "domingo"
-            }
-            dia_atual_servidor = mapeamento_dias.get(dia_ingles, "segunda-feira")
+            dias_semana_map = {0: 'Segunda-feira', 1: 'Terça-feira', 2: 'Quarta-feira', 3: 'Quinta-feira', 4: 'Sexta-feira', 5: 'Sábado', 6: 'Domingo'}
+
+            # 🌟 CORREÇÃO: Adicionado .datetime. antes do .now()
+            dia_atual_servidor = dias_semana_map[datetime.datetime.now().weekday()]
 
 
             if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
