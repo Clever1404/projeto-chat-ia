@@ -61,28 +61,10 @@ if st.session_state.get("usuario_id") is not None:
     #     ... seu menu de navegação interna ...
     
     # Se o chat ou outra tela interna estiver aqui, ela roda isolada
-    st.write(f"Visualizando: {renderizar_chat_lucy_isolado}")
+    st.session_state.opcao_menu = "💬 Conversar com Lucy"
     
     # O comando abaixo impede o Python de continuar descendo para as telas públicas
     st.stop()
-
-
-# --- 3. AMBIENTE PÚBLICO (SÓ EXECUTA SE O USUÁRIO NÃO ESTIVER LOGADO) ---
-menu_atual = st.session_state.get("opcao_menu", "home")
-
-if menu_atual == "home":
-    st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
-    # ... restando do seu código da Home ...
-
-elif menu_atual == "login":
-    st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
-    with st.form("form_login"):
-        # ... seu formulário de login igual ao anterior ...
-        if st.form_submit_button("login", type="primary", use_container_width=True):
-            # ... sua validação de banco igual ...
-            # Ao final do sucesso:
-            st.session_state.opcao_menu = "💬 Conversar com Lucy"
-            st.rerun() # O rerun vai voltar para o topo e cair no 'if' do usuário logado
 
 
 # Estilização Padrão Global (Sem rolagem dupla)
