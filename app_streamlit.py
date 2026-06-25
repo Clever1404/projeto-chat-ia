@@ -293,25 +293,32 @@ def processar_match_lucy(dados_m):
 # ==============================================================================
 @st.fragment
 def renderizar_chat_lucy_isolado():
-       
-    col_titulos, col_botoes_topo = st.columns([2, 1])
-    
-    with col_titulos:
-        st.markdown("<h2 style='margin-top:0; margin-bottom:2px; font-size: 24px;'>🤖 Olá, Seja bem-vindo ao Lucy Chat IA</h2>", unsafe_allow_html=True) 
-        st.caption("Lucy conversa com você e armazena os seus interesses para encontrar matches.") 
-        
-    
-    with col_botoes_topo:
-        c_refresh, c_fc = st.columns(2)
-        with c_refresh:
-            if st.button("🔄 Atualizar Dados", type="tertiary", help="Sincronizar mensagens"):
-                st.rerun() 
-        with c_fc:
-            if st.button("✉️ Fale Conosco", type="tertiary"):
-                st.session_state.opcao_menu = "✉️ Fale Conosco"
-                st.rerun()
 
-    st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
+    if "opcao_menu" not in st.session_state:
+        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+
+    # Roteamento de tela usando a variável de estado
+    if st.session_state.opcao_menu == "✉️ Fale Conosco":
+        template_fale_conosco()
+    else:       
+        col_titulos, col_botoes_topo = st.columns([2, 1])
+        
+        with col_titulos:
+            st.markdown("<h2 style='margin-top:0; margin-bottom:2px; font-size: 24px;'>🤖 Olá, Seja bem-vindo ao Lucy Chat IA</h2>", unsafe_allow_html=True) 
+            st.caption("Lucy conversa com você e armazena os seus interesses para encontrar matches.") 
+            
+        
+        with col_botoes_topo:
+            c_refresh, c_fc = st.columns(2)
+            with c_refresh:
+                if st.button("🔄 Atualizar Dados", type="tertiary", help="Sincronizar mensagens"):
+                    st.rerun() 
+            with c_fc:
+                if st.button("✉️ Fale Conosco", type="tertiary"):
+                    st.session_state.opcao_menu = "✉️ Fale Conosco"
+                    st.rerun()
+
+        st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
 
 
 
