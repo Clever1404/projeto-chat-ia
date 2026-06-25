@@ -326,7 +326,7 @@ def renderizar_chat_lucy_isolado():
             
             st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
             # O histórico de mensagens e o st.chat_input devem vir listados aqui...
-U
+
 
 
     meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
