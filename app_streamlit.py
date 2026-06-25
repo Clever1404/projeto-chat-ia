@@ -1709,7 +1709,7 @@ else:
 
                 
             with st.sidebar:
-                st.session_state.get("usuario_id")
+                st.session_state.get("id_usuario")
                 opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"])
                 if st.button("Gerar Pix de Pagamento"):
                     valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
