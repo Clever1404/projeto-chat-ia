@@ -2013,8 +2013,8 @@ else:
                 st.session_state.opcao_menu = "📅 Disponibilidade"
                 st.rerun()
                     
-            if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_ir_loja"):
-                st.session_state.abrir_popup_loja = True
+            if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True):
+                st.session_state.opcao_menu = "planos"
                 st.rerun()
                     
             # Validação de privilégios administrativos
