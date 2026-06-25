@@ -1160,47 +1160,61 @@ if menu_atual == "home":
                 st.rerun()        
 
 elif menu_atual == "login":
-    st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
-    with st.form("form_login"):
-        user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed")
-        pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed")
+        st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
+        
+        # Criamos uma chave para o formulário baseada se o usuário está logado ou não
+        # Isso força o Streamlit a destruir o formulário visual da tela após o sucesso
+        form_login_key = "form_login_ativo" if "usuario_id" not in st.session_state else "form_login_oculto"
+        
+        with st.form(form_login_key):
+            user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed", key="login_user_field")
+            pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed", key="login_pass_field")
                 
-        if st.form_submit_button("login", type="primary", use_container_width=True):
-            try:
-                conn = obter_conexao_eficiente()
-                cursor = conn.cursor()
-                cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
-                res = cursor.fetchone()
-                if res:
-                    st.session_state.usuario_id = int(res[0])
-                    st.session_state.username = res[1]
-                    st.session_state.foto_perfil = res[2]
-                    st.session_state.eh_admin = bool(res[3])
-                    st.session_state.genero = res[4]
-                    st.session_state.dados_usuario = {
-                        "username": res[1], "foto_perfil": res[2], "genero": res[4],
-                        "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", "moedas": res[6] if res[6] else 0
-                    }
-                    cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (int(res[0]),))
-                    conn.commit(); cursor.close(); 
-                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                    st.rerun()
-                else:
-                    st.error("Usuário não encontrado.")
-                cursor.close(); 
-            except Exception as e: 
-                st.error(f"Erro: {e}")       
+            if st.form_submit_button("login", type="primary", use_container_width=True):
+                try:
+                    conn = obter_conexao_eficiente()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
+                    res = cursor.fetchone()
+                    if res:
+                        # 1. Define todas as variáveis de sessão primeiro
+                        st.session_state.usuario_id = int(res[0])
+                        st.session_state.username = res[1]
+                        st.session_state.foto_perfil = res[2]
+                        st.session_state.eh_admin = bool(res[3])
+                        st.session_state.genero = res[4]
+                        st.session_state.dados_usuario = {
+                            "username": res[1], "foto_perfil": res[2], "genero": res[4],
+                            "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", "moedas": res[6] if res[6] else 0
+                        }
+                        
+                        cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (int(res[0]),))
+                        conn.commit()
+                        cursor.close()
+                        
+                        # 2. Atualiza a navegação para o chat
+                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                        
+                        # 3. Limpa explicitamente o estado dos campos de texto da memória do Streamlit
+                        if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
+                        if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
+                        
+                        # 4. Força o reinício limpo da aplicação fora do estado do formulário
+                        st.rerun()
+                    else:
+                        st.error("Usuário não encontrado.")
+                    cursor.close() 
+                except Exception as e: 
+                    st.error(f"Erro: {e}")       
 
-    col_voltar, col_esqueceu = st.columns(2)
-    with col_voltar:
-        if st.button("⬅️ Voltar para a Home", use_container_width=True):
-            st.session_state.opcao_menu = "home"
-            st.rerun()
-    with col_esqueceu:
-        # CORREÇÃO AQUI: Removemos o st.rerun() daqui de dentro. 
-        # Agora o Streamlit consegue renderizar o modal sem sofrer interrupção imediata.
-        if st.button("🔑 Esqueceu a senha?", use_container_width=True):
-            modal_recuperar_senha()
+        col_voltar, col_esqueceu = st.columns(2)
+        with col_voltar:
+            if st.button("⬅️ Voltar para a Home", use_container_width=True, key="btn_voltar_home_login"):
+                st.session_state.opcao_menu = "home"
+                st.rerun()
+        with col_esqueceu:
+            if st.button("🔑 Esqueceu a senha?", use_container_width=True, key="btn_esqueceu_senha_login"):
+                modal_recuperar_senha()
 
             
 
