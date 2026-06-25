@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import psycopg
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -842,6 +842,11 @@ def template_sala_privada():
             except Exception: pass
             
         st.divider()
+        st.write(f"**ID ({st.session_state.get('id', 'matches')}):** {id_match_atual}")
+        st.write(f"**Ultima atividade ({st.session_state.get('ultima_atividade', 'matches')}):** {agora_iso}")
+        
+
+
 
         if st.button("🎥 Iniciar Videochamada Privada"): 
             nome_da_sala_unica = f"Atendimento_FaleConosco_SalaPrivada_{id_match_int}" 
@@ -886,6 +891,46 @@ def verificar_status_pix(id_pagamento):
         st.error(f"Erro ao consultar Mercado Pago: {e}")
         return "erro"
 
+
+def atualizar_plano_banco_supabase(id_usuario, tipo_pagamento):
+    """Atualiza o plano ou incrementa moedas do usuário no Supabase."""
+    try:
+        data_atual = datetime.now()
+        id_usuario_str = str(id_usuario)
+
+        if tipo_pagamento == "vip":
+            # Define a expiração para daqui a 30 dias (formato ISO para o Supabase)
+            data_expiracao = (data_atual + timedelta(days=30)).isoformat()
+            
+            # Atualiza a tabela 'usuarios'
+            resposta = supabase.table("usuarios").update({
+                "plano": "vip",
+                "data_expiracao_vip": data_expiracao
+            }).eq("id", id_usuario_str).execute()
+            
+        elif tipo_pagamento == "moedas":
+            # 1. Busca a quantidade atual de moedas do usuário
+            usuario_dados = supabase.table("usuarios").select("moedas").eq("id", id_usuario_str).single().execute()
+            
+            if usuario_dados.data:
+                # Garante que o valor atual não seja None/Nulo
+                moedas_atuais = usuario_dados.data.get("moedas") or 0
+                novas_moedas = moedas_atuais + 10
+                
+                # 2. Atualiza com o novo saldo somado
+                resposta = supabase.table("usuarios").update({
+                    "moedas": novas_moedas
+                }).eq("id", id_usuario_str).execute()
+            else:
+                print("Usuário não encontrado para atualizar moedas.")
+                return False
+                
+        # Se a resposta do Supabase contiver dados, a operação foi um sucesso
+        return len(resposta.data) > 0
+
+    except Exception as e:
+        print(f"Erro ao atualizar o Supabase: {e}")
+        return False
 
 
 # ==============================================================================
@@ -1522,6 +1567,11 @@ def template_fale_conosco():
 # ==============================================================================
 menu_atual = st.session_state.get("opcao_menu", "home")
 
+# TRAVA DE SEGURANÇA: Se o usuário já está logado, ele não pode ver Home, Login ou Cadastro
+if st.session_state.get("usuario_id") and menu_atual in ["home", "login", "cadastro", "planos"]:
+    st.session_state.opcao_menu = "💬 Conversar com Lucy"
+    st.rerun()
+
 # 1. GESTÃO CENTRALIZADA DE MODAIS (Chame o modal aqui e use 'pass' ou 'return' para bloquear o miolo)
 if st.session_state.get("abrir_reserva_fluxo"):
     modal_agendamento_encontro(st.session_state.abrir_reserva_fluxo)
@@ -1575,13 +1625,14 @@ else:
                     st.rerun()        
 
     elif menu_atual == "login":
+        # Se o usuário já se logou com sucesso, impede a renderização da tela de login
+        if "usuario_id" in st.session_state:
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun()
+        else:
             st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
             
-            # Criamos uma chave para o formulário baseada se o usuário está logado ou não
-            # Isso força o Streamlit a destruir o formulário visual da tela após o sucesso
-            form_login_key = "form_login_ativo" if "usuario_id" not in st.session_state else "form_login_oculto"
-            
-            with st.form(form_login_key):
+            with st.form("form_login_ativo"):
                 user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed", key="login_user_field")
                 pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed", key="login_pass_field")
                     
@@ -1605,20 +1656,23 @@ else:
                             
                             cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (int(res[0]),))
                             conn.commit()
-                            cursor.close()
                             
                             # 2. Atualiza a navegação para o chat
                             st.session_state.opcao_menu = "💬 Conversar com Lucy"
                             
-                            # 3. Limpa explicitamente o estado dos campos de texto da memória do Streamlit
+                            # 3. Limpa explicitamente os campos texto
                             if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
                             if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
                             
-                            # 4. Força o reinício limpo da aplicação fora do estado do formulário
+                            cursor.close()
+                            conn.close()
+                            
+                            # 4. Força o reinício limpo para sumir com o formulário
                             st.rerun()
                         else:
                             st.error("Usuário não encontrado.")
                         cursor.close() 
+                        conn.close()
                     except Exception as e: 
                         st.error(f"Erro: {e}")       
 
