@@ -26,19 +26,19 @@ import altair as alt
 st.title("⚡ Diagnóstico de Conexão: Streamlit ⇄ Supabase")
 
 # 1. Recupera o ID do usuário da sessão atual
-id_usuario_teste = st.session_state.get("id_usuario")
+usuario_id_teste = st.session_state.get("usuario_id")
 
-if not id_usuario_teste:
+if not usurio_id_teste:
     st.warning("⚠️ Nenhum 'id_usuario' encontrado na sessão do Streamlit. Insira um ID válido abaixo para testar:")
-    id_usuario_teste = st.text_input("ID do Usuário Cadastrado no Banco:")
+    usuario_id_teste = st.text_input("ID do Usuário Cadastrado no Banco:")
 
-if id_usuario_teste:
-    st.info(f"Procurando usuário com ID: `{id_usuario_teste}`")
+if usuario_id_teste:
+    st.info(f"Procurando usuário com ID: `{usuario_id_teste}`")
     
     # --- PASSO 1: TESTE DE LEITURA (SELECT) ---
     st.subheader("1. Testando Leitura de Dados")
     try:
-        dados_usuario = supabase.table("usuarios").select("moedas, tipo_plano").eq("id", str(id_usuario_teste)).execute()
+        dados_usuario = supabase.table("usuarios").select("moedas, tipo_plano").eq("id", str(usuario_id_teste)).execute()
         
         if dados_usuario.data:
             st.success("✅ Conexão estabelecida! Usuário encontrado com sucesso.")
@@ -56,7 +56,7 @@ if id_usuario_teste:
                     update_teste = supabase.table("usuarios").update({
                         "moedas": novas_moedas,
                         "ultima_recarga": data_atual_iso
-                    }).eq("id", str(id_usuario_teste)).execute()
+                    }).eq("id", str(usuario_id_teste)).execute()
                     
                     if update_teste.data and len(update_teste.data) > 0:
                         st.balloons()
