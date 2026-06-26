@@ -1660,73 +1660,76 @@ else:
                     st.rerun()        
 
     elif menu_atual == "login":
-            st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
             
-            # Criamos uma chave para o formulário baseada se o usuário está logado ou não
-            form_login_key = "form_login_ativo" if "usuario_id" not in st.session_state else "form_login_oculto"
+        # Criamos uma chave para o formulário baseada se o usuário está logado ou não
+        form_login_key = "form_login_ativo" if "usuario_id" not in st.session_state else "form_login_oculto"
 
-            with st.form(form_login_key):
-                user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed", key="login_user_field")
-                pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed", key="login_pass_field")
+        with st.form(form_login_key):
+            user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed", key="login_user_field")
+            pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed", key="login_pass_field")
+                
+            if st.form_submit_button("login", type="primary", use_container_width=True):
+                try:
+                    conn = obter_conexao_eficiente()
+                    cursor = conn.cursor()
                     
-                if st.form_submit_button("login", type="primary", use_container_width=True):
-                    try:
-                        conn = obter_conexao_eficiente()
-                        cursor = conn.cursor()
+                    # Busca os dados incluindo a senha (índice 7)
+                    cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
+                    res = cursor.fetchone()
+                    
+                    if res:
+                        # CORREÇÃO DOS ÍNDICES: Acessando a senha corretamente no índice 7 da tupla
+                        senha_banco = res[7]
                         
-                        # ADICIONADO: 'senha' na consulta SQL para validação
-                        cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
-                        res = cursor.fetchone()
-                        
-                        if res:
-                            # VALIDAÇÃO DE SENHA: Altere se o seu banco usar criptografia (ex: bcrypt)
-                            password_hash_banco = res[6]
-                            if pass_in != password_hash_banco:
-                                st.error("Senha incorreta. Tente novamente.")
-                            else:
-                                # 1. Define todas as variáveis de sessão primeiro
-                                id_numerico = int(res[0])
-                                st.session_state.usuario_id = id_numerico
-                                
-                                # CORREÇÃO CRUCIAL: Alimenta também a variável esperada pela tela de planos e pagamentos
-                                st.session_state.id_usuario = id_numerico
-                                
-                                st.session_state.username = res[1]
-                                st.session_state.foto_perfil = res[2]
-                                st.session_state.eh_admin = bool(res[3])
-                                st.session_state.genero = res[4]
-                                st.session_state.dados_usuario = {
-                                    "username": res[1], "foto_perfil": res[2], "genero": res[4],
-                                    "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", "moedas": res[6] if res[6] else 0
-                                }
-                                
-                                cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
-                                conn.commit()
-                                cursor.close()
-                                
-                                # 2. Atualiza a navegação para o chat
-                                st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                                
-                                # 3. Limpa explicitamente o estado dos campos de texto da memória do Streamlit
-                                if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
-                                if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
-                                
-                                # 4. Força o reinício limpo da aplicação fora do estado do formulário
-                                st.rerun()
+                        if str(pass_in) != str(senha_banco):
+                            st.error("Senha incorreta. Tente novamente.")
                         else:
-                            st.error("Usuário não encontrado.")
-                        cursor.close() 
-                    except Exception as e: 
-                        st.error(f"Erro: {e}")       
+                            # CORREÇÃO DOS ÍNDICES: Atribuindo os valores corretos de cada coluna
+                            id_numerico = int(res[0])
+                            st.session_state.usuario_id = id_numerico
+                            st.session_state.id_usuario = id_numerico  # Variável unificada para a tela de planos
+                            
+                            st.session_state.username = res[1]
+                            st.session_state.foto_perfil = res[2]
+                            st.session_state.eh_admin = bool(res[3])
+                            st.session_state.genero = res[4]
+                            st.session_state.dados_usuario = {
+                                "username": res[1], 
+                                "foto_perfil": res[2], 
+                                "genero": res[4],
+                                "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", 
+                                "moedas": res[6] if res[6] else 0
+                            }
+                            
+                            # Atualiza o status do usuário para Online no banco
+                            cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
+                            conn.commit()
+                            cursor.close()
+                            
+                            # Redireciona para o chat
+                            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                            
+                            # Limpa os campos do formulário da memória do Streamlit
+                            if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
+                            if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
+                            
+                            st.rerun()
+                    else:
+                        st.error("Usuário não encontrado.")
+                    cursor.close() 
+                except Exception as e: 
+                    st.error(f"Erro no processo de login: {e}")       
 
-            col_voltar, col_esqueceu = st.columns(2)
-            with col_voltar:
-                if st.button("⬅️ Voltar para a Home", use_container_width=True, key="btn_voltar_home_login"):
-                    st.session_state.opcao_menu = "home"
-                    st.rerun()
-            with col_esqueceu:
-                if st.button("🔑 Esqueceu a senha?", use_container_width=True, key="btn_esqueceu_senha_login"):
-                    modal_recuperar_senha()
+        col_voltar, col_esqueceu = st.columns(2)
+        with col_voltar:
+            if st.button("⬅️ Voltar para a Home", use_container_width=True, key="btn_voltar_home_login"):
+                st.session_state.opcao_menu = "home"
+                st.rerun()
+        with col_esqueceu:
+            if st.button("🔑 Esqueceu a senha?", use_container_width=True, key="btn_esqueceu_senha_login"):
+                modal_recuperar_senha()
+
 
                 
 
