@@ -28,7 +28,7 @@ st.title("⚡ Diagnóstico de Conexão: Streamlit ⇄ Supabase")
 # 1. Recupera o ID do usuário da sessão atual
 usuario_id_teste = st.session_state.get("usuario_id")
 
-if not usurio_id_teste:
+if not usuario_id_teste:
     st.warning("⚠️ Nenhum 'id_usuario' encontrado na sessão do Streamlit. Insira um ID válido abaixo para testar:")
     usuario_id_teste = st.text_input("ID do Usuário Cadastrado no Banco:")
 
