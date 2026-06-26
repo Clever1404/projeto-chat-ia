@@ -952,42 +952,46 @@ def verificar_status_pix(id_pagamento):
         return "erro"
 
 
+# --- FUNÇÃO PARA ATUALIZAR O SUPABASE (VERSÃO FINAL INTEGRAL) ---
 def atualizar_plano_banco_supabase(id_usuario, tipo_pagamento):
-    """Atualiza o plano ou incrementa moedas do usuário no Supabase, registrando a última recarga."""
+    """Atualiza o plano ou incrementa moedas do usuário no Supabase garantindo ID numérico."""
     try:
-        id_usuario_str = str(id_usuario)
-        # Captura o timestamp atual no formato ISO exigido pelo Supabase (ex: 2026-06-25T18:26:00)
+        # FORÇA O ID A SER UM NÚMERO INTEIRO (Evita o erro 'invalid input syntax for type integer')
+        id_usuario_int = int(id_usuario)
         data_atual_iso = datetime.now().isoformat()
 
         if tipo_pagamento == "vip":
-            # Atualiza o tipo de plano e registra o momento da recarga
             resposta = supabase.table("usuarios").update({
                 "tipo_plano": "vip",
                 "ultima_recarga": data_atual_iso
-            }).eq("id", id_usuario_str).execute()
+            }).eq("id", id_usuario_int).execute()
+            
+            return len(resposta.data) > 0
             
         elif tipo_pagamento == "moedas":
-            # 1. Busca a quantidade atual de moedas do usuário
-            usuario_dados = supabase.table("usuarios").select("moedas").eq("id", id_usuario_str).single().execute()
+            # Busca as moedas usando o ID numérico inteiro
+            query = supabase.table("usuarios").select("moedas").eq("id", id_usuario_int).execute()
             
-            if usuario_dados.data:
-                moedas_atuais = usuario_dados.data.get("moedas") or 0
+            if query.data and len(query.data) > 0:
+                # O query.data retorna uma lista, pegamos o primeiro item [0]
+                moedas_atuais = query.data[0].get("moedas") or 0
                 novas_moedas = moedas_atuais + 10
                 
-                # 2. Atualiza o saldo de moedas e registra o momento da recarga
                 resposta = supabase.table("usuarios").update({
                     "moedas": novas_moedas,
                     "ultima_recarga": data_atual_iso
-                }).eq("id", id_usuario_str).execute()
-            else:
-                print("Usuário não encontrado para atualizar moedas.")
-                return False
+                }).eq("id", id_usuario_int).execute()
                 
-        # Retorna True se a tabela foi atualizada com sucesso
-        return len(resposta.data) > 0
+                return len(resposta.data) > 0
+            else:
+                st.error("Usuário não encontrado no banco de dados.")
+                return False
 
+    except ValueError:
+        st.error(f"❌ Erro crítico: O ID do usuário ('{id_usuario}') não pôde ser convertido para número inteiro. Ajuste seu fluxo de login.")
+        return False
     except Exception as e:
-        print(f"Erro ao atualizar o Supabase: {e}")
+        st.error(f"❌ Erro crítico ao atualizar o Supabase: {e}")
         return False
         
 
@@ -1659,9 +1663,8 @@ else:
             st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
             
             # Criamos uma chave para o formulário baseada se o usuário está logado ou não
-            # Isso força o Streamlit a destruir o formulário visual da tela após o sucesso
             form_login_key = "form_login_ativo" if "usuario_id" not in st.session_state else "form_login_oculto"
-            
+
             with st.form(form_login_key):
                 user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed", key="login_user_field")
                 pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed", key="login_pass_field")
@@ -1670,33 +1673,46 @@ else:
                     try:
                         conn = obter_conexao_eficiente()
                         cursor = conn.cursor()
-                        cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
+                        
+                        # ADICIONADO: 'senha' na consulta SQL para validação
+                        cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, senha FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
                         res = cursor.fetchone()
+                        
                         if res:
-                            # 1. Define todas as variáveis de sessão primeiro
-                            st.session_state.usuario_id = int(res[0])
-                            st.session_state.username = res[1]
-                            st.session_state.foto_perfil = res[2]
-                            st.session_state.eh_admin = bool(res[3])
-                            st.session_state.genero = res[4]
-                            st.session_state.dados_usuario = {
-                                "username": res[1], "foto_perfil": res[2], "genero": res[4],
-                                "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", "moedas": res[6] if res[6] else 0
-                            }
-                            
-                            cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (int(res[0]),))
-                            conn.commit()
-                            cursor.close()
-                            
-                            # 2. Atualiza a navegação para o chat
-                            st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                            
-                            # 3. Limpa explicitamente o estado dos campos de texto da memória do Streamlit
-                            if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
-                            if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
-                            
-                            # 4. Força o reinício limpo da aplicação fora do estado do formulário
-                            st.rerun()
+                            # VALIDAÇÃO DE SENHA: Altere se o seu banco usar criptografia (ex: bcrypt)
+                            senha_banco = res[7]
+                            if pass_in != senha_banco:
+                                st.error("Senha incorreta. Tente novamente.")
+                            else:
+                                # 1. Define todas as variáveis de sessão primeiro
+                                id_numerico = int(res[0])
+                                st.session_state.usuario_id = id_numerico
+                                
+                                # CORREÇÃO CRUCIAL: Alimenta também a variável esperada pela tela de planos e pagamentos
+                                st.session_state.id_usuario = id_numerico
+                                
+                                st.session_state.username = res[1]
+                                st.session_state.foto_perfil = res[2]
+                                st.session_state.eh_admin = bool(res[3])
+                                st.session_state.genero = res[4]
+                                st.session_state.dados_usuario = {
+                                    "username": res[1], "foto_perfil": res[2], "genero": res[4],
+                                    "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", "moedas": res[6] if res[6] else 0
+                                }
+                                
+                                cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
+                                conn.commit()
+                                cursor.close()
+                                
+                                # 2. Atualiza a navegação para o chat
+                                st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                                
+                                # 3. Limpa explicitamente o estado dos campos de texto da memória do Streamlit
+                                if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
+                                if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
+                                
+                                # 4. Força o reinício limpo da aplicação fora do estado do formulário
+                                st.rerun()
                         else:
                             st.error("Usuário não encontrado.")
                         cursor.close() 
