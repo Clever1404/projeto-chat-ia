@@ -760,7 +760,7 @@ def template_sala_privada():
         </style>
     """, unsafe_allow_html=True)
 
-    st.title("🤝 Sala Privada de Conversa")
+    #st.title("🤝 Sala Privada de Conversa")
     
     parceiro_nome = "Usuário"
     parceiro_foto = None
@@ -804,7 +804,7 @@ def template_sala_privada():
         saldo_moedas_sala = st.session_state.dados_usuario.get("moedas", 0)
 
     # Divisão de Colunas Layout
-    col_perfil, col_chat = st.columns([1, 3])
+    col_perfil, col_chat, col_video = st.columns([1, 3, 1])
 
     with col_perfil:
         st.markdown(f"""<div class="box-perfil-fixo"><div style="font-size: 40px; text-align:center;">{"👩" if parceiro_gen == "F" else "👨"}</div></div>""", unsafe_allow_html=True)
@@ -812,7 +812,7 @@ def template_sala_privada():
         st.markdown(f'<div style="color: {status_cor}; font-size:14px; margin-top:5px; text-align:center;">{status_parceiro}</div>', unsafe_allow_html=True)
         
         st.markdown("""<div style="background-color:#161b22; padding:10px; border-radius:5px; border:1px solid #30363d; margin:15px 0;">🔒 Sala criptografada temporária de ponta a ponta.</div>""", unsafe_allow_html=True)
-        
+                
         if st.button("🚪 Sair da Sala Privada", type="primary", use_container_width=True):
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
             st.rerun()
@@ -835,23 +835,19 @@ def template_sala_privada():
         st.markdown(f"### 💬 Sala Privada com {parceiro_nome}")
         id_match_atual = st.session_state.get("match_id_atual")
         
-        if id_match_atual:
-            try:
-                agora_iso = datetime.now().isoformat()
-                supabase.table("matches").update({"status_conexao": "online", "ultima_atividade": agora_iso}).eq("id", id_match_atual).execute()
-            except Exception: pass
-            
-        st.divider()
-        st.write(f"**ID ({st.session_state.get('id', 'matches')}):** {id_match_atual}")
-        st.write(f"**Ultima atividade ({st.session_state.get('ultima_atividade', 'matches')}):** {agora_iso}")
-        st.write(f"**status ({st.session_state.get('status_conexao', 'matches')}):** {" "}")
-
-        if st.button("🎥 Iniciar Videochamada Privada"): 
+        if st.button("🎥 Iniciar Videochamada Privada", type="tertiary"): 
             nome_da_sala_unica = f"Atendimento_FaleConosco_SalaPrivada_{id_match_int}" 
             url_jitsi = f"https://meet.jit.si/{nome_da_sala_unica}" 
         
             st.info("A videochamada foi iniciada abaixo. Garanta as permissões no navegador.") 
-            st.iframe(url_jitsi, height=600)  
+            st.iframe(url_jitsi, height=600)
+
+        if id_match_atual:
+            try:
+                agora_iso = datetime.now().isoformat()
+                supabase.table("matches").update({"status_conexao": "online", "ultima_atividade": agora_iso}).eq("id", id_match_atual).execute()
+            except Exception: pass   
+        st.divider()
 
         with st.container(height=380, border=True):
             st.markdown('<div class="chat-container">', unsafe_allow_html=True)
@@ -875,8 +871,8 @@ def template_sala_privada():
                 if st.form_submit_button("Enviar", use_container_width=True) and texto_msg.strip():
                     enviar_mensagem(match_id, meu_id, texto_msg)
                     st.rerun()
-
-
+    
+      
 
 # --- FUNÇÃO PARA VERIFICAR O PAGAMENTO ---
 def verificar_status_pix(id_pagamento):
