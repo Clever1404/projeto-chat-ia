@@ -1535,25 +1535,25 @@ def template_fale_conosco():
 # ==============================================================================
 # 8. ROTEADOR DE FLUXO GLOBAL (CORREÇÃO DE DIALOGS DUPLICADOS)
 # ==============================================================================
-
-# Captura o estado atual do menu
 menu_atual = st.session_state.get("opcao_menu", "home")
-usuario_id_ativo = st.session_state.get("usuario_id")
 
-# ==============================================================================
-# 1. GESTÃO CENTRALIZADA DE MODAIS (Bloqueia o miolo visual se ativo)
-# ==============================================================================
+# 1. GESTÃO CENTRALIZADA DE MODAIS (Chame o modal aqui e use 'pass' ou 'return' para bloquear o miolo)
 if st.session_state.get("abrir_reserva_fluxo"):
     modal_agendamento_encontro(st.session_state.abrir_reserva_fluxo)
+    # Importante: Não deixe o script continuar executando telas no fundo enquanto o modal está ativo
+    # Isso impede que o miolo chame outros blocos visuais concorrentes
 
-# ==============================================================================
-# 2. ROTEADOR GLOBAL DE TELAS (Só executa se nenhum modal acima capturar o fluxo)
-# ==============================================================================
+# elif st.session_state.get("abrir_popup_loja"):
+#     if st.session_state.get("usuario_id"):
+#         mostrar_popup_loja(st.session_state.usuario_id)
+#     st.session_state.abrir_popup_loja = False
+
+
+
+# 2. SEGUIDO PELO SEU IF/ELIF NORMAL DE TELAS (Apenas se nenhum modal acima capturar o fluxo)
 else:
-    # --------------------------------------------------------------------------
-    # --- GRUPO A: TELAS PÚBLICAS (Sem Barra Lateral / Usuário Deslogado) ---
-    # --------------------------------------------------------------------------
-    if menu_atual == "home":
+    if menu_atual == "home":  
+    # --- TELAS PÚBLICAS (Sem Barra Lateral de Usuário) ---
         st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
         st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>", unsafe_allow_html=True)
         st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
@@ -1576,13 +1576,77 @@ else:
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔑 Fazer Login", use_container_width=True, type="primary", key="btn_home_login"):
+            if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
                 st.session_state.opcao_menu = "login"
                 st.rerun()
+                        
         with col2:
-            if st.button("📝 Cadastre-se", use_container_width=True, key="btn_home_cadastro"):
-                st.session_state.opcao_menu = "cadastro"
-                st.rerun()
+            with stylable_container(
+                key="green_button", 
+                css_styles="button { background-color: #28a745; color: white; }"
+            ):
+                if st.button("📝 Cadastre-se", use_container_width=True):
+                    st.session_state.opcao_menu = "cadastro"
+                    st.rerun()        
+
+    elif menu_atual == "login":
+            st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
+            
+            # Criamos uma chave para o formulário baseada se o usuário está logado ou não
+            # Isso força o Streamlit a destruir o formulário visual da tela após o sucesso
+            form_login_key = "form_login_ativo" if "usuario_id" not in st.session_state else "form_login_oculto"
+            
+            with st.form(form_login_key):
+                user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed", key="login_user_field")
+                pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed", key="login_pass_field")
+                    
+                if st.form_submit_button("login", type="primary", use_container_width=True):
+                    try:
+                        conn = obter_conexao_eficiente()
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
+                        res = cursor.fetchone()
+                        if res:
+                            # 1. Define todas as variáveis de sessão primeiro
+                            st.session_state.usuario_id = int(res[0])
+                            st.session_state.username = res[1]
+                            st.session_state.foto_perfil = res[2]
+                            st.session_state.eh_admin = bool(res[3])
+                            st.session_state.genero = res[4]
+                            st.session_state.dados_usuario = {
+                                "username": res[1], "foto_perfil": res[2], "genero": res[4],
+                                "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", "moedas": res[6] if res[6] else 0
+                            }
+                            
+                            cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (int(res[0]),))
+                            conn.commit()
+                            cursor.close()
+                            
+                            # 2. Atualiza a navegação para o chat
+                            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                            
+                            # 3. Limpa explicitamente o estado dos campos de texto da memória do Streamlit
+                            if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
+                            if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
+                            
+                            # 4. Força o reinício limpo da aplicação fora do estado do formulário
+                            st.rerun()
+                        else:
+                            st.error("Usuário não encontrado.")
+                        cursor.close() 
+                    except Exception as e: 
+                        st.error(f"Erro: {e}")       
+
+            col_voltar, col_esqueceu = st.columns(2)
+            with col_voltar:
+                if st.button("⬅️ Voltar para a Home", use_container_width=True, key="btn_voltar_home_login"):
+                    st.session_state.opcao_menu = "home"
+                    st.rerun()
+            with col_esqueceu:
+                if st.button("🔑 Esqueceu a senha?", use_container_width=True, key="btn_esqueceu_senha_login"):
+                    modal_recuperar_senha()
+
+                
 
     elif menu_atual == "cadastro":
         st.html('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>')
@@ -1630,13 +1694,13 @@ else:
                         finally:
                             if conn:
                                 cursor.close()
-
+                                    
 
         if st.button("← Voltar para o Login", use_container_width=True):
-                    st.session_state.opcao_menu = "login"
-                    st.rerun()
-    
-    
+            st.session_state.opcao_menu = "login"
+            st.rerun()
+
+
     elif menu_atual == "planos":
         st.session_state.opcao_menu = "planos"
         # Inicializa a sub-visão caso ela não exista
@@ -1671,7 +1735,9 @@ else:
                 """        
             )
                 
-               
+
+
+                
         with st.sidebar:
             # CORREÇÃO: Captura o ID do usuário da sessão
             id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
@@ -1751,83 +1817,49 @@ else:
         
         if st.button("← Voltar para o Login", use_container_width=True):
                 st.session_state.opcao_menu = "login"
-                st.rerun()
-
-
-    elif menu_atual == "login":
-        # Força o redirecionamento se o usuário já estiver logado
-        if isinstance(usuario_id_ativo, int) and usuario_id_ativo > 0:
-            st.session_state.opcao_menu = "💬 Conversar com Lucy"
-            st.rerun()
-        else:
-            st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
-            
-            # 💡 O SEGREDO AQUI: Se o usuário clicar em login, mudamos a chave do form. 
-            # Isso força o Streamlit a deletar o componente antigo do DOM do navegador.
-            chave_formulario = "form_deslogado" if "usuario_id" not in st.session_state else "form_destruido"
-            
-            with st.form(key=chave_formulario):
-                user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed", key="login_user_field")
-                pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed", key="login_pass_field")
-                
-                if st.form_submit_button("login", type="primary", use_container_width=True):
-                    try:
-                        conn = obter_conexao_eficiente()
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
-                        res = cursor.fetchone()
-                        
-                        if res:
-                            # 1. Define o ID numérico puro antes de qualquer mudança visual
-                            st.session_state.usuario_id = int(res[0])
-                            st.session_state.username = str(res[1])
-                            st.session_state.foto_perfil = str(res[2]) if res[2] else ""
-                            st.session_state.eh_admin = bool(res[3])
-                            st.session_state.genero = str(res[4])
-                            st.session_state.dados_usuario = {
-                                "username": res[1], "foto_perfil": res[2], "genero": res[4],
-                                "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", "moedas": res[6] if res[6] else 0
-                            }
-                            
-                            cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (int(res[0]),))
-                            conn.commit()
-                            
-                            # 2. Muda o ponteiro do roteador global
-                            st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                            
-                            # 3. Limpa os valores guardados nos inputs de texto para não sobrarem resíduos
-                            if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
-                            if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
-                            
-                            cursor.close()
-                            conn.close()
-                            
-                            # 4. Limpa caches locais e reinicia limpando o canvas visual do Streamlit
-                            st.cache_data.clear()
-                            st.rerun()
-                        else:
-                            st.error("Usuário não encontrado.")
-                            cursor.close()
-                            conn.close()
-                    except Exception as e: 
-                        st.error(f"Erro: {e}")       
-
-        col_voltar, col_esqueceu = st.columns(2)
-        with col_voltar:
-            if st.button("⬅️ Voltar para a Home", use_container_width=True, key="btn_voltar_home_login"):
-                st.session_state.opcao_menu = "home"
-                st.rerun()
-        with col_esqueceu:
-            if st.button("🔑 Esqueceu a senha?", use_container_width=True, key="btn_esqueceu_senha_login"):
-                modal_recuperar_senha()
-                      
-
-    # --------------------------------------------------------------------------
-    # --- GRUPO B: TELAS PRIVADAS (Com Barra Lateral / Usuário Logado) ---
-    # --------------------------------------------------------------------------
-    elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Gerenciar Conexões", "🤝 Sala Privada", "🛠️ Painel Admin", "✉️ Fale Conosco"]:
+                st.rerun() 
+                    
         
-        # BARRA LATERAL (Renderizada apenas se o usuário estiver em uma tela privada)
+
+    # --- TELAS PRIVADAS (Com Barra Lateral de Usuário Logado) ---
+    elif menu_atual in ["💬 Conversar com Lucy", "📅 Disponibilidade", "🤝 Gerenciar Conexões", "🤝 Sala Privada", "🛠️ Painel Admin"]:
+    #    st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
+
+                # 1. Verifica os dados salvos na Sessão Atual do Navegador
+            #    id_usuario_logado = st.session_state.get("usuario_id")
+            #    foto_sessao = st.session_state.get("foto_perfil")
+
+            #    st.write(f"🔹 **Seu ID de Usuário:** `{id_usuario_logado}`")
+            #    st.write(f"🔹 **Caminho salvo na Session State:** `{foto_sessao}`")
+
+                # 2. Testa a limpeza da barra que o sistema operacional exige
+            #    if foto_sessao:
+            #        caminho_limpo = str(foto_sessao).strip().lstrip('/')
+            #        st.write(f"🥾 **Caminho convertido para o Servidor:** `{caminho_limpo}`")
+            #        st.write(f"📂 **O arquivo existe fisicamente no servidor?** `{'✅ SIM' if os.path.exists(caminho_limpo) else '❌ NÃO'}`")
+
+                # 3. Faz uma varredura real na pasta física para listar TODAS as fotos salvas
+            #    st.markdown("#### 📁 Arquivos encontrados na pasta `static/uploads/perfis/`:")
+            #    try:
+            #        if os.path.exists(UPLOAD_FOLDER):
+            #            arquivos = os.listdir(UPLOAD_FOLDER)
+            #            if arquivos:
+            #                for arq in arquivos:
+            #                    caminho_completo_arquivo = os.path.join(UPLOAD_FOLDER, arq)
+            #                    tamanho_kb = os.path.getsize(caminho_completo_arquivo) / 1024
+            #                    st.code(f"📄 {arq} ({tamanho_kb:.1f} KB) -> Caminho para ler no st.image: '{caminho_completo_arquivo}'")
+            #            else:
+            #                st.info("A pasta existe, mas está vazia. Nenhum usuário fez upload de foto ainda.")
+            #        else:
+            #            st.warning("⚠️ A pasta de uploads ainda não foi criada fisicamente no servidor remoto.")
+            #    except Exception as e:
+            #        st.error(f"Erro ao listar diretório: {e}")
+            
+            
+
+                #avatar_html = ""
+                # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
+
         with st.sidebar: 
             # ==========================================================================
             # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO E MAIOR ---
@@ -2068,17 +2100,18 @@ else:
                 st.session_state.form_seed = 42
                 
                 st.rerun()
-            pass
-
-        # ROTEADOR DE CONTEÚDO CENTRAL (Decide qual miolo privado desenhar)
+        
+        # Renderiza estritamente a tela selecionada no miolo da página
         if menu_atual == "💬 Conversar com Lucy":   
+            # Apenas invoca o fragmento global de forma ultra eficiente
             renderizar_chat_lucy_isolado()   
             
         elif menu_atual == "📅 Disponibilidade":
-            template_disponibilidade()
-                              
+                template_disponibilidade()
+                
         elif menu_atual == "🤝 Gerenciar Conexões":
             st.title("🤝 Gestão de Relacionamentos") 
+
             
             if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
                 st.session_state.opcao_menu = "💬 Conversar com Lucy"
@@ -2204,10 +2237,10 @@ else:
                         parceiro_antigo_limpo = str(parceiro_nome).split('@')[0].capitalize()
                         st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
                         
-                except Exception as e: st.error(f"Erro: {e}")       
+                except Exception as e: st.error(f"Erro: {e}")   
 
-            pass        
-                           
+
+
         elif menu_atual == "🤝 Sala Privada":
             if st.session_state.get("match_id_atual"):
                 template_sala_privada()
@@ -2218,17 +2251,17 @@ else:
                     
         elif menu_atual == "🛠️ Painel Admin":
             template_painel_admin()
-            
-        elif menu_atual == "✉️ Fale Conosco":
+        elif st.session_state.opcao_menu == "✉️ Fale Conosco":
             template_fale_conosco()
 
-    # --------------------------------------------------------------------------
-    # --- GRUPO C: FALLBACK DE SEGURANÇA SEGURO (FIM DO ARQUIVO) ---
-    # --------------------------------------------------------------------------
+    # ==============================================================================
+    # FALLBACK DE SEGURANÇA SEGURO (FIM DO ARQUIVO)
+    # ==============================================================================
     else:
+        # Se o menu atual não corresponder a nenhuma tela, redefine para a home 
+        # e renderiza o layout visual imediatamente, quebrando loops de st.rerun()
         st.session_state.opcao_menu = "home"
-        st.rerun()
-
+        #template_home()        
 
 # ==============================================================================
 # RODAPÉ FIXO DISCRETO (TERMOS E POLÍTICAS)
