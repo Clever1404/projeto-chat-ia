@@ -1788,8 +1788,8 @@ else:
                             st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
 
                             # --- INTEGRAÇÃO COM O SUPABASE ---
-                            tipo_produto = st.session_state.tipo_pagamento_pendente
-                            sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo_produto)
+                            tipo = st.session_state.tipo_pagamento_pendente
+                            sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo_pagamento)
                             
                             if sucesso_banco:
                                 st.toast("Sua conta foi atualizada com sucesso no banco!")
