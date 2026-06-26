@@ -23,16 +23,26 @@ import plotly.express as px
 import altair as alt
 
 
+
 st.title("⚡ Diagnóstico de Conexão: Streamlit ⇄ Supabase")
+# --- INICIALIZAÇÃO DO SUPABASE ---
+# Tenta conectar usando os secrets do Streamlit Cloud
+try:
+    url: str = st.secrets["SUPABASE_URL"]
+    key: str = st.secrets["SUPABASE_KEY"]
+    supabase: Client = create_client(url, key)
+except Exception as e:
+    st.error(f"❌ Erro ao carregar as credenciais dos Secrets: {e}")
+    st.markdown("Verifique se as chaves `SUPABASE_URL` e `SUPABASE_KEY` estão configuradas no painel do Streamlit Cloud.")
 
 # 1. Recupera o ID do usuário da sessão atual
 usuario_id_teste = st.session_state.get("usuario_id")
 
 if not usuario_id_teste:
-    st.warning("⚠️ Nenhum 'id_usuario' encontrado na sessão do Streamlit. Insira um ID válido abaixo para testar:")
-    usuario_id_teste = st.text_input("ID do Usuário Cadastrado no Banco:")
+    st.warning("⚠️ Nenhum 'usuario_id' encontrado na sessão do Streamlit. Insira um ID válido abaixo para testar:")
+    usuario_id_teste = st.text_input("ID do Usuário Cadastrado no Banco:", value="Mariana")
 
-if usuario_id_teste:
+if usuario_id_teste and 'supabase' in locals():
     st.info(f"Procurando usuário com ID: `{usuario_id_teste}`")
     
     # --- PASSO 1: TESTE DE LEITURA (SELECT) ---
@@ -40,7 +50,7 @@ if usuario_id_teste:
     try:
         dados_usuario = supabase.table("usuarios").select("moedas, tipo_plano").eq("id", str(usuario_id_teste)).execute()
         
-        if dados_usuario.data:
+        if dados_usuario.data and len(dados_usuario.data) > 0:
             st.success("✅ Conexão estabelecida! Usuário encontrado com sucesso.")
             st.json(dados_usuario.data)
             
@@ -48,7 +58,9 @@ if usuario_id_teste:
             st.subheader("2. Testando Escrita de Dados")
             
             if st.button("Simular Atualização (Adicionar 10 moedas)"):
-                moedas_atuais = dados_usuario.data[0].get("moedas") or 0
+                # Pega o primeiro registro retornado na lista
+                user_record = dados_usuario.data[0]
+                moedas_atuais = user_record.get("moedas") or 0
                 novas_moedas = moedas_atuais + 10
                 data_atual_iso = datetime.now().isoformat()
                 
@@ -68,15 +80,11 @@ if usuario_id_teste:
                     st.error(f"❌ Falha na Escrita (Erro de RLS ou Constraints): {error_update}")
                     
         else:
-            st.error("❌ O Supabase respondeu, mas esse ID não existe na tabela 'usuarios'.")
+            st.error(f"❌ O Supabase respondeu, mas o ID '{usuario_id_teste}' não foi encontrado na tabela 'usuarios'.")
+            st.info("💡 Lembre-se: O ID digitado precisa ser exatamente igual ao que está salvo na coluna 'id' do seu banco de dados.")
             
     except Exception as error_select:
         st.error(f"❌ Falha Crítica na Leitura: {error_select}")
-        st.markdown("""
-        **Prováveis causas para falha de leitura:**
-        * As credenciais `SUPABASE_URL` ou `SUPABASE_KEY` nos seus *Secrets* estão erradas.
-        * O nome da tabela não é exatamente `usuarios`.
-        """)
 
 
 
