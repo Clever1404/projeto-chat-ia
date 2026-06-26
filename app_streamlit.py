@@ -1675,13 +1675,13 @@ else:
                         cursor = conn.cursor()
                         
                         # ADICIONADO: 'senha' na consulta SQL para validação
-                        cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, senha FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
+                        cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
                         res = cursor.fetchone()
                         
                         if res:
                             # VALIDAÇÃO DE SENHA: Altere se o seu banco usar criptografia (ex: bcrypt)
-                            senha_banco = res[7]
-                            if pass_in != senha_banco:
+                            password_hash_banco = res[7]
+                            if pass_in != password_hash_banco:
                                 st.error("Senha incorreta. Tente novamente.")
                             else:
                                 # 1. Define todas as variáveis de sessão primeiro
