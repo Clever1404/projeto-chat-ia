@@ -1680,7 +1680,7 @@ else:
                         
                         if res:
                             # VALIDAÇÃO DE SENHA: Altere se o seu banco usar criptografia (ex: bcrypt)
-                            password_hash_banco = res[7]
+                            password_hash_banco = res[6]
                             if pass_in != password_hash_banco:
                                 st.error("Senha incorreta. Tente novamente.")
                             else:
