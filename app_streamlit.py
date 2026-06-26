@@ -23,6 +23,64 @@ import plotly.express as px
 import altair as alt
 
 
+st.title("⚡ Diagnóstico de Conexão: Streamlit ⇄ Supabase")
+
+# 1. Recupera o ID do usuário da sessão atual
+id_usuario_teste = st.session_state.get("id_usuario")
+
+if not id_usuario_teste:
+    st.warning("⚠️ Nenhum 'id_usuario' encontrado na sessão do Streamlit. Insira um ID válido abaixo para testar:")
+    id_usuario_teste = st.text_input("ID do Usuário Cadastrado no Banco:")
+
+if id_usuario_teste:
+    st.info(f"Procurando usuário com ID: `{id_usuario_teste}`")
+    
+    # --- PASSO 1: TESTE DE LEITURA (SELECT) ---
+    st.subheader("1. Testando Leitura de Dados")
+    try:
+        dados_usuario = supabase.table("usuarios").select("moedas, tipo_plano").eq("id", str(id_usuario_teste)).execute()
+        
+        if dados_usuario.data:
+            st.success("✅ Conexão estabelecida! Usuário encontrado com sucesso.")
+            st.json(dados_usuario.data)
+            
+            # --- PASSO 2: TESTE DE ESCRITA (UPDATE) ---
+            st.subheader("2. Testando Escrita de Dados")
+            
+            if st.button("Simular Atualização (Adicionar 10 moedas)"):
+                moedas_atuais = dados_usuario.data[0].get("moedas") or 0
+                novas_moedas = moedas_atuais + 10
+                data_atual_iso = datetime.now().isoformat()
+                
+                try:
+                    update_teste = supabase.table("usuarios").update({
+                        "moedas": novas_moedas,
+                        "ultima_recarga": data_atual_iso
+                    }).eq("id", str(id_usuario_teste)).execute()
+                    
+                    if update_teste.data and len(update_teste.data) > 0:
+                        st.balloons()
+                        st.success(f"🎉 Sucesso! Moedas atualizadas de {moedas_atuais} para {novas_moedas}.")
+                        st.json(update_teste.data)
+                    else:
+                        st.error("❌ O comando foi enviado, mas nenhuma linha foi alterada. O ID está correto?")
+                except Exception as error_update:
+                    st.error(f"❌ Falha na Escrita (Erro de RLS ou Constraints): {error_update}")
+                    
+        else:
+            st.error("❌ O Supabase respondeu, mas esse ID não existe na tabela 'usuarios'.")
+            
+    except Exception as error_select:
+        st.error(f"❌ Falha Crítica na Leitura: {error_select}")
+        st.markdown("""
+        **Prováveis causas para falha de leitura:**
+        * As credenciais `SUPABASE_URL` ou `SUPABASE_KEY` nos seus *Secrets* estão erradas.
+        * O nome da tabela não é exatamente `usuarios`.
+        """)
+
+
+
+
 # ==============================================================================
 # 1. CONFIGURAÇÕES OBRIGATÓRIAS DE PÁGINA (Sempre no Topo Absoluto)
 # ==============================================================================
@@ -1710,7 +1768,7 @@ else:
         # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
         if st.session_state.sub_visao == "planos":
             st.markdown('<h1 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
-                
+        
             # Texto descritivo dos planos centralizado
             st.html(
                 """
@@ -1734,90 +1792,91 @@ else:
                 </div>
                 """        
             )
-                
 
-
+            with st.sidebar:
+                # Captura o ID do usuário da sessão
+                id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
                 
-        with st.sidebar:
-            # CORREÇÃO: Captura o ID do usuário da sessão
-            id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
-            
-            opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"])
-            
-            if st.button("Gerar Pix de Pagamento"):
-                valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
-                id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
+                opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"])
                 
-                payment_data = {
-                    "transaction_amount": valor, 
-                    "description": desc, 
-                    "payment_method_id": "pix",
-                    "payer": {"email": "cliente@email.com"}, 
-                    "external_reference": f"{id_limpo}:{tipo}"
-                }
+                if st.button("Gerar Pix de Pagamento"):
+                    valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
+                    id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
                     
-                try:
-                    payment_response = sdk.payment().create(payment_data)
-                    payment = payment_response["response"]
+                    payment_data = {
+                        "transaction_amount": valor, 
+                        "description": desc, 
+                        "payment_method_id": "pix",
+                        "payer": {"email": "cliente@email.com"}, 
+                        "external_reference": f"{id_limpo}:{tipo}"
+                    }
                         
-                    if "point_of_interaction" in payment:
-                        st.session_state.id_pagamento_pendente = payment["id"]
-                        st.session_state.tipo_pagamento_pendente = tipo
-                        st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
-                        st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
-                        st.success("Pix gerado com sucesso!")
-                        st.rerun()
-                except Exception as e: 
-                    st.error(f"Erro ao gerar pagamento: {e}")
-
-            # Renderiza o QR Code caso ele já exista na sessão ativa
-            if st.session_state.get("qr_code_img"):
-                st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
-                st.image(base64.b64decode(st.session_state.qr_code_img), width=250)
-                st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=70)
-                        
-                # BOTÃO CORRIGIDO: Agora ele realmente valida o Pix
-                if st.button("🔄 Já realizei o pagamento", type="primary"):
-                    id_pagamento = st.session_state.get("id_pagamento_pendente")
-                    
-                    if id_pagamento:
-                        with st.spinner("Verificando compensação do Pix..."):
-                            status = verificar_status_pix(id_pagamento)
-                        
-                        if status == "approved":
-                            st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
-
-                            # --- INTEGRAÇÃO COM O SUPABASE ---
-                            tipo = st.session_state.tipo_pagamento_pendente
-                            sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo_pagamento)
+                    try:
+                        payment_response = sdk.payment().create(payment_data)
+                        payment = payment_response["response"]
                             
-                            if sucesso_banco:
-                                st.toast("Sua conta foi atualizada com sucesso no banco!")
-                            else:
-                                st.error("Erro ao computar créditos no banco. Contate o suporte informando o ID do pagamento.")
-                            
-                            # Limpa as variáveis de pagamento da sessão para sumir com o QR code
-                            del st.session_state.qr_code_img
-                            del st.session_state.qr_code_texto
-                            del st.session_state.id_pagamento_pendente
-                            
-                            st.session_state.abrir_popup_loja = False
+                        if "point_of_interaction" in payment:
+                            st.session_state.id_pagamento_pendente = payment["id"]
+                            st.session_state.tipo_pagamento_pendente = tipo
+                            st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+                            st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+                            st.success("Pix gerado com sucesso!")
                             st.rerun()
-                                                     
-                        elif status == "pending":
-                            st.warning("⏳ O pagamento ainda consta como pendente. Aguarde um instante e tente novamente.")
+                    except Exception as e: 
+                        st.error(f"Erro ao gerar pagamento: {e}")
+
+                # Renderiza o QR Code caso ele já exista na sessão ativa
+                if st.session_state.get("qr_code_img"):
+                    st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
+                    st.image(base64.b64decode(st.session_state.qr_code_img), width=250)
+                    st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=70)
+                            
+                    if st.button("🔄 Já realizei o pagamento", type="primary"):
+                        id_pagamento = st.session_state.get("id_pagamento_pendente")
+                        
+                        if id_pagamento:
+                            with st.spinner("Verificando compensação do Pix..."):
+                                status = verificar_status_pix(id_pagamento)
+                            
+                            if status == "approved":
+                                st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
+
+                                # --- INTEGRACAO COM O SUPABASE CORRIGIDA ---
+                                tipo = st.session_state.get("tipo_pagamento_pendente")
+                                
+                                # CORREÇÃO DA VARIÁVEL: Enviando 'tipo' em vez de 'tipo_pagamento'
+                                sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo)
+                                
+                                if sucesso_banco:
+                                    st.toast("Sua conta foi atualizada com sucesso no banco!")
+                                    
+                                    # Limpa as variáveis de pagamento da sessão apenas se o banco gravou com sucesso
+                                    del st.session_state.qr_code_img
+                                    del st.session_state.qr_code_texto
+                                    del st.session_state.id_pagamento_pendente
+                                    del st.session_state.tipo_pagamento_pendente
+                                    
+                                    if "abrir_popup_loja" in st.session_state:
+                                        st.session_state.abrir_popup_loja = False
+                                    st.rerun()
+                                else:
+                                    st.error("Erro ao computar créditos no banco. Contate o suporte informando o ID do pagamento.")
+                                                        
+                            elif status == "pending":
+                                st.warning("⏳ O pagamento ainda consta como pendente. Aguarde um instante e tente novamente.")
+                            else:
+                                st.error(f"❌ O status do pagamento é: {status}. Se houve algum problema, contate o suporte.")
                         else:
-                            st.error(f"❌ O status do pagamento é: {status}. Se houve algum problema, contate o suporte.")
-                    else:
-                        st.error("Nenhum ID de pagamento encontrado na sessão.")
-          
-        if st.button("← Voltar para o Chat", use_container_width=True):
+                            st.error("Nenhum ID de pagamento encontrado na sessão.")
+            
+            # CORREÇÃO DE INDENTAÇÃO: Botões de navegação movidos para dentro do bloco principal dos planos
+            if st.button("← Voltar para o Chat", use_container_width=True):
                 st.session_state.opcao_menu = "💬 Conversar com Lucy"
                 st.rerun() 
-        
-        if st.button("← Voltar para o Login", use_container_width=True):
+            
+            if st.button("← Voltar para o Login", use_container_width=True):
                 st.session_state.opcao_menu = "login"
-                st.rerun() 
+                st.rerun()
                     
         
 
