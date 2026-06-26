@@ -36,19 +36,19 @@ except Exception as e:
     st.markdown("Verifique se as chaves `SUPABASE_URL` e `SUPABASE_KEY` estão configuradas no painel do Streamlit Cloud.")
 
 # 1. Recupera o ID do usuário da sessão atual
-usuario_id_teste = st.session_state.get("usuario_id")
+id_usuario_teste = st.session_state.get("id_usuario")
 
-if not usuario_id_teste:
-    st.warning("⚠️ Nenhum 'usuario_id' encontrado na sessão do Streamlit. Insira um ID válido abaixo para testar:")
-    usuario_id_teste = st.text_input("ID do Usuário Cadastrado no Banco:", value="Mariana")
+if not id_usuario_teste:
+    st.warning("⚠️ Nenhum 'id_usuario' encontrado na sessão do Streamlit. Insira um ID válido abaixo para testar:")
+    id_usuario_teste = st.text_input("ID do Usuário Cadastrado no Banco:", value="Mariana")
 
-if usuario_id_teste and 'supabase' in locals():
-    st.info(f"Procurando usuário com ID: `{usuario_id_teste}`")
+if id_usuario_teste and 'supabase' in locals():
+    st.info(f"Procurando usuário com ID: `{id_usuario_teste}`")
     
     # --- PASSO 1: TESTE DE LEITURA (SELECT) ---
     st.subheader("1. Testando Leitura de Dados")
     try:
-        dados_usuario = supabase.table("usuarios").select("moedas, tipo_plano").eq("id", str(usuario_id_teste)).execute()
+        dados_usuario = supabase.table("usuarios").select("moedas, tipo_plano").eq("id", str(id_usuario_teste)).execute()
         
         if dados_usuario.data and len(dados_usuario.data) > 0:
             st.success("✅ Conexão estabelecida! Usuário encontrado com sucesso.")
@@ -68,7 +68,7 @@ if usuario_id_teste and 'supabase' in locals():
                     update_teste = supabase.table("usuarios").update({
                         "moedas": novas_moedas,
                         "ultima_recarga": data_atual_iso
-                    }).eq("id", str(usuario_id_teste)).execute()
+                    }).eq("id", str(id_usuario_teste)).execute()
                     
                     if update_teste.data and len(update_teste.data) > 0:
                         st.balloons()
@@ -80,7 +80,7 @@ if usuario_id_teste and 'supabase' in locals():
                     st.error(f"❌ Falha na Escrita (Erro de RLS ou Constraints): {error_update}")
                     
         else:
-            st.error(f"❌ O Supabase respondeu, mas o ID '{usuario_id_teste}' não foi encontrado na tabela 'usuarios'.")
+            st.error(f"❌ O Supabase respondeu, mas o ID '{id_usuario_teste}' não foi encontrado na tabela 'usuarios'.")
             st.info("💡 Lembre-se: O ID digitado precisa ser exatamente igual ao que está salvo na coluna 'id' do seu banco de dados.")
             
     except Exception as error_select:
