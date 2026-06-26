@@ -496,11 +496,11 @@ def modal_agendamento_encontro(dados_r):
             cursor.close()
             conn.close() # Fecha a conexão de leitura com segurança
             
-            # 3. EXIBIÇÃO DO PAINEL DE DEPURAÇÃO (Movido para dentro do botão para refletir os dados em tempo real)
-            with st.expander("🔍 Depurador de Agenda (Debug)", expanded=True):
-                st.write(f"**Seu ID ({st.session_state.get('username', 'Usuário')}):** {meu_id_limpo} | Possui este horário? `{'Sim' if meu_registro_existe else 'Não'}`")
-                st.write(f"**ID do Par ({dados_r['nome_par']}):** {parceiro_id_limpo} | Possui este horário? `{'Sim' if parceiro_registro_existe else 'Não'}`")
-                st.write(f"**O parceiro já preencheu a grade alguma vez?** `{'Sim' if parceiro_tem_algum_horario else 'Não'}`")
+            # # 3. EXIBIÇÃO DO PAINEL DE DEPURAÇÃO (Movido para dentro do botão para refletir os dados em tempo real)
+            # with st.expander("🔍 Depurador de Agenda (Debug)", expanded=True):
+            #     st.write(f"**Seu ID ({st.session_state.get('username', 'Usuário')}):** {meu_id_limpo} | Possui este horário? `{'Sim' if meu_registro_existe else 'Não'}`")
+            #     st.write(f"**ID do Par ({dados_r['nome_par']}):** {parceiro_id_limpo} | Possui este horário? `{'Sim' if parceiro_registro_existe else 'Não'}`")
+            #     st.write(f"**O parceiro já preencheu a grade alguma vez?** `{'Sim' if parceiro_tem_algum_horario else 'Não'}`")
 
             # 4. REGRAS DE NEGÓCIO E VALIDAÇÕES DE TRAVA
             hora_int = hor_s.hour
@@ -804,7 +804,7 @@ def template_sala_privada():
         saldo_moedas_sala = st.session_state.dados_usuario.get("moedas", 0)
 
     # Divisão de Colunas Layout
-    col_perfil, col_chat, col_video = st.columns([1, 3, 1])
+    col_perfil, col_chat = st.columns([1, 3])
 
     with col_perfil:
         st.markdown(f"""<div class="box-perfil-fixo"><div style="font-size: 40px; text-align:center;">{"👩" if parceiro_gen == "F" else "👨"}</div></div>""", unsafe_allow_html=True)
