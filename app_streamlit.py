@@ -836,6 +836,177 @@ def template_disponibilidade():
             st.rerun()
 
 
+def template_gerenciar_conexoes():  
+# ... (todo o resto do bloco with st.sidebar) ...
+    st.title("🤝 Gestão de Relacionamentos") 
+
+    if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
+        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+        st.rerun()
+                
+    aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
+    meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
+
+    # Captura e normalização estável do plano do usuário para as travas de negócio
+    plano_atual = str(st.session_state.get("tipo_plano", "grátis")).strip().lower()
+    usuario_tem_acesso = (plano_atual == "vip") or ("crédito" in plano_atual) or ("credito" in plano_atual)
+    bloquear_botoes = not usuario_tem_acesso
+
+    # ==============================================================================
+    # ABA 1: MEUS MATCHES (AFINIDADES)
+    # ==============================================================================
+    with aba_m:
+        st.markdown("### 👥 Suas Afinidades")
+        matches_dados = []
+        conn = None
+        try:
+            # ⚡ OTIMIZAÇÃO: Varredura de afinidades encapsulada no Pool
+            conn = obter_conexao_eficiente()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT m.id, u.username, u.foto_perfil, u.genero, u.id 
+                    FROM matches m 
+                    JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) 
+                    WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;
+                """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
+                matches_dados = cursor.fetchall()
+        except Exception as e:
+            st.error(f"Erro ao buscar afinidades: {e}")
+        finally:
+            if conn:
+                liberar_conexao(conn)  # ⚡ LIBERAÇÃO OBRIGATÓRIA AO POOL
+
+        if not matches_dados: 
+            st.info("Nenhum par localizado.")
+            
+        for m_id, m_nome, m_foto, m_gen, par_id in matches_dados:
+            with st.container(border=True):
+                c_av_c, c_nm_c, c_go_c, c_del_c = st.columns([0.6, 2, 1, 1])
+                
+                with c_av_c:
+                    caminho_par_img = str(m_foto).strip()
+                    # Otimizado: Renderiza imagens da web de forma direta e sem IO local assíncrono
+                    if caminho_par_img and caminho_par_img.startswith("http"):
+                        st.image(caminho_par_img, width=50)
+                    else:
+                        st.markdown(f'<div style="font-size: 35px; margin-top: 5px; text-align: center;">{"👩" if m_gen == "F" else "👨"}</div>', unsafe_allow_html=True)
+                        
+                with c_nm_c:
+                    st.markdown(f"<p style='font-size:15px; font-weight:bold; margin-top:5px; color:#f0f6fc;'>{str(m_nome).split('@')[0].capitalize()}</p>", unsafe_allow_html=True)
+                    
+                with c_go_c:
+                    if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
+                                help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
+                        st.session_state.match_id_atual = m_id
+                        st.session_state.opcao_menu = "🤝 Sala Privada"
+                        st.rerun()
+                        
+                with c_del_c:
+                    if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", use_container_width=True):
+                        conn_del = None
+                        try:
+                            # Executa exclusão atômica em cascata manual protegida por rollback
+                            conn_del = obter_conexao_eficiente()
+                            with conn_del.cursor() as cursor_del:
+                                cursor_del.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(m_id),))
+                                cursor_del.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
+                                cursor_del.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
+                                conn_del.commit()
+                            st.toast("Match removido!")
+                            time.sleep(0.5)
+                            st.rerun()
+                        except Exception as e: 
+                            if conn_del: conn_del.rollback()
+                            st.error(f"Erro ao remover match: {e}")
+                        finally:
+                            if conn_del:
+                                liberar_conexao(conn_del)
+
+    # ==============================================================================
+    # ABA 2: GESTÃO DE CONVITES E HISTÓRICO
+    # ==============================================================================
+    with aba_e:
+        st.markdown("### 📩 Convites Ativos da Semana")
+        encontros = []
+        conn_enc = None
+        
+        # 1. BUSCA INICIAL DE ENCONTROS (Totalmente isolada)
+        try:
+            conn_enc = obter_conexao_eficiente()
+            with conn_enc.cursor() as cursor_enc:
+                cursor_enc.execute("""
+                    SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
+                        CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
+                    FROM agendamentos_virtuais a 
+                    JOIN matches m ON m.id = a.match_id 
+                    JOIN usuarios u1 ON u1.id = m.usuario_1_id 
+                    JOIN usuarios u2 ON u2.id = m.usuario_2_id
+                    WHERE a.remetente_id = %s OR a.destinatario_id = %s ORDER BY a.id DESC;
+                """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
+                encontros = cursor_enc.fetchall()
+        except Exception as e:
+            st.error(f"Erro ao buscar convites: {e}")
+        finally:
+            if conn_enc:
+                liberar_conexao(conn_enc)
+
+        # 2. SEPARAÇÃO DOS FILTROS (Fora do bloco finally da query)
+        encontros_ativos = [e for e in encontros if str(e[4]).lower() in ['pendente', 'aceito']]
+        encontros_passados = [e for e in encontros if str(e[4]).lower() in ['concluido', 'recusado', 'cancelado']]
+
+        if not encontros_ativos:
+            st.caption("Nenhum convite pendente ou encontro ativo para hoje.")
+        
+        # 3. RENDERIZAÇÃO DOS CONVITES ATIVOS
+        for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_ativos:
+            eu_enviei = (int(rem_id) == meu_id_limpo)
+            parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize()
+        
+            with st.container(border=True):
+                col_i, col_b = st.columns([3, 1])
+                with col_i:
+                    st.write(f"📅 **Encontro com {parceiro_limpo}:** {dia} às {str(hora)[:5]}")
+                    st.caption(f"Status: {status.upper()}")
+                with col_b:
+                    if status == 'pendente' and not eu_enviei:
+                        if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
+                            help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
+                            
+                            # ⚡ CORREÇÃO: O processamento do banco agora está estritamente DENTRO do botão
+                            conn_up = None
+                            try:
+                                conn_up = obter_conexao_eficiente()
+                                with conn_up.cursor() as cursor_up:
+                                    cursor_up.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,))
+                                    conn_up.commit()
+                                st.rerun()
+                            except Exception as e_up:
+                                if conn_up: conn_up.rollback()
+                                st.error(f"Erro ao confirmar convite: {e_up}")
+                            finally:
+                                if conn_up:
+                                    liberar_conexao(conn_up)
+                                                
+                    elif status == 'aceito':
+                        if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
+                            help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
+                            st.session_state.match_id_atual = m_id
+                            st.session_state.opcao_menu = "🤝 Sala Privada"
+                            st.rerun()
+        
+        # ⚡ CORREÇÃO: Histórico movido para fora do laço FOR dos ativos e alinhado corretamente na base
+        st.markdown("<br><hr style='border-color: #21262d;'>", unsafe_allow_html=True)
+        st.markdown("### 📚 Histórico de Encontros Concluídos")
+        
+        if not encontros_passados:
+            st.caption("Nenhum registro antigo arquivado.")
+        else:
+            for ag_id, dia, per, hora, status_p, rem_id_p, parceiro_nome_p, m_id_p in encontros_passados:
+                parceiro_antigo_limpo = str(parceiro_nome_p).split('@')[0].capitalize()
+                st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
+
+
+
 
 
 # ==============================================================================
@@ -1834,6 +2005,10 @@ if menu_atual not in ["home", "login", "cadastro"]:
         # ==========================================================================
         # --- BOTÕES DE NAVEGAÇÃO INTERNA (TODOS COM CHAVES FIXAS ESTÁVEIS) ---
         # ==========================================================================              
+        if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel"):
+                st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
+                st.rerun()
+                
         if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria_final"): 
             st.session_state.opcao_menu = "📅 Disponibilidade"
             st.rerun()
@@ -1903,182 +2078,8 @@ if menu_atual not in ["home", "login", "cadastro"]:
             st.session_state.form_seed = 42
             
             st.rerun()
-    
         
-        # Botões de navegação protegidos
-        if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel_final"):
-            st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
-            st.rerun()
-            
-        # ... (todo o resto do bloco with st.sidebar) ...
-            st.title("🤝 Gestão de Relacionamentos") 
-
-            if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
-                st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                st.rerun()
-                        
-            aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
-            meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
-
-            # Captura e normalização estável do plano do usuário para as travas de negócio
-            plano_atual = str(st.session_state.get("tipo_plano", "grátis")).strip().lower()
-            usuario_tem_acesso = (plano_atual == "vip") or ("crédito" in plano_atual) or ("credito" in plano_atual)
-            bloquear_botoes = not usuario_tem_acesso
-
-            # ==============================================================================
-            # ABA 1: MEUS MATCHES (AFINIDADES)
-            # ==============================================================================
-            with aba_m:
-                st.markdown("### 👥 Suas Afinidades")
-                matches_dados = []
-                conn = None
-                try:
-                    # ⚡ OTIMIZAÇÃO: Varredura de afinidades encapsulada no Pool
-                    conn = obter_conexao_eficiente()
-                    with conn.cursor() as cursor:
-                        cursor.execute("""
-                            SELECT m.id, u.username, u.foto_perfil, u.genero, u.id 
-                            FROM matches m 
-                            JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) 
-                            WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;
-                        """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-                        matches_dados = cursor.fetchall()
-                except Exception as e:
-                    st.error(f"Erro ao buscar afinidades: {e}")
-                finally:
-                    if conn:
-                        liberar_conexao(conn)  # ⚡ LIBERAÇÃO OBRIGATÓRIA AO POOL
-
-                if not matches_dados: 
-                    st.info("Nenhum par localizado.")
-                    
-                for m_id, m_nome, m_foto, m_gen, par_id in matches_dados:
-                    with st.container(border=True):
-                        c_av_c, c_nm_c, c_go_c, c_del_c = st.columns([0.6, 2, 1, 1])
-                        
-                        with c_av_c:
-                            caminho_par_img = str(m_foto).strip()
-                            # Otimizado: Renderiza imagens da web de forma direta e sem IO local assíncrono
-                            if caminho_par_img and caminho_par_img.startswith("http"):
-                                st.image(caminho_par_img, width=50)
-                            else:
-                                st.markdown(f'<div style="font-size: 35px; margin-top: 5px; text-align: center;">{"👩" if m_gen == "F" else "👨"}</div>', unsafe_allow_html=True)
-                                
-                        with c_nm_c:
-                            st.markdown(f"<p style='font-size:15px; font-weight:bold; margin-top:5px; color:#f0f6fc;'>{str(m_nome).split('@')[0].capitalize()}</p>", unsafe_allow_html=True)
-                            
-                        with c_go_c:
-                            if st.button("💬 Entrar", key=f"go_ch_h_{m_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                                        help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                                st.session_state.match_id_atual = m_id
-                                st.session_state.opcao_menu = "🤝 Sala Privada"
-                                st.rerun()
-                                
-                        with c_del_c:
-                            if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", use_container_width=True):
-                                conn_del = None
-                                try:
-                                    # Executa exclusão atômica em cascata manual protegida por rollback
-                                    conn_del = obter_conexao_eficiente()
-                                    with conn_del.cursor() as cursor_del:
-                                        cursor_del.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(m_id),))
-                                        cursor_del.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
-                                        cursor_del.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
-                                        conn_del.commit()
-                                    st.toast("Match removido!")
-                                    time.sleep(0.5)
-                                    st.rerun()
-                                except Exception as e: 
-                                    if conn_del: conn_del.rollback()
-                                    st.error(f"Erro ao remover match: {e}")
-                                finally:
-                                    if conn_del:
-                                        liberar_conexao(conn_del)
-
-            # ==============================================================================
-            # ABA 2: GESTÃO DE CONVITES E HISTÓRICO
-            # ==============================================================================
-            with aba_e:
-                st.markdown("### 📩 Convites Ativos da Semana")
-                encontros = []
-                conn_enc = None
-                
-                # 1. BUSCA INICIAL DE ENCONTROS (Totalmente isolada)
-                try:
-                    conn_enc = obter_conexao_eficiente()
-                    with conn_enc.cursor() as cursor_enc:
-                        cursor_enc.execute("""
-                            SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
-                                CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
-                            FROM agendamentos_virtuais a 
-                            JOIN matches m ON m.id = a.match_id 
-                            JOIN usuarios u1 ON u1.id = m.usuario_1_id 
-                            JOIN usuarios u2 ON u2.id = m.usuario_2_id
-                            WHERE a.remetente_id = %s OR a.destinatario_id = %s ORDER BY a.id DESC;
-                        """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-                        encontros = cursor_enc.fetchall()
-                except Exception as e:
-                    st.error(f"Erro ao buscar convites: {e}")
-                finally:
-                    if conn_enc:
-                        liberar_conexao(conn_enc)
-
-                # 2. SEPARAÇÃO DOS FILTROS (Fora do bloco finally da query)
-                encontros_ativos = [e for e in encontros if str(e[4]).lower() in ['pendente', 'aceito']]
-                encontros_passados = [e for e in encontros if str(e[4]).lower() in ['concluido', 'recusado', 'cancelado']]
-
-                if not encontros_ativos:
-                    st.caption("Nenhum convite pendente ou encontro ativo para hoje.")
-                
-                # 3. RENDERIZAÇÃO DOS CONVITES ATIVOS
-                for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_ativos:
-                    eu_enviei = (int(rem_id) == meu_id_limpo)
-                    parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize()
-                
-                    with st.container(border=True):
-                        col_i, col_b = st.columns([3, 1])
-                        with col_i:
-                            st.write(f"📅 **Encontro com {parceiro_limpo}:** {dia} às {str(hora)[:5]}")
-                            st.caption(f"Status: {status.upper()}")
-                        with col_b:
-                            if status == 'pendente' and not eu_enviei:
-                                if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                                    help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                                    
-                                    # ⚡ CORREÇÃO: O processamento do banco agora está estritamente DENTRO do botão
-                                    conn_up = None
-                                    try:
-                                        conn_up = obter_conexao_eficiente()
-                                        with conn_up.cursor() as cursor_up:
-                                            cursor_up.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,))
-                                            conn_up.commit()
-                                        st.rerun()
-                                    except Exception as e_up:
-                                        if conn_up: conn_up.rollback()
-                                        st.error(f"Erro ao confirmar convite: {e_up}")
-                                    finally:
-                                        if conn_up:
-                                            liberar_conexao(conn_up)
-                                                        
-                            elif status == 'aceito':
-                                if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                                    help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                                    st.session_state.match_id_atual = m_id
-                                    st.session_state.opcao_menu = "🤝 Sala Privada"
-                                    st.rerun()
-                
-                # ⚡ CORREÇÃO: Histórico movido para fora do laço FOR dos ativos e alinhado corretamente na base
-                st.markdown("<br><hr style='border-color: #21262d;'>", unsafe_allow_html=True)
-                st.markdown("### 📚 Histórico de Encontros Concluídos")
-                
-                if not encontros_passados:
-                    st.caption("Nenhum registro antigo arquivado.")
-                else:
-                    for ag_id, dia, per, hora, status_p, rem_id_p, parceiro_nome_p, m_id_p in encontros_passados:
-                        parceiro_antigo_limpo = str(parceiro_nome_p).split('@')[0].capitalize()
-                        st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
-
-
+        
 # ==============================================================================
 # 3. ROTEADOR DE INTERFACE DO MIOLO (CENTRALIZADO COM st.empty() E st.stop())
 # ==============================================================================
@@ -2310,8 +2311,9 @@ with miolo_pagina.container():
         st.stop()
         
     elif menu_atual == "🤝 Gerenciar Conexões":
-        st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
+        template_gerenciar_conexoes()
         st.stop()
+        
         
     elif menu_atual == "planos":
         # Template de planos sem st.sidebar interno
@@ -2324,8 +2326,8 @@ with miolo_pagina.container():
         if st.session_state.sub_visao == "planos":
             st.markdown('<h1 style="text-align:center; color:#007bff; margin-bottom:15px;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
 
-            # ⚡ OTIMIZAÇÃO VISUAL: HTML convertido para markdown estável (mais leve que st.html)
-            st.markdown(
+            # Texto descritivo dos planos centralizado
+            st.html(
                 """
                 <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
                     <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
@@ -2345,8 +2347,7 @@ with miolo_pagina.container():
                         <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
                     </div>
                 </div>
-                """, 
-                unsafe_allow_html=True
+                """        
             )
 
             # ==========================================================================
