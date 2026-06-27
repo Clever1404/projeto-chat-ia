@@ -1049,7 +1049,7 @@ def template_sala_privada():
             with col_btn:
                 botao_enviar = st.form_submit_button("Enviar", use_container_width=True)
                 
-            if botao_entrar or (botao_enviar and texto_msg.strip()):
+            if botao_enviar and texto_msg.strip():
                 enviar_mensagem(match_id, meu_id, texto_msg)
                 st.rerun(scope="fragment") # Recarrega apenas as mensagens, eliminando o travamento de fundo
       
