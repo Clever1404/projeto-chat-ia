@@ -24,77 +24,77 @@ import altair as alt
 
 
 
-st.title("⚡ Diagnóstico de Conexão: Streamlit ⇄ Supabase")
-# --- INICIALIZAÇÃO DO SUPABASE ---
-# Tenta conectar usando os secrets do Streamlit Cloud
-try:
-    url: str = st.secrets["SUPABASE_URL"]
-    key: str = st.secrets["SUPABASE_KEY"]
-    supabase: Client = create_client(url, key)
-except Exception as e:
-    st.error(f"❌ Erro ao carregar as credenciais dos Secrets: {e}")
-    st.markdown("Verifique se as chaves `SUPABASE_URL` e `SUPABASE_KEY` estão configuradas no painel do Streamlit Cloud.")
+# st.title("⚡ Diagnóstico de Conexão: Streamlit ⇄ Supabase")
+# # --- INICIALIZAÇÃO DO SUPABASE ---
+# # Tenta conectar usando os secrets do Streamlit Cloud
+# try:
+#     url: str = st.secrets["SUPABASE_URL"]
+#     key: str = st.secrets["SUPABASE_KEY"]
+#     supabase: Client = create_client(url, key)
+# except Exception as e:
+#     st.error(f"❌ Erro ao carregar as credenciais dos Secrets: {e}")
+#     st.markdown("Verifique se as chaves `SUPABASE_URL` e `SUPABASE_KEY` estão configuradas no painel do Streamlit Cloud.")
 
-# 1. Recupera o ID do usuário da sessão atual
-id_usuario_teste = st.session_state.get("id_usuario")
+# # 1. Recupera o ID do usuário da sessão atual
+# id_usuario_teste = st.session_state.get("id_usuario")
 
-if not id_usuario_teste:
-    st.warning("⚠️ Nenhum 'id_usuario' encontrado na sessão do Streamlit. Insira um ID válido abaixo para testar:")
-    id_usuario_teste = st.text_input("ID do Usuário Cadastrado no Banco:", value="3")
+# if not id_usuario_teste:
+#     st.warning("⚠️ Nenhum 'id_usuario' encontrado na sessão do Streamlit. Insira um ID válido abaixo para testar:")
+#     id_usuario_teste = st.text_input("ID do Usuário Cadastrado no Banco:", value="3")
 
-if id_usuario_teste and 'supabase' in locals():
-    st.info(f"Procurando usuário com ID: `{id_usuario_teste}`")
+# if id_usuario_teste and 'supabase' in locals():
+#     st.info(f"Procurando usuário com ID: `{id_usuario_teste}`")
     
-    # --- PASSO 1: TESTE DE LEITURA (SELECT) ---
-    st.subheader("1. Testando Leitura de Dados")
-    try:
-        dados_usuario = supabase.table("usuarios").select("moedas, tipo_plano").eq("id", int(id_usuario_teste)).execute()
+#     # --- PASSO 1: TESTE DE LEITURA (SELECT) ---
+#     st.subheader("1. Testando Leitura de Dados")
+#     try:
+#         dados_usuario = supabase.table("usuarios").select("moedas, tipo_plano").eq("id", int(id_usuario_teste)).execute()
         
-        if dados_usuario.data and len(dados_usuario.data) > 0:
-            st.success("✅ Conexão estabelecida! Usuário encontrado com sucesso.")
-            st.json(dados_usuario.data)
+#         if dados_usuario.data and len(dados_usuario.data) > 0:
+#             st.success("✅ Conexão estabelecida! Usuário encontrado com sucesso.")
+#             st.json(dados_usuario.data)
             
-            # --- PASSO 2: TESTE DE ESCRITA (UPDATE) ---
-            st.subheader("2. Testando Escrita de Dados")
+#             # --- PASSO 2: TESTE DE ESCRITA (UPDATE) ---
+#             st.subheader("2. Testando Escrita de Dados")
             
-            if st.button("Simular Atualização (Adicionar 10 moedas)"):
-                try:
-                    # Converte o ID para inteiro para bater com a tipagem do seu banco
-                    id_numerico = int(id_usuario_teste)
-                    data_atual_iso = datetime.now().isoformat()
+#             if st.button("Simular Atualização (Adicionar 10 moedas)"):
+#                 try:
+#                     # Converte o ID para inteiro para bater com a tipagem do seu banco
+#                     id_numerico = int(id_usuario_teste)
+#                     data_atual_iso = datetime.now().isoformat()
                     
-                    # 1. Busca o saldo atual diretamente
-                    query = supabase.table("usuarios").select("moedas").eq("id", id_numerico).execute()
+#                     # 1. Busca o saldo atual diretamente
+#                     query = supabase.table("usuarios").select("moedas").eq("id", id_numerico).execute()
                 
-                    if query.data and len(query.data) > 0:
-                        moedas_atuais = query.data[0].get("moedas") or 0
-                        novas_moedas = moedas_atuais + 10
+#                     if query.data and len(query.data) > 0:
+#                         moedas_atuais = query.data[0].get("moedas") or 0
+#                         novas_moedas = moedas_atuais + 10
                         
-                        # 2. Executa a atualização completa com os 3 cenários integrados
-                        resposta = supabase.table("usuarios").update({
-                            "tipo_plano": "Plano Crédito de Moedas",
-                            "moedas": novas_moedas,
-                            "ultima_recarga": data_atual_iso
-                        }).eq("id", id_numerico).execute()
+#                         # 2. Executa a atualização completa com os 3 cenários integrados
+#                         resposta = supabase.table("usuarios").update({
+#                             "tipo_plano": "Plano Crédito de Moedas",
+#                             "moedas": novas_moedas,
+#                             "ultima_recarga": data_atual_iso
+#                         }).eq("id", id_numerico).execute()
                         
-                        if resposta.data and len(resposta.data) > 0:
-                            st.balloons()
-                            st.success(f"🎉 Sucesso! Moedas atualizadas de {moedas_atuais} para {novas_moedas}.")
-                            st.json(resposta.data)
-                        else:
-                            st.error("❌ O comando foi enviado, mas nenhuma linha foi alterada.")
-                    else:
-                        st.error(f"❌ O ID '{id_usuario_teste}' não foi encontrado para atualização.")
+#                         if resposta.data and len(resposta.data) > 0:
+#                             st.balloons()
+#                             st.success(f"🎉 Sucesso! Moedas atualizadas de {moedas_atuais} para {novas_moedas}.")
+#                             st.json(resposta.data)
+#                         else:
+#                             st.error("❌ O comando foi enviado, mas nenhuma linha foi alterada.")
+#                     else:
+#                         st.error(f"❌ O ID '{id_usuario_teste}' não foi encontrado para atualização.")
                         
-                except Exception as error_update:
-                    st.error(f"❌ Falha na Escrita (Erro de RLS ou Constraints): {error_update}")
+#                 except Exception as error_update:
+#                     st.error(f"❌ Falha na Escrita (Erro de RLS ou Constraints): {error_update}")
                     
-        else:
-            st.error(f"❌ O Supabase respondeu, mas o ID '{id_usuario_teste}' não foi encontrado na tabela 'usuarios'.")
-            st.info("💡 Lembre-se: O ID digitado precisa ser um número válido cadastrado na coluna 'id'.")
+#         else:
+#             st.error(f"❌ O Supabase respondeu, mas o ID '{id_usuario_teste}' não foi encontrado na tabela 'usuarios'.")
+#             st.info("💡 Lembre-se: O ID digitado precisa ser um número válido cadastrado na coluna 'id'.")
             
-    except Exception as error_select:
-        st.error(f"❌ Falha Crítica na Leitura: {error_select}")
+#     except Exception as error_select:
+#         st.error(f"❌ Falha Crítica na Leitura: {error_select}")
 
 
 
@@ -1913,6 +1913,7 @@ else:
                                 status = verificar_status_pix(id_pagamento)
                             
                             if status == "approved":
+                                time.sleep(3)
                                 st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
 
                                 # --- INTEGRACAO COM O SUPABASE CORRIGIDA ---
@@ -1922,6 +1923,7 @@ else:
                                 sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo)
                                 
                                 if sucesso_banco:
+                                    time.sleep(3)
                                     st.toast("Sua conta foi atualizada com sucesso no banco!")
                                     
                                     # Limpa as variáveis de pagamento da sessão apenas se o banco gravou com sucesso
