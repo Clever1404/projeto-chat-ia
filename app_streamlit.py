@@ -65,6 +65,30 @@ if id_usuario_teste and 'supabase' in locals():
                 data_atual_iso = datetime.now().isoformat()
                 
                 try:
+                    query = supabase.table("usuarios").select("moedas").eq("id", id_usuario_int).execute()
+                
+                    if query.data and len(query.data) > 0:
+                        # Captura o saldo atual com segurança extraindo do primeiro dicionário da lista [0]
+                        moedas_atuais = query.data[0].get("moedas") or 0
+                        novas_moedas = moedas_atuais + 10
+                        
+                        # Atualiza a quantidade e muda a string do tipo_plano para refletir a nova categoria
+                        resposta = supabase.table("usuarios").update({
+                            "tipo_plano": "Plano Crédito de Moedas",
+                            "moedas": novas_moedas,
+                            "ultima_recarga": data_atual_iso
+                        }).eq("id", id_usuario_int).execute()
+                        
+                        return len(resposta.data) > 0
+                        st.balloons()
+                        st.success(f"🎉 Sucesso! Moedas atualizadas de {moedas_atuais} para {novas_moedas}.")
+                        st.json(update_teste.data)
+                else:
+                    st.error(f"❌ O Supabase respondeu, mas o ID '{id_usuario_teste}' não foi encontrado na tabela 'usuarios'.")
+                    st.info("💡 Lembre-se: O ID digitado precisa ser exatamente igual ao que está salvo na coluna 'id' do seu banco de dados.")
+
+
+
                     update_teste = supabase.table("usuarios").update({
                         "moedas": novas_moedas,
                         "ultima_recarga": data_atual_iso
