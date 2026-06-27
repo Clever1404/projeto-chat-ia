@@ -954,12 +954,19 @@ def verificar_status_pix(id_pagamento):
 
 # --- FUNÇÃO PARA ATUALIZAR O SUPABASE (VERSÃO FINAL INTEGRAL) ---
 def atualizar_plano_banco_supabase(id_usuario, tipo_pagamento):
-    """Atualiza o plano ou incrementa moedas do usuário no Supabase garantindo ID numérico."""
+    """
+    Atualiza o plano ou incrementa moedas do usuário no Supabase garantindo ID numérico.
+    Cenários:
+    1) vip -> tipo_plano: 'vip'
+    2) moedas -> tipo_plano: 'Plano Crédito de Moedas' e soma +10 moedas
+    3) gratis -> tipo_plano: 'Grátis' e reseta moedas (opcional para controle do app)
+    """
     try:
         # FORÇA O ID A SER UM NÚMERO INTEIRO (Evita o erro 'invalid input syntax for type integer')
         id_usuario_int = int(id_usuario)
         data_atual_iso = datetime.now().isoformat()
 
+        # CENÁRIO 1: Compra do Plano VIP 30 dias
         if tipo_pagamento == "vip":
             resposta = supabase.table("usuarios").update({
                 "tipo_plano": "vip",
@@ -968,16 +975,19 @@ def atualizar_plano_banco_supabase(id_usuario, tipo_pagamento):
             
             return len(resposta.data) > 0
             
+        # CENÁRIO 2: Compra de Pacote de Moedas
         elif tipo_pagamento == "moedas":
-            # Busca as moedas usando o ID numérico inteiro
+            # Busca as moedas atuais usando o ID numérico
             query = supabase.table("usuarios").select("moedas").eq("id", id_usuario_int).execute()
             
             if query.data and len(query.data) > 0:
-                # O query.data retorna uma lista, pegamos o primeiro item [0]
+                # Captura o saldo atual com segurança extraindo do primeiro dicionário da lista [0]
                 moedas_atuais = query.data[0].get("moedas") or 0
                 novas_moedas = moedas_atuais + 10
                 
+                # Atualiza a quantidade e muda a string do tipo_plano para refletir a nova categoria
                 resposta = supabase.table("usuarios").update({
+                    "tipo_plano": "Plano Crédito de Moedas",
                     "moedas": novas_moedas,
                     "ultima_recarga": data_atual_iso
                 }).eq("id", id_usuario_int).execute()
@@ -986,6 +996,16 @@ def atualizar_plano_banco_supabase(id_usuario, tipo_pagamento):
             else:
                 st.error("Usuário não encontrado no banco de dados.")
                 return False
+
+        # CENÁRIO 3: Retorno ou rebaixamento para o Plano Grátis (Caso precise expirar um plano)
+        elif tipo_pagamento == "gratis":
+            resposta = supabase.table("usuarios").update({
+                "tipo_plano": "Grátis",
+                "moedas": 0,
+                "ultima_recarga": data_atual_iso
+            }).eq("id", id_usuario_int).execute()
+            
+            return len(resposta.data) > 0
 
     except ValueError:
         st.error(f"❌ Erro crítico: O ID do usuário ('{id_usuario}') não pôde ser convertido para número inteiro. Ajuste seu fluxo de login.")
