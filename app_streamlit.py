@@ -2261,45 +2261,53 @@ with miolo_pagina.container():
                 """        
             )
 
-            with st.sidebar:
-                # Captura o ID do usuário da sessão
-                id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
+            st.markdown("### 🛒 Realizar Pagamento")
+            id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
+            
+            opcoes_compra = st.radio(
+                "Escolha uma opção para recarga:", 
+                ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"],
+                key="radio_opcao_compra_estatico"
+            )
+            
+            if st.button("Gerar Pix de Pagamento", use_container_width=True, type="secondary", key="btn_gerar_pix_planos"):
+                valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
+                id_limpo = id_usuario if not isinstance(id_usuario, (list, tuple)) else id_usuario
                 
-                opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"])
-                
-                if st.button("Gerar Pix de Pagamento"):
-                    valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
-                    id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
+                payment_data = {
+                    "transaction_amount": valor, 
+                    "description": desc, 
+                    "payment_method_id": "pix",
+                    "payer": {"email": "cliente@email.com"}, 
+                    "external_reference": f"{id_limpo}:{tipo}"
+                }
                     
-                    payment_data = {
-                        "transaction_amount": valor, 
-                        "description": desc, 
-                        "payment_method_id": "pix",
-                        "payer": {"email": "cliente@email.com"}, 
-                        "external_reference": f"{id_limpo}:{tipo}"
-                    }
+                try:
+                    payment_response = sdk.payment().create(payment_data)
+                    payment = payment_response["response"]
                         
-                    try:
-                        payment_response = sdk.payment().create(payment_data)
-                        payment = payment_response["response"]
-                            
-                        if "point_of_interaction" in payment:
-                            st.session_state.id_pagamento_pendente = payment["id"]
-                            st.session_state.tipo_pagamento_pendente = tipo
-                            st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
-                            st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
-                            st.success("Pix gerado com sucesso!")
-                            st.rerun()
-                    except Exception as e: 
-                        st.error(f"Erro ao gerar pagamento: {e}")
+                    if "point_of_interaction" in payment:
+                        st.session_state.id_pagamento_pendente = payment["id"]
+                        st.session_state.tipo_pagamento_pendente = tipo
+                        st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+                        st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+                        st.success("Pix gerado com sucesso!")
+                        st.rerun()
+                except Exception as e: 
+                    st.error(f"Erro ao gerar pagamento: {e}")
 
-                # Renderiza o QR Code caso ele já exista na sessão ativa
-                if st.session_state.get("qr_code_img"):
-                    st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
-                    st.image(base64.b64decode(st.session_state.qr_code_img), width=250)
-                    st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=70)
+            # Renderiza o QR Code e o formulário de validação no corpo da página
+            if st.session_state.get("qr_code_img"):
+                st.markdown("---")
+                st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
+                
+                col_qr, col_txt = st.columns([1, 2])
+                with col_qr:
+                    st.image(base64.b64decode(st.session_state.qr_code_img), width=220)
+                with col_txt:
+                    st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=90, key="txt_area_copia_cola_estatica")
                             
-                    if st.button("🔄 Já realizei o pagamento", type="primary"):
+                    if st.button("🔄 Já realizei o pagamento", type="primary", use_container_width=True, key="btn_verificar_status_pix_final"):
                         id_pagamento = st.session_state.get("id_pagamento_pendente")
                         
                         if id_pagamento:
@@ -2307,46 +2315,48 @@ with miolo_pagina.container():
                                 status = verificar_status_pix(id_pagamento)
                             
                             if status == "approved":
-                                time.sleep(3)
                                 st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
-
-                                # --- INTEGRACAO COM O SUPABASE CORRIGIDA ---
                                 tipo = st.session_state.get("tipo_pagamento_pendente")
                                 
-                                # CORREÇÃO DA VARIÁVEL: Enviando 'tipo' em vez de 'tipo_pagamento'
+                                # Chama a atualização atômica de banco e sessão que otimizamos
                                 sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo)
                                 
                                 if sucesso_banco:
-                                    time.sleep(3)
-                                    st.toast("Sua conta foi atualizada com sucesso no banco!")
+                                    st.toast("Sua conta foi atualizada com sucesso!")
                                     
-                                    # Limpa as variáveis de pagamento da sessão apenas se o banco gravou com sucesso
-                                    del st.session_state.qr_code_img
-                                    del st.session_state.qr_code_texto
-                                    del st.session_state.id_pagamento_pendente
-                                    del st.session_state.tipo_pagamento_pendente
-                                    
+                                    # Limpeza explícita de chaves após sucesso
+                                    for chave in ["qr_code_img", "qr_code_texto", "id_pagamento_pendente", "tipo_pagamento_pendente"]:
+                                        if chave in st.session_state:
+                                            del st.session_state[chave]
+                                            
                                     if "abrir_popup_loja" in st.session_state:
                                         st.session_state.abrir_popup_loja = False
+                                        
+                                    time.sleep(0.5)  # Delay reduzido drasticamente para resposta imediata
                                     st.rerun()
                                 else:
-                                    st.error("Erro ao computar créditos no banco. Contate o suporte informando o ID do pagamento.")
+                                    st.error("Erro ao computar créditos no banco. Contate o suporte.")
                                                         
                             elif status == "pending":
                                 st.warning("⏳ O pagamento ainda consta como pendente. Aguarde um instante e tente novamente.")
                             else:
-                                st.error(f"❌ O status do pagamento é: {status}. Se houve algum problema, contate o suporte.")
+                                st.error(f"❌ O status do pagamento é: {status}.")
                         else:
                             st.error("Nenhum ID de pagamento encontrado na sessão.")
+                st.markdown("---")
             
-            # CORREÇÃO DE INDENTAÇÃO: Botões de navegação movidos para dentro do bloco principal dos planos
-            if st.button("← Voltar para o Chat", use_container_width=True):
-                st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                st.rerun() 
-            
-            if st.button("← Voltar para o Login", use_container_width=True):
-                st.session_state.opcao_menu = "login"
-                st.rerun()
+            # Botões de navegação inferiores organizados por colunas estáveis
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_nav1, col_nav2 = st.columns(2)
+            with col_nav1:
+                if st.button("⬅️ Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_desde_planos"):
+                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                    st.rerun() 
+            with col_nav2:
+                if st.button("🔑 Voltar para o Login", use_container_width=True, key="btn_voltar_login_desde_planos"):
+                    st.session_state.opcao_menu = "login"
+                    st.rerun()
+
 
         st.stop() 
 
@@ -2361,22 +2371,19 @@ with miolo_pagina.container():
     elif menu_atual == "🤝 Gerenciar Conexões":
         template_gerenciar_conexoes()
         st.stop()
-        
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    elif menu_atual == "🤝 Sala Privada":
+        if st.session_state.get("match_id_atual"):
+            template_sala_privada()
+        else:
+            st.warning("Nenhuma sala ativa.")
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun()
+                    
+    elif menu_atual == "🛠️ Painel Admin":
+        template_painel_admin()
+    elif st.session_state.opcao_menu == "✉️ Fale Conosco":
+        template_fale_conosco()    
 
 
 # ==============================================================================
