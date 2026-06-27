@@ -1662,7 +1662,7 @@ else:
     elif menu_atual == "login":
         st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
             
-        # Criamos uma chave para o formulário baseada se o usuário está logado ou não
+        # Chave dinâmica para controle do formulário visual
         form_login_key = "form_login_ativo" if "usuario_id" not in st.session_state else "form_login_oculto"
 
         with st.form(form_login_key):
@@ -1674,26 +1674,29 @@ else:
                     conn = obter_conexao_eficiente()
                     cursor = conn.cursor()
                     
-                    # Busca os dados incluindo a senha (índice 7)
+                    # Executa a query trazendo exatamente 8 colunas (índices 0 a 7)
                     cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
                     res = cursor.fetchone()
                     
                     if res:
-                        # CORREÇÃO DOS ÍNDICES: Acessando a senha corretamente no índice 7 da tupla
+                        # 🛑 FIX: Acessando explicitamente o índice 7 para obter a senha textual do banco
                         password_hash_banco = res[7]
                         
+                        # Compara a senha digitada com a armazenada
                         if str(pass_in) != str(password_hash_banco):
                             st.error("Senha incorreta. Tente novamente.")
                         else:
-                            # CORREÇÃO DOS ÍNDICES: Atribuindo os valores corretos de cada coluna
+                            # 🛑 FIX: Mapeamento de todas as colunas usando os índices corretos da tupla 'res'
                             id_numerico = int(res[0])
                             st.session_state.usuario_id = id_numerico
-                            st.session_state.id_usuario = id_numerico  # Variável unificada para a tela de planos
+                            st.session_state.id_usuario = id_numerico  # Mantém compatibilidade com a tela de planos
                             
                             st.session_state.username = res[1]
                             st.session_state.foto_perfil = res[2]
                             st.session_state.eh_admin = bool(res[3])
                             st.session_state.genero = res[4]
+                            
+                            # Constrói o dicionário de dados do usuário
                             st.session_state.dados_usuario = {
                                 "username": res[1], 
                                 "foto_perfil": res[2], 
@@ -1702,15 +1705,13 @@ else:
                                 "moedas": res[6] if res[6] else 0
                             }
                             
-                            # Atualiza o status do usuário para Online no banco
+                            # Atualiza o status online no banco usando PostgreSQL nativo via psycopg2
                             cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
                             conn.commit()
                             cursor.close()
                             
-                            # Redireciona para o chat
+                            # Define a rota para o chat e limpa os inputs do formulário
                             st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                            
-                            # Limpa os campos do formulário da memória do Streamlit
                             if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
                             if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
                             
