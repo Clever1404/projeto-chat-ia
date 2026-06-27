@@ -1626,16 +1626,6 @@ def template_fale_conosco():
         st.rerun()
 
 
-try:
-    from werkzeug.security import check_password_hash
-except ImportError:
-    # Alternativa caso o ambiente use bcrypt nativo
-    import bcrypt
-    def check_password_hash(hash_banco, senha_digitada):
-        if isinstance(hash_banco, str):
-            hash_banco = hash_banco.encode('utf-8')
-        return bcrypt.checkpw(senha_digitada.encode('utf-8'), hash_banco)
-
 
 # ==============================================================================
 # 8. ROTEADOR DE FLUXO GLOBAL (CORREÇÃO DE DIALOGS DUPLICADOS)
@@ -1695,94 +1685,96 @@ else:
                     st.rerun()        
 
     elif menu_atual == "login":
-        # 1. CURTO-CIRCUITO: Se o ID já existe na sessão, não renderiza nada e redireciona
+        # --- INSTALE SE NECESSÁRIO: pip install Werkzeug ---
+        try:
+            from werkzeug.security import check_password_hash
+        except ImportError:
+            # Caso seu projeto use bcrypt em vez de werkzeug, essa alternativa evita quebras
+            import bcrypt
+            def check_password_hash(hash_banco, senha_digitada):
+                # Converte strings para bytes necessário para o bcrypt comum
+                return bcrypt.checkpw(senha_digitada.encode('utf-8'), hash_banco.encode('utf-8'))
+
+        # 1. CURTO-CIRCUITO DE SEGURANÇA
         if "usuario_id" in st.session_state and st.session_state.usuario_id:
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
             st.rerun()
 
-        st.markdown('<h1 style="text-align:center; color:#007bff; margin-bottom: 20px;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
-                    
-        # 2. SEGREDO DO CACHE: Chave dinâmica baseada no estado de login. 
-        # Se o ID mudar ou não existir, o Streamlit reconstrói o DOM do zero, eliminando o fantasma.
-        estado_login_chave = "logado" if "usuario_id" in st.session_state else "deslogado"
-        
-        with st.form(key=f"form_login_{estado_login_chave}", clear_on_submit=True):
-            user_in = st.text_input(
-                "Usuário", 
-                placeholder="Nome de Usuário ou E-mail", 
-                label_visibility="collapsed", 
-                key=f"input_user_{estado_login_chave}"
-            )
-            pass_in = st.text_input(
-                "Senha", 
-                placeholder="Senha", 
-                type="password", 
-                label_visibility="collapsed", 
-                key=f"input_pass_{estado_login_chave}"
-            )
-                
-            botao_entrar = st.form_submit_button("Entrar", type="primary", use_container_width=True)
+        # 2. ALOCAÇÃO DE ESPAÇO EXCLUSIVO (O segredo para apagar o fantasma)
+        # Criamos um bloco vazio e isolado que força o navegador a limpar o fundo
+        conteudo_login = st.empty()
 
-        # 3. ISOLAMENTO LOGICO: O processamento do banco ocorre FORA do bloco 'with st.form'
-        if botao_entrar:
-            if not user_in.strip() or not pass_in.strip():
-                st.warning("Por favor, preencha todos os campos.")
-            else:
-                try:
-                    with obter_conexao_eficiente() as conn:
-                        with conn.cursor() as cursor:
-                            
-                            cursor.execute(
-                                "SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", 
-                                (user_in.strip(), user_in.strip())
-                            )
-                            res = cursor.fetchone()
+        # Abrimos o contêiner isolado para desenhar o login
+        with conteudo_login.container():
+            st.markdown('<h1 style="text-align:center; color:#007bff; margin-bottom: 20px;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
+                        
+            # Formulário com chave estática limpa
+            with st.form(key="form_login_final", clear_on_submit=True):
+                user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed", key="login_user_input")
+                pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed", key="login_pass_input")
+                botao_entrar = st.form_submit_button("Entrar", type="primary", use_container_width=True)
 
-                            if res:
-                                # Captura explicitamente o hash do índice 7 do SELECT
-                                banco_password_hash = res[7] 
+            # 3. INTERRUPÇÃO IMEDIATA DO FLUXO DO BANCO
+            if botao_entrar:
+                if not user_in.strip() or not pass_in.strip():
+                    st.warning("Por favor, preencha todos os campos.")
+                else:
+                    try:
+                        with obter_conexao_eficiente() as conn:
+                            with conn.cursor() as cursor:
+                                cursor.execute(
+                                    "SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", 
+                                    (user_in.strip(), user_in.strip())
+                                )
+                                res = cursor.fetchone()
                                 
-                                # Executa a função global pré-carregada
-                                if not check_password_hash(banco_password_hash, str(pass_in)):
-                                    st.error("Senha incorreta. Tente novamente.")
+                                if res:
+                                    banco_password_hash = res[7]
+                                    
+                                    if not check_password_hash(banco_password_hash, str(pass_in)):
+                                        st.error("Senha incorreta. Tente novamente.")
+                                    else:
+                                        # Gravação de sessão instantânea
+                                        id_numerico = int(res[0])
+                                        st.session_state.usuario_id = id_numerico
+                                        st.session_state.id_usuario = id_numerico 
+                                        st.session_state.username = res[1]
+                                        st.session_state.foto_perfil = res[2]
+                                        st.session_state.eh_admin = bool(res[3])
+                                        st.session_state.genero = res[4]
+                                        
+                                        st.session_state.dados_usuario = {
+                                            "username": res[1], 
+                                            "foto_perfil": res[2], 
+                                            "genero": res[4],
+                                            "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", 
+                                            "moedas": res[6] if res[6] else 0
+                                        }
+                                        
+                                        cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
+                                        conn.commit()
+                                        
+                                        # Limpa o contêiner visual antes de mudar de tela
+                                        conteudo_login.empty()
+                                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                                        st.rerun()
                                 else:
-                                    # CONFIGURAÇÃO DE SESSÃO UNIFICADA (Índices corretos da tupla)
-                                    id_numerico = int(res[0])
-                                    st.session_state.usuario_id = id_numerico
-                                    st.session_state.id_usuario = id_numerico 
-                                    st.session_state.username = res[1]
-                                    st.session_state.foto_perfil = res[2]
-                                    st.session_state.eh_admin = bool(res[3])
-                                    st.session_state.genero = res[4]
-                                    
-                                    st.session_state.dados_usuario = {
-                                        "username": res[1], 
-                                        "foto_perfil": res[2], 
-                                        "genero": res[4],
-                                        "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", 
-                                        "moedas": res[6] if res[6] else 0
-                                    }
-                                    
-                                    cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
-                                    conn.commit()
-                                    
-                                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                                    st.rerun()
-                            else:
-                                st.error("Usuário não encontrado.")
-                except Exception as e: 
-                    st.error(f"Erro crítico no login: {e}")       
+                                    st.error("Usuário não encontrado.")
+                    except Exception as e: 
+                        st.error(f"Erro crítico no login: {e}")       
 
-        # Botões auxiliares totalmente isolados do formulário
-        st.markdown("<br>", unsafe_allow_html=True)
-        col_voltar, col_esqueceu = st.columns(2)
-        with col_voltar:
-            if st.button("⬅️ Voltar para a Home", use_container_width=True, key="btn_voltar_home_exclusivo"):
-                st.session_state.opcao_menu = "home"
-                st.rerun()
-        with col_esqueceu:
-            if st.button("🔑 Esqueceu a senha?", use_container_width=True, key="btn_esqueceu_senha_exclusivo"):
-                modal_recuperar_senha()
+            # Botões inferiores de navegação
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_voltar, col_esqueceu = st.columns(2)
+            with col_voltar:
+                if st.button("⬅️ Voltar para a Home", use_container_width=True, key="btn_voltar_home_login_final"):
+                    conteudo_login.empty() # Limpa o contêiner
+                    st.session_state.opcao_menu = "home"
+                    st.rerun()
+            with col_esqueceu:
+                if st.button("🔑 Esqueceu a senha?", use_container_width=True, key="btn_esqueceu_senha_login_final"):
+                    modal_recuperar_senha()
+
                 
 
     elif menu_atual == "cadastro":
