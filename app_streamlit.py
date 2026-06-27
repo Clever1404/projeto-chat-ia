@@ -529,7 +529,7 @@ def renderizar_chat_lucy_isolado():
             # Salva no histórico usando a função estável de Pool com try/finally
             conn_salvar = None
             try:
-                conn_salvar = obter_conexao_efficiente()
+                conn_salvar = obter_conexao_eficiente()
                 with conn_salvar.cursor() as cursor_salvar:
                     cursor_salvar.execute("""
                         INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta) 
