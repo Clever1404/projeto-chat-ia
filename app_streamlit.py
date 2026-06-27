@@ -40,7 +40,7 @@ id_usuario_teste = st.session_state.get("id_usuario")
 
 if not id_usuario_teste:
     st.warning("⚠️ Nenhum 'id_usuario' encontrado na sessão do Streamlit. Insira um ID válido abaixo para testar:")
-    id_usuario_teste = st.text_input("ID do Usuário Cadastrado no Banco:", value="Mariana")
+    id_usuario_teste = st.text_input("ID do Usuário Cadastrado no Banco:", value="3")
 
 if id_usuario_teste and 'supabase' in locals():
     st.info(f"Procurando usuário com ID: `{id_usuario_teste}`")
@@ -48,7 +48,7 @@ if id_usuario_teste and 'supabase' in locals():
     # --- PASSO 1: TESTE DE LEITURA (SELECT) ---
     st.subheader("1. Testando Leitura de Dados")
     try:
-        dados_usuario = supabase.table("usuarios").select("moedas, tipo_plano").eq("id", str(id_usuario_teste)).execute()
+        dados_usuario = supabase.table("usuarios").select("moedas, tipo_plano").eq("id", int(id_usuario_teste)).execute()
         
         if dados_usuario.data and len(dados_usuario.data) > 0:
             st.success("✅ Conexão estabelecida! Usuário encontrado com sucesso.")
@@ -58,58 +58,43 @@ if id_usuario_teste and 'supabase' in locals():
             st.subheader("2. Testando Escrita de Dados")
             
             if st.button("Simular Atualização (Adicionar 10 moedas)"):
-                # Pega o primeiro registro retornado na lista
-                user_record = dados_usuario.data[0]
-                moedas_atuais = user_record.get("moedas") or 0
-                novas_moedas = moedas_atuais + 10
-                data_atual_iso = datetime.now().isoformat()
-                
                 try:
-                    query = supabase.table("usuarios").select("moedas").eq("id", id_usuario_int).execute()
+                    # Converte o ID para inteiro para bater com a tipagem do seu banco
+                    id_numerico = int(id_usuario_teste)
+                    data_atual_iso = datetime.now().isoformat()
+                    
+                    # 1. Busca o saldo atual diretamente
+                    query = supabase.table("usuarios").select("moedas").eq("id", id_numerico).execute()
                 
                     if query.data and len(query.data) > 0:
-                        # Captura o saldo atual com segurança extraindo do primeiro dicionário da lista [0]
                         moedas_atuais = query.data[0].get("moedas") or 0
                         novas_moedas = moedas_atuais + 10
                         
-                        # Atualiza a quantidade e muda a string do tipo_plano para refletir a nova categoria
+                        # 2. Executa a atualização completa com os 3 cenários integrados
                         resposta = supabase.table("usuarios").update({
                             "tipo_plano": "Plano Crédito de Moedas",
                             "moedas": novas_moedas,
                             "ultima_recarga": data_atual_iso
-                        }).eq("id", id_usuario_int).execute()
+                        }).eq("id", id_numerico).execute()
                         
-                        return len(resposta.data) > 0
-                        st.balloons()
-                        st.success(f"🎉 Sucesso! Moedas atualizadas de {moedas_atuais} para {novas_moedas}.")
-                        st.json(update_teste.data)
+                        if resposta.data and len(resposta.data) > 0:
+                            st.balloons()
+                            st.success(f"🎉 Sucesso! Moedas atualizadas de {moedas_atuais} para {novas_moedas}.")
+                            st.json(resposta.data)
+                        else:
+                            st.error("❌ O comando foi enviado, mas nenhuma linha foi alterada.")
                     else:
-                        st.error(f"❌ O Supabase respondeu, mas o ID '{id_usuario_teste}' não foi encontrado na tabela 'usuarios'.")
-                        st.info("💡 Lembre-se: O ID digitado precisa ser exatamente igual ao que está salvo na coluna 'id' do seu banco de dados.")
-
-
-
-                    update_teste = supabase.table("usuarios").update({
-                        "moedas": novas_moedas,
-                        "ultima_recarga": data_atual_iso
-                    }).eq("id", str(id_usuario_teste)).execute()
-                    
-                    if update_teste.data and len(update_teste.data) > 0:
-                        st.balloons()
-                        st.success(f"🎉 Sucesso! Moedas atualizadas de {moedas_atuais} para {novas_moedas}.")
-                        st.json(update_teste.data)
-                    else:
-                        st.error("❌ O comando foi enviado, mas nenhuma linha foi alterada. O ID está correto?")
+                        st.error(f"❌ O ID '{id_usuario_teste}' não foi encontrado para atualização.")
+                        
                 except Exception as error_update:
                     st.error(f"❌ Falha na Escrita (Erro de RLS ou Constraints): {error_update}")
                     
         else:
             st.error(f"❌ O Supabase respondeu, mas o ID '{id_usuario_teste}' não foi encontrado na tabela 'usuarios'.")
-            st.info("💡 Lembre-se: O ID digitado precisa ser exatamente igual ao que está salvo na coluna 'id' do seu banco de dados.")
+            st.info("💡 Lembre-se: O ID digitado precisa ser um número válido cadastrado na coluna 'id'.")
             
     except Exception as error_select:
         st.error(f"❌ Falha Crítica na Leitura: {error_select}")
-
 
 
 
