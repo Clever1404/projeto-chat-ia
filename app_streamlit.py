@@ -1627,18 +1627,6 @@ def template_fale_conosco():
 
 
 
-
-# ==============================================================================
-# 0. COLOQUE ISSO NO TOPO DO SEU ARQUIVO GLOBAL (FORA DE QUALQUER CONDICIONAL)
-# ==============================================================================
-try:
-    from werkzeug.security import check_password_hash
-except ImportError:
-    import bcrypt
-    def check_password_hash(hash_banco, senha_digitada):
-        return bcrypt.checkpw(senha_digitada.encode('utf-8'), hash_banco.encode('utf-8'))
-
-
 # ==============================================================================
 # 8. ROTEADOR DE FLUXO GLOBAL (CORREÇÃO DE DIALOGS DUPLICADOS)
 # ==============================================================================
@@ -1647,7 +1635,6 @@ menu_atual = st.session_state.get("opcao_menu", "home")
 # 1. GESTÃO CENTRALIZADA DE MODAIS (Chame o modal aqui e use 'pass' ou 'return' para bloquear o miolo)
 if st.session_state.get("abrir_reserva_fluxo"):
     modal_agendamento_encontro(st.session_state.abrir_reserva_fluxo)
-    st.stop()  # 👈 ADICIONE ISSO AQUI: Bloqueia o miolo e impede o fundo de renderizar
     # Importante: Não deixe o script continuar executando telas no fundo enquanto o modal está ativo
     # Isso impede que o miolo chame outros blocos visuais concorrentes
 
@@ -1661,32 +1648,32 @@ if st.session_state.get("abrir_reserva_fluxo"):
 # 2. SEGUIDO PELO SEU IF/ELIF NORMAL DE TELAS (Apenas se nenhum modal acima capturar o fluxo)
 else:
     if menu_atual == "home":  
-        # ⚡ OTIMIZAÇÃO: Um único bloco markdown com todo o HTML estático unificado
-        # Isso reduz o overhead de renderização do Streamlit drasticamente
-        st.markdown("""
-            <h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>
-            <h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>
-            <h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>
-            
-            <div style='text-align: center; margin-bottom: 20px;'>
-                🔒 **Ambiente 100% Seguro:** Suas mensagens e chamadas são privadas.<br>
-                🎥 **Videochamada Integrada:** Conecte-se por vídeo com um clique.<br>
-                📬 **Suporte Dedicado:** Canal direto via Fale Conosco.<br>
-            </div>
+    # --- TELAS PÚBLICAS (Sem Barra Lateral de Usuário) ---
+        st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
 
+        st.markdown("""
+            <div style='text-align: center;'>
+            🔒 **Ambiente 100% Seguro:** Suas mensagens e chamadas são privadas.<br>
+            🎥 **Videochamada Integrada:** Conecte-se por vídeo com um clique.<br>
+            📬 **Suporte Dedicado:** Canal direto via Fale Conosco.<br>
+            </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("""
             <div style="background-color: #004085; padding: 20px; border-radius: 5px; text-align: center; border-left: 5px solid #0066cc; margin-bottom: 20px;">
                 <h1 style="margin: 0; color: #ffffff; font-size: 24px;">
-                    💡 CADASTRE-SE AGORA EM NOSSO SITE ENCONTRE SEU MATCH E MARQUE UM ENCONTRO VIRTUAL!!
+                            💡 CADASTRE-SE AGORA EM NOSSO SITE ENCONTRE SEU MATCH E MARQUE UM ENCONTRO VIRTUAL!!
                 </h1>
             </div>
         """, unsafe_allow_html=True)
 
-        # Colunas de ação rápidas
         col1, col2 = st.columns(2)
         with col1:
             if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
                 st.session_state.opcao_menu = "login"
-                st.rerun()  # Limpa e troca de tela instantaneamente
+                st.rerun()
                         
         with col2:
             with stylable_container(
@@ -1695,69 +1682,86 @@ else:
             ):
                 if st.button("📝 Cadastre-se", use_container_width=True):
                     st.session_state.opcao_menu = "cadastro"
-                    st.rerun()  # Limpa e troca de tela instantaneamente
-
+                    st.rerun()        
 
     elif menu_atual == "login":
+        # --- INSTALE SE NECESSÁRIO: pip install Werkzeug ---
+        try:
+            from werkzeug.security import check_password_hash
+        except ImportError:
+            # Caso seu projeto use bcrypt em vez de werkzeug, essa alternativa evita quebras
+            import bcrypt
+            def check_password_hash(hash_banco, senha_digitada):
+                # Converte strings para bytes necessário para o bcrypt comum
+                return bcrypt.checkpw(senha_digitada.encode('utf-8'), hash_banco.encode('utf-8'))
+
         st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
-                
+                    
         form_login_key = "form_login_ativo" if "usuario_id" not in st.session_state else "form_login_oculto"
 
-        with st.form(form_login_key, clear_on_submit=True): # ⚡ OTIMIZAÇÃO: Limpa o form nativamente ao enviar
+        with st.form(form_login_key):
             user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed", key="login_user_field")
             pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed", key="login_pass_field")
                 
-            if st.form_submit_button("Entrar", type="primary", use_container_width=True):
-                if not user_in or not pass_in:
-                    st.warning("Por favor, preencha todos os campos.")
-                else:
-                    try:
-                        # Gerencia a conexão com gerenciador de contexto (fecha sozinho em caso de erro)
-                        with obter_conexao_eficiente() as conn:
-                            with conn.cursor() as cursor:
-                                
-                                cursor.execute(
-                                    "SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", 
-                                    (user_in, user_in)
-                                )
-                                res = cursor.fetchone()
-                                
-                                if res:
-                                    banco_password_hash = res[7]
-                                    
-                                    if not check_password_hash(banco_password_hash, str(pass_in)):
-                                        st.error("Senha incorreta. Tente novamente.")
-                                    else:
-                                        # CONFIGURAÇÃO DE SESSÃO UNIFICADA
-                                        id_numerico = int(res[0])
-                                        st.session_state.usuario_id = id_numerico
-                                        st.session_state.id_usuario = id_numerico 
-                                        st.session_state.username = res[1]
-                                        st.session_state.foto_perfil = res[2]
-                                        st.session_state.eh_admin = bool(res[3])
-                                        st.session_state.genero = res[4]
-                                        
-                                        st.session_state.dados_usuario = {
-                                            "username": res[1], 
-                                            "foto_perfil": res[2], 
-                                            "genero": res[4],
-                                            "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", 
-                                            "moedas": res[6] if res[6] else 0
-                                        }
-                                        
-                                        # Atualiza o status online
-                                        cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
-                                        conn.commit()
-                                        
-                                        # Redireciona e força a limpeza da UI na mesma hora
-                                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                                        st.rerun()
-                                else:
-                                    st.error("Usuário não encontrado.")
-                    except Exception as e: 
-                        st.error(f"Erro crítico no login: {e}")       
+            if st.form_submit_button("login", type="primary", use_container_width=True):
+                try:
+                    conn = obter_conexao_eficiente()
+                    cursor = conn.cursor()
+                    
+                    # Traz os registros da tabela do Supabase
+                    cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
+                    res = cursor.fetchone()
+                    
+                    if res:
+                        # Fatiamento explícito e seguro das colunas do banco
+                        banco_id = res[0]
+                        banco_username = res[1]
+                        banco_foto = res[2]
+                        banco_admin = res[3]
+                        banco_genero = res[4]
+                        banco_plano = res[5]
+                        banco_moedas = res[6]
+                        banco_password_hash = res[7] # Contém o hash criptografado
+                        
+                        # Validação usando a função de Hash importada no início
+                        if not check_password_hash(banco_password_hash, str(pass_in)):
+                            st.error("Senha incorreta. Tente novamente.")
+                        else:
+                            # CONFIGURAÇÃO DE SESSÃO UNIFICADA (O segredo para o Mercado Pago funcionar)
+                            id_numerico = int(banco_id)
+                            st.session_state.usuario_id = id_numerico
+                            st.session_state.id_usuario = id_numerico  # Atualiza a variável usada na sua Tela de Planos
+                            
+                            st.session_state.username = banco_username
+                            st.session_state.foto_perfil = banco_foto
+                            st.session_state.eh_admin = bool(banco_admin)
+                            st.session_state.genero = banco_genero
+                            
+                            st.session_state.dados_usuario = {
+                                "username": banco_username, 
+                                "foto_perfil": banco_foto, 
+                                "genero": banco_genero,
+                                "tipo_plano": str(banco_plano).strip() if banco_plano else "Grátis", 
+                                "moedas": banco_moedas if banco_moedas else 0
+                            }
+                            
+                            # Atualiza o status online
+                            cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
+                            conn.commit()
+                            cursor.close()
+                            
+                            # Redireciona o usuário e limpa o formulário
+                            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                            if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
+                            if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
+                            
+                            st.rerun()
+                    else:
+                        st.error("Usuário não encontrado.")
+                    cursor.close() 
+                except Exception as e: 
+                    st.error(f"Erro crítico no login: {e}")       
 
-        # ⚡ OTIMIZAÇÃO: Botões de navegação fora do escopo do formulário com chaves seguras
         col_voltar, col_esqueceu = st.columns(2)
         with col_voltar:
             if st.button("⬅️ Voltar para a Home", use_container_width=True, key="btn_voltar_home_login"):
@@ -1770,83 +1774,77 @@ else:
                 
 
     elif menu_atual == "cadastro":
-        # ⚡ OTIMIZAÇÃO: st.html pode causar lentidão se reinjetado. st.markdown é mais leve.
-        st.markdown('<h2 style="text-align:center; color:#007bff; margin-bottom:20px;">Criar Conta</h2>', unsafe_allow_html=True)
-        
-        # ⚡ OTIMIZAÇÃO: Chave estática e limpa. Nunca use seeds dinâmicas no 'key' do st.form.
-        with st.form(key="form_cadastro_estatico", clear_on_submit=True):
+        st.html('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>')
+        with st.form(key=f"form_cad_unico_{st.session_state.form_seed}"):
             usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
             email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed")
             senha = st.text_input("Senha", placeholder="Escolha uma Senha", type="password", label_visibility="collapsed")
             genero = st.selectbox("Gênero", options=["M", "F"], index=0, label_visibility="collapsed")
 
             with stylable_container(
-                key="green_button_cad",
-                css_styles="""
-                    button { background-color: #28a745; color: white; border-radius: 5px; }
-                    button:hover { background-color: #218838; color: white; }
-                """,
-            ):
-                botao_submeter = st.form_submit_button("Cadastre-se", use_container_width=True)
+                        key="green_button_cad",
+                        css_styles="""
+                            button { background-color: #28a745; color: white; border-radius: 5px; }
+                            button:hover { background-color: #218838; color: white; }
+                        """,
+                    ):
 
-            if botao_submeter:
-                # Validações rápidas na memória antes de abrir conexão
-                if not usuario.strip() or not email.strip() or not senha.strip():
-                    st.warning("⚠️ Por favor, preencha todos os campos.")
-                elif len(senha) < 6:
-                    st.warning("⚠️ A senha deve ter pelo menos 6 caracteres.")
-                else:
-                    try:
-                        # ⚡ OTIMIZAÇÃO: Gerenciador de contexto garante fechamento imediato do banco
-                        with obter_conexao_eficiente() as conn:
-                            with conn.cursor() as cursor:
+                if st.form_submit_button("Cadastre-se", use_container_width=True):
+                    if not usuario.strip() or not email.strip() or not senha.strip():
+                        st.warning("⚠️ Por favor, preencha todos os campos.")
+                    elif len(senha) < 6:
+                        st.warning("⚠️ A senha deve ter pelo menos 6 caracteres.")
+                    else:
+                        conn = None
+                        try:
+                            conn = obter_conexao_eficiente()
+                            cursor = conn.cursor()
+                            cursor.execute("SELECT username, email FROM usuarios WHERE username = %s OR email = %s;", (usuario.strip(), email.strip()))
+                            existente = cursor.fetchone()
+                            if existente:
+                                st.error("❌ Usuário ou E-mail já cadastrado.")
+                            else:
+                                senha_final = generate_password_hash(senha)
+                                cursor.execute("INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", (usuario.strip(), email.strip(), senha_final, genero))
                                 
-                                # Verifica duplicidade
-                                cursor.execute("SELECT username, email FROM usuarios WHERE username = %s OR email = %s;", (usuario.strip(), email.strip()))
-                                if cursor.fetchone():
-                                    st.error("❌ Usuário ou E-mail já cadastrado.")
-                                else:
-                                    # Criptografia rápida com função pré-carregada no topo
-                                    senha_final = generate_password_hash(senha)
+                                # Captura o ID gerado pelo banco de dados
+                                id_gerado = int(cursor.fetchone()[0])
+                                
+                                # 🟢 CORREÇÃO CRUCIAL: Define as duas variáveis de sessão com o ID numérico
+                                st.session_state.usuario_id = id_gerado
+                                st.session_state.id_usuario = id_gerado  # <--- Esta linha resolve o problema do Mercado Pago!
+                                
+                                st.session_state.username = usuario.strip()
+                                st.session_state.genero = genero
+                                conn.commit()
                                     
-                                    cursor.execute(
-                                        "INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", 
-                                        (usuario.strip(), email.strip(), senha_final, genero)
-                                    )
+                                # Atualiza para a tela de planos e limpa estados residuais
+                                st.session_state.opcao_menu = "planos"
+                                st.rerun()
+                        except Exception as e: 
+                            st.error(f"Erro ao processar cadastro: {e}")
+                        finally:
+                            if conn:
+                                cursor.close()
                                     
-                                    id_gerado = int(cursor.fetchone()[0])
-                                    conn.commit()
-                                    
-                                    # Define sessões unificadas instantaneamente
-                                    st.session_state.usuario_id = id_gerado
-                                    st.session_state.id_usuario = id_gerado  
-                                    st.session_state.username = usuario.strip()
-                                    st.session_state.genero = genero
-                                        
-                                    # Redirecionamento limpo
-                                    st.session_state.opcao_menu = "planos"
-                                    st.rerun()
-                                    
-                    except Exception as e: 
-                        st.error(f"Erro ao processar cadastro: {e}")
 
-        # ⚡ OTIMIZAÇÃO: Botão posicionado fora do formulário com chave única para evitar travamento
-        if st.button("← Voltar para o Login", use_container_width=True, key="btn_voltar_login_desde_cadastro"):
+        if st.button("← Voltar para o Login", use_container_width=True):
             st.session_state.opcao_menu = "login"
             st.rerun()
 
 
     elif menu_atual == "planos":
+        st.session_state.opcao_menu = "planos"
         # Inicializa a sub-visão caso ela não exista
         if "sub_visao" not in st.session_state:
             st.session_state.sub_visao = "planos"
 
         # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
         if st.session_state.sub_visao == "planos":
-            st.markdown('<h1 style="text-align:center; color:#007bff; margin-bottom:15px;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
+            st.markdown('<h1 style="text-align:center; color:#007bff;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
         
-            # ⚡ OTIMIZAÇÃO: HTML estático unificado com st.markdown (muito mais leve que st.html)
-            st.markdown(
+            # Texto descritivo dos planos centralizado
+            st.html(
                 """
                 <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
                     <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
@@ -1866,55 +1864,48 @@ else:
                         <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
                     </div>
                 </div>
-                """, 
-                unsafe_allow_html=True       
+                """        
             )
 
-            # ⚡ OTIMIZAÇÃO: Removido st.sidebar daqui. O fluxo de checkout agora acontece no container principal
-            # Isso impede que os menus da barra lateral pisquem ou entrem em conflito com o checkout.
-            st.markdown("### 🛒 Área de Checkout")
-            id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
-            
-            opcoes_compra = st.radio("Escolha uma opção de pagamento:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"], key="radio_planos_opcao")
-            
-            if st.button("Gerar Pix de Pagamento", use_container_width=True, type="secondary", key="btn_gerar_pix"):
-                valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
-                id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
+            with st.sidebar:
+                # Captura o ID do usuário da sessão
+                id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
                 
-                payment_data = {
-                    "transaction_amount": valor, 
-                    "description": desc, 
-                    "payment_method_id": "pix",
-                    "payer": {"email": "cliente@email.com"}, 
-                    "external_reference": f"{id_limpo}:{tipo}"
-                }
+                opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"])
+                
+                if st.button("Gerar Pix de Pagamento"):
+                    valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
+                    id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
                     
-                try:
-                    payment_response = sdk.payment().create(payment_data)
-                    payment = payment_response["response"]
+                    payment_data = {
+                        "transaction_amount": valor, 
+                        "description": desc, 
+                        "payment_method_id": "pix",
+                        "payer": {"email": "cliente@email.com"}, 
+                        "external_reference": f"{id_limpo}:{tipo}"
+                    }
                         
-                    if "point_of_interaction" in payment:
-                        st.session_state.id_pagamento_pendente = payment["id"]
-                        st.session_state.tipo_pagamento_pendente = tipo
-                        st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
-                        st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
-                        st.success("Pix gerado com sucesso!")
-                        st.rerun()
-                except Exception as e: 
-                    st.error(f"Erro ao gerar pagamento: {e}")
+                    try:
+                        payment_response = sdk.payment().create(payment_data)
+                        payment = payment_response["response"]
+                            
+                        if "point_of_interaction" in payment:
+                            st.session_state.id_pagamento_pendente = payment["id"]
+                            st.session_state.tipo_pagamento_pendente = tipo
+                            st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+                            st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+                            st.success("Pix gerado com sucesso!")
+                            st.rerun()
+                    except Exception as e: 
+                        st.error(f"Erro ao gerar pagamento: {e}")
 
-            # Renderiza o QR Code no corpo principal de forma limpa e estruturada
-            if st.session_state.get("qr_code_img"):
-                st.markdown("---")
-                st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
-                
-                col_qr, col_txt = st.columns([1, 2])
-                with col_qr:
-                    st.image(base64.b64decode(st.session_state.qr_code_img), width=220)
-                with col_txt:
-                    st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=100, key="txt_copia_cola")
-                    
-                    if st.button("🔄 Já realizei o pagamento", type="primary", use_container_width=True, key="btn_verificar_pagamento"):
+                # Renderiza o QR Code caso ele já exista na sessão ativa
+                if st.session_state.get("qr_code_img"):
+                    st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
+                    st.image(base64.b64decode(st.session_state.qr_code_img), width=250)
+                    st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=70)
+                            
+                    if st.button("🔄 Já realizei o pagamento", type="primary"):
                         id_pagamento = st.session_state.get("id_pagamento_pendente")
                         
                         if id_pagamento:
@@ -1922,23 +1913,27 @@ else:
                                 status = verificar_status_pix(id_pagamento)
                             
                             if status == "approved":
+                                time.sleep(3)
                                 st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
+
+                                # --- INTEGRACAO COM O SUPABASE CORRIGIDA ---
                                 tipo = st.session_state.get("tipo_pagamento_pendente")
                                 
+                                # CORREÇÃO DA VARIÁVEL: Enviando 'tipo' em vez de 'tipo_pagamento'
                                 sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo)
                                 
                                 if sucesso_banco:
+                                    time.sleep(3)
                                     st.toast("Sua conta foi atualizada com sucesso no banco!")
                                     
-                                    # Limpeza segura das chaves voláteis de pagamento
-                                    for chave in ["qr_code_img", "qr_code_texto", "id_pagamento_pendente", "tipo_pagamento_pendente"]:
-                                        if chave in st.session_state:
-                                            del st.session_state[chave]
+                                    # Limpa as variáveis de pagamento da sessão apenas se o banco gravou com sucesso
+                                    del st.session_state.qr_code_img
+                                    del st.session_state.qr_code_texto
+                                    del st.session_state.id_pagamento_pendente
+                                    del st.session_state.tipo_pagamento_pendente
                                     
                                     if "abrir_popup_loja" in st.session_state:
                                         st.session_state.abrir_popup_loja = False
-                                    
-                                    time.sleep(1) # Dorme apenas 1 segundo para o feedback do toast antes do re-load
                                     st.rerun()
                                 else:
                                     st.error("Erro ao computar créditos no banco. Contate o suporte informando o ID do pagamento.")
@@ -1949,19 +1944,15 @@ else:
                                 st.error(f"❌ O status do pagamento é: {status}. Se houve algum problema, contate o suporte.")
                         else:
                             st.error("Nenhum ID de pagamento encontrado na sessão.")
-                st.markdown("---")
-
-            # Seção inferior de navegação limpa
-            st.markdown("<br>", unsafe_allow_html=True)
-            col_nav1, col_nav2 = st.columns(2)
-            with col_nav1:
-                if st.button("← Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_desde_planos"):
-                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                    st.rerun() 
-            with col_nav2:
-                if st.button("← Voltar para o Login", use_container_width=True, key="btn_voltar_login_desde_planos"):
-                    st.session_state.opcao_menu = "login"
-                    st.rerun()
+            
+            # CORREÇÃO DE INDENTAÇÃO: Botões de navegação movidos para dentro do bloco principal dos planos
+            if st.button("← Voltar para o Chat", use_container_width=True):
+                st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                st.rerun() 
+            
+            if st.button("← Voltar para o Login", use_container_width=True):
+                st.session_state.opcao_menu = "login"
+                st.rerun()
                     
         
 
