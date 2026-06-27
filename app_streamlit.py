@@ -1680,9 +1680,9 @@ else:
                     
                     if res:
                         # CORREÇÃO DOS ÍNDICES: Acessando a senha corretamente no índice 7 da tupla
-                        senha_banco = res[7]
+                        password_hash_banco = res[7]
                         
-                        if str(pass_in) != str(senha_banco):
+                        if str(pass_in) != str(password_hash_banco):
                             st.error("Senha incorreta. Tente novamente.")
                         else:
                             # CORREÇÃO DOS ÍNDICES: Atribuindo os valores corretos de cada coluna
