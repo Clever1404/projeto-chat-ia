@@ -83,9 +83,9 @@ if id_usuario_teste and 'supabase' in locals():
                         st.balloons()
                         st.success(f"🎉 Sucesso! Moedas atualizadas de {moedas_atuais} para {novas_moedas}.")
                         st.json(update_teste.data)
-                else:
-                    st.error(f"❌ O Supabase respondeu, mas o ID '{id_usuario_teste}' não foi encontrado na tabela 'usuarios'.")
-                    st.info("💡 Lembre-se: O ID digitado precisa ser exatamente igual ao que está salvo na coluna 'id' do seu banco de dados.")
+                    else:
+                        st.error(f"❌ O Supabase respondeu, mas o ID '{id_usuario_teste}' não foi encontrado na tabela 'usuarios'.")
+                        st.info("💡 Lembre-se: O ID digitado precisa ser exatamente igual ao que está salvo na coluna 'id' do seu banco de dados.")
 
 
 
