@@ -1662,7 +1662,6 @@ else:
     elif menu_atual == "login":
         st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
             
-        # Chave dinâmica para controle do formulário visual
         form_login_key = "form_login_ativo" if "usuario_id" not in st.session_state else "form_login_oculto"
 
         with st.form(form_login_key):
@@ -1674,44 +1673,53 @@ else:
                     conn = obter_conexao_eficiente()
                     cursor = conn.cursor()
                     
-                    # Executa a query trazendo exatamente 8 colunas (índices 0 a 7)
+                    # ALTERADO: Mudamos de 'senha' para 'password_hash' na consulta SQL
                     cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
                     res = cursor.fetchone()
                     
                     if res:
-                        # 🛑 FIX: Acessando explicitamente o índice 7 para obter a senha textual do banco
-                        password_hash_banco = res[7]
+                        # Desempacotamento limpo de todas as variáveis recebidas do banco
+                        banco_id = res[0]
+                        banco_username = res[1]
+                        banco_foto = res[2]
+                        banco_admin = res[3]
+                        banco_genero = res[4]
+                        banco_plano = res[5]
+                        banco_moedas = res[6]
+                        banco_password_hash = res[7] # Aqui está o código criptografado
                         
-                        # Compara a senha digitada com a armazenada
-                        if str(pass_in) != str(password_hash_banco):
+                        # ADICIONADO: Validação segura comparando o texto digitado com o Hash do banco
+                        # Nota: Se o seu cadastro usa outra lib (como bcrypt), altere para: bcrypt.checkpw(...)
+                        if not check_password_hash(banco_password_hash, str(pass_in)):
                             st.error("Senha incorreta. Tente novamente.")
                         else:
-                            # 🛑 FIX: Mapeamento de todas as colunas usando os índices corretos da tupla 'res'
-                            id_numerico = int(res[0])
+                            # Configurando as variáveis da sessão do Streamlit
+                            id_numerico = int(banco_id)
                             st.session_state.usuario_id = id_numerico
-                            st.session_state.id_usuario = id_numerico  # Mantém compatibilidade com a tela de planos
+                            st.session_state.id_usuario = id_numerico  # ESSA CORRIGE O SEU MERCADO PAGO!
                             
-                            st.session_state.username = res[1]
-                            st.session_state.foto_perfil = res[2]
-                            st.session_state.eh_admin = bool(res[3])
-                            st.session_state.genero = res[4]
+                            st.session_state.username = banco_username
+                            st.session_state.foto_perfil = banco_foto
+                            st.session_state.eh_admin = bool(banco_admin)
+                            st.session_state.genero = banco_genero
                             
-                            # Constrói o dicionário de dados do usuário
                             st.session_state.dados_usuario = {
-                                "username": res[1], 
-                                "foto_perfil": res[2], 
-                                "genero": res[4],
-                                "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", 
-                                "moedas": res[6] if res[6] else 0
+                                "username": banco_username, 
+                                "foto_perfil": banco_foto, 
+                                "genero": banco_genero,
+                                "tipo_plano": str(banco_plano).strip() if banco_plano else "Grátis", 
+                                "moedas": banco_moedas if banco_moedas else 0
                             }
                             
-                            # Atualiza o status online no banco usando PostgreSQL nativo via psycopg2
+                            # Atualiza o status do usuário para Online no banco
                             cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
                             conn.commit()
                             cursor.close()
                             
-                            # Define a rota para o chat e limpa os inputs do formulário
+                            # Redireciona para o chat
                             st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                            
+                            # Limpa a memória de formulário do Streamlit
                             if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
                             if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
                             
@@ -1720,7 +1728,7 @@ else:
                         st.error("Usuário não encontrado.")
                     cursor.close() 
                 except Exception as e: 
-                    st.error(f"Erro no processo de login: {e}")       
+                    st.error(f"Erro crítico no login: {e}")       
 
         col_voltar, col_esqueceu = st.columns(2)
         with col_voltar:
@@ -1730,7 +1738,6 @@ else:
         with col_esqueceu:
             if st.button("🔑 Esqueceu a senha?", use_container_width=True, key="btn_esqueceu_senha_login"):
                 modal_recuperar_senha()
-
 
                 
 
