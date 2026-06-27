@@ -1685,92 +1685,93 @@ else:
                     st.rerun()        
 
     elif menu_atual == "login":
-        # --- INSTALE SE NECESSÁRIO: pip install Werkzeug ---
-        try:
-            from werkzeug.security import check_password_hash
-        except ImportError:
-            # Caso seu projeto use bcrypt em vez de werkzeug, essa alternativa evita quebras
-            import bcrypt
-            def check_password_hash(hash_banco, senha_digitada):
-                # Converte strings para bytes necessário para o bcrypt comum
-                return bcrypt.checkpw(senha_digitada.encode('utf-8'), hash_banco.encode('utf-8'))
+        # 1. CURTO-CIRCUITO: Se o ID já existe na sessão, não renderiza nada e redireciona
+        if "usuario_id" in st.session_state and st.session_state.usuario_id:
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun()
 
-        st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#007bff; margin-bottom: 20px;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
                     
-        form_login_key = "form_login_ativo" if "usuario_id" not in st.session_state else "form_login_oculto"
-
-        with st.form(form_login_key):
-            user_in = st.text_input("Usuário", placeholder="Nome de Usuário ou E-mail", label_visibility="collapsed", key="login_user_field")
-            pass_in = st.text_input("Senha", placeholder="Senha", type="password", label_visibility="collapsed", key="login_pass_field")
+        # 2. SEGREDO DO CACHE: Chave dinâmica baseada no estado de login. 
+        # Se o ID mudar ou não existir, o Streamlit reconstrói o DOM do zero, eliminando o fantasma.
+        estado_login_chave = "logado" if "usuario_id" in st.session_state else "deslogado"
+        
+        with st.form(key=f"form_login_{estado_login_chave}", clear_on_submit=True):
+            user_in = st.text_input(
+                "Usuário", 
+                placeholder="Nome de Usuário ou E-mail", 
+                label_visibility="collapsed", 
+                key=f"input_user_{estado_login_chave}"
+            )
+            pass_in = st.text_input(
+                "Senha", 
+                placeholder="Senha", 
+                type="password", 
+                label_visibility="collapsed", 
+                key=f"input_pass_{estado_login_chave}"
+            )
                 
-            if st.form_submit_button("login", type="primary", use_container_width=True):
+            botao_entrar = st.form_submit_button("Entrar", type="primary", use_container_width=True)
+
+        # 3. ISOLAMENTO LOGICO: O processamento do banco ocorre FORA do bloco 'with st.form'
+        if botao_entrar:
+            if not user_in.strip() or not pass_in.strip():
+                st.warning("Por favor, preencha todos os campos.")
+            else:
                 try:
-                    conn = obter_conexao_eficiente()
-                    cursor = conn.cursor()
-                    
-                    # Traz os registros da tabela do Supabase
-                    cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
-                    res = cursor.fetchone()
-                    
-                    if res:
-                        # Fatiamento explícito e seguro das colunas do banco
-                        banco_id = res[0]
-                        banco_username = res[1]
-                        banco_foto = res[2]
-                        banco_admin = res[3]
-                        banco_genero = res[4]
-                        banco_plano = res[5]
-                        banco_moedas = res[6]
-                        banco_password_hash = res[7] # Contém o hash criptografado
-                        
-                        # Validação usando a função de Hash importada no início
-                        if not check_password_hash(banco_password_hash, str(pass_in)):
-                            st.error("Senha incorreta. Tente novamente.")
-                        else:
-                            # CONFIGURAÇÃO DE SESSÃO UNIFICADA (O segredo para o Mercado Pago funcionar)
-                            id_numerico = int(banco_id)
-                            st.session_state.usuario_id = id_numerico
-                            st.session_state.id_usuario = id_numerico  # Atualiza a variável usada na sua Tela de Planos
+                    with obter_conexao_eficiente() as conn:
+                        with conn.cursor() as cursor:
                             
-                            st.session_state.username = banco_username
-                            st.session_state.foto_perfil = banco_foto
-                            st.session_state.eh_admin = bool(banco_admin)
-                            st.session_state.genero = banco_genero
+                            cursor.execute(
+                                "SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", 
+                                (user_in.strip(), user_in.strip())
+                            )
+                            res = cursor.fetchone()
                             
-                            st.session_state.dados_usuario = {
-                                "username": banco_username, 
-                                "foto_perfil": banco_foto, 
-                                "genero": banco_genero,
-                                "tipo_plano": str(banco_plano).strip() if banco_plano else "Grátis", 
-                                "moedas": banco_moedas if banco_moedas else 0
-                            }
-                            
-                            # Atualiza o status online
-                            cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
-                            conn.commit()
-                            cursor.close()
-                            
-                            # Redireciona o usuário e limpa o formulário
-                            st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                            if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
-                            if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
-                            
-                            st.rerun()
-                    else:
-                        st.error("Usuário não encontrado.")
-                    cursor.close() 
+                            if res:
+                                banco_password_hash = res[7]
+                                
+                                if not check_password_hash(banco_password_hash, str(pass_in)):
+                                    st.error("Senha incorreta. Tente novamente.")
+                                else:
+                                    # CONFIGURAÇÃO DE SESSÃO UNIFICADA
+                                    id_numerico = int(res[0])
+                                    st.session_state.usuario_id = id_numerico
+                                    st.session_state.id_usuario = id_numerico 
+                                    st.session_state.username = res[1]
+                                    st.session_state.foto_perfil = res[2]
+                                    st.session_state.eh_admin = bool(res[3])
+                                    st.session_state.genero = res[4]
+                                    
+                                    st.session_state.dados_usuario = {
+                                        "username": res[1], 
+                                        "foto_perfil": res[2], 
+                                        "genero": res[4],
+                                        "tipo_plano": str(res[5]).strip() if res[5] else "Grátis", 
+                                        "moedas": res[6] if res[6] else 0
+                                    }
+                                    
+                                    cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
+                                    conn.commit()
+                                    
+                                    # Redirecionamento e limpeza imediata
+                                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                                    st.rerun()
+                            else:
+                                st.error("Usuário não encontrado.")
                 except Exception as e: 
                     st.error(f"Erro crítico no login: {e}")       
 
+        # Botões auxiliares totalmente isolados do formulário
+        st.markdown("<br>", unsafe_allow_html=True)
         col_voltar, col_esqueceu = st.columns(2)
         with col_voltar:
-            if st.button("⬅️ Voltar para a Home", use_container_width=True, key="btn_voltar_home_login"):
+            if st.button("⬅️ Voltar para a Home", use_container_width=True, key="btn_voltar_home_exclusivo"):
                 st.session_state.opcao_menu = "home"
                 st.rerun()
         with col_esqueceu:
-            if st.button("🔑 Esqueceu a senha?", use_container_width=True, key="btn_esqueceu_senha_login"):
+            if st.button("🔑 Esqueceu a senha?", use_container_width=True, key="btn_esqueceu_senha_exclusivo"):
                 modal_recuperar_senha()
-
                 
 
     elif menu_atual == "cadastro":
