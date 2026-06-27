@@ -1626,6 +1626,16 @@ def template_fale_conosco():
         st.rerun()
 
 
+try:
+    from werkzeug.security import check_password_hash
+except ImportError:
+    # Alternativa caso o ambiente use bcrypt nativo
+    import bcrypt
+    def check_password_hash(hash_banco, senha_digitada):
+        if isinstance(hash_banco, str):
+            hash_banco = hash_banco.encode('utf-8')
+        return bcrypt.checkpw(senha_digitada.encode('utf-8'), hash_banco)
+
 
 # ==============================================================================
 # 8. ROTEADOR DE FLUXO GLOBAL (CORREÇÃO DE DIALOGS DUPLICADOS)
@@ -1727,14 +1737,16 @@ else:
                                 (user_in.strip(), user_in.strip())
                             )
                             res = cursor.fetchone()
-                            
+
                             if res:
-                                banco_password_hash = res[7]
+                                # Captura explicitamente o hash do índice 7 do SELECT
+                                banco_password_hash = res[7] 
                                 
+                                # Executa a função global pré-carregada
                                 if not check_password_hash(banco_password_hash, str(pass_in)):
                                     st.error("Senha incorreta. Tente novamente.")
                                 else:
-                                    # CONFIGURAÇÃO DE SESSÃO UNIFICADA
+                                    # CONFIGURAÇÃO DE SESSÃO UNIFICADA (Índices corretos da tupla)
                                     id_numerico = int(res[0])
                                     st.session_state.usuario_id = id_numerico
                                     st.session_state.id_usuario = id_numerico 
@@ -1754,10 +1766,9 @@ else:
                                     cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
                                     conn.commit()
                                     
-                                    # Redirecionamento e limpeza imediata
                                     st.session_state.opcao_menu = "💬 Conversar com Lucy"
                                     st.rerun()
-                            else:
+                                                        else:
                                 st.error("Usuário não encontrado.")
                 except Exception as e: 
                     st.error(f"Erro crítico no login: {e}")       
