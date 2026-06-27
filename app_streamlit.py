@@ -1768,7 +1768,7 @@ else:
                                     
                                     st.session_state.opcao_menu = "💬 Conversar com Lucy"
                                     st.rerun()
-                                                        else:
+                            else:
                                 st.error("Usuário não encontrado.")
                 except Exception as e: 
                     st.error(f"Erro crítico no login: {e}")       
