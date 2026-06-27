@@ -1204,10 +1204,6 @@ def template_painel_admin():
             help="Total de encontros simultâneos em andamento monitorados em tempo real pela tabela matches"
         )
 
-    # Exibe Métricas Rápidas
-    st.metric(label="Salas Privadas com Atividade Recente (5m)", value=int(total_salas_ativas))
-    st.markdown("<br>", unsafe_allow_html=True)
-
     # --- 3. SEPARAÇÃO ESTRUTURAL EM ABAS ---
     aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
 
@@ -1781,7 +1777,14 @@ else:
                             else:
                                 senha_final = generate_password_hash(senha)
                                 cursor.execute("INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", (usuario.strip(), email.strip(), senha_final, genero))
-                                st.session_state.usuario_id = int(cursor.fetchone()[0])
+                                
+                                # Captura o ID gerado pelo banco de dados
+                                id_gerado = int(cursor.fetchone()[0])
+                                
+                                # 🟢 CORREÇÃO CRUCIAL: Define as duas variáveis de sessão com o ID numérico
+                                st.session_state.usuario_id = id_gerado
+                                st.session_state.id_usuario = id_gerado  # <--- Esta linha resolve o problema do Mercado Pago!
+                                
                                 st.session_state.username = usuario.strip()
                                 st.session_state.genero = genero
                                 conn.commit()
