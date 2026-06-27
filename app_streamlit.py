@@ -1660,8 +1660,18 @@ else:
                     st.rerun()        
 
     elif menu_atual == "login":
+        # --- INSTALE SE NECESSÁRIO: pip install Werkzeug ---
+        try:
+            from werkzeug.security import check_password_hash
+        except ImportError:
+            # Caso seu projeto use bcrypt em vez de werkzeug, essa alternativa evita quebras
+            import bcrypt
+            def check_password_hash(hash_banco, senha_digitada):
+                # Converte strings para bytes necessário para o bcrypt comum
+                return bcrypt.checkpw(senha_digitada.encode('utf-8'), hash_banco.encode('utf-8'))
+
         st.markdown('<h1 style="text-align:center; color:#007bff;">Login Lucy Chat IA</h1>', unsafe_allow_html=True)
-            
+                    
         form_login_key = "form_login_ativo" if "usuario_id" not in st.session_state else "form_login_oculto"
 
         with st.form(form_login_key):
@@ -1673,12 +1683,12 @@ else:
                     conn = obter_conexao_eficiente()
                     cursor = conn.cursor()
                     
-                    # ALTERADO: Mudamos de 'senha' para 'password_hash' na consulta SQL
+                    # Traz os registros da tabela do Supabase
                     cursor.execute("SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", (user_in, user_in))
                     res = cursor.fetchone()
                     
                     if res:
-                        # Desempacotamento limpo de todas as variáveis recebidas do banco
+                        # Fatiamento explícito e seguro das colunas do banco
                         banco_id = res[0]
                         banco_username = res[1]
                         banco_foto = res[2]
@@ -1686,17 +1696,16 @@ else:
                         banco_genero = res[4]
                         banco_plano = res[5]
                         banco_moedas = res[6]
-                        banco_password_hash = res[7] # Aqui está o código criptografado
+                        banco_password_hash = res[7] # Contém o hash criptografado
                         
-                        # ADICIONADO: Validação segura comparando o texto digitado com o Hash do banco
-                        # Nota: Se o seu cadastro usa outra lib (como bcrypt), altere para: bcrypt.checkpw(...)
+                        # Validação usando a função de Hash importada no início
                         if not check_password_hash(banco_password_hash, str(pass_in)):
                             st.error("Senha incorreta. Tente novamente.")
                         else:
-                            # Configurando as variáveis da sessão do Streamlit
+                            # CONFIGURAÇÃO DE SESSÃO UNIFICADA (O segredo para o Mercado Pago funcionar)
                             id_numerico = int(banco_id)
                             st.session_state.usuario_id = id_numerico
-                            st.session_state.id_usuario = id_numerico  # ESSA CORRIGE O SEU MERCADO PAGO!
+                            st.session_state.id_usuario = id_numerico  # Atualiza a variável usada na sua Tela de Planos
                             
                             st.session_state.username = banco_username
                             st.session_state.foto_perfil = banco_foto
@@ -1711,15 +1720,13 @@ else:
                                 "moedas": banco_moedas if banco_moedas else 0
                             }
                             
-                            # Atualiza o status do usuário para Online no banco
+                            # Atualiza o status online
                             cursor.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
                             conn.commit()
                             cursor.close()
                             
-                            # Redireciona para o chat
+                            # Redireciona o usuário e limpa o formulário
                             st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                            
-                            # Limpa a memória de formulário do Streamlit
                             if "login_user_field" in st.session_state: del st.session_state["login_user_field"]
                             if "login_pass_field" in st.session_state: del st.session_state["login_pass_field"]
                             
