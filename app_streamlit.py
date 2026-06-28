@@ -151,30 +151,51 @@ def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
                             liberar_conexao(conn)
 
 # ==============================================================================
-# 3. GERENCIADOR DE LOGOUT RÁPIDO INTERCEPTADOR
+# 2. GERENCIADOR DE ROTA E REFRESH ATÔMICO (TOPO DO SCRIPT - LINHA 1)
 # ==============================================================================
 if st.session_state.get("opcao_menu") == "executar_logout_imediato":
     id_usuario_logado = st.session_state.get("usuario_id")
+    
+    # ⚡ SEGUNDO SEGREDO: Se o ID existe, significa que veio da tela de Planos!
+    # Nós NÃO deslogamos o usuário. Apenas atualizamos a presença e mudamos a rota.
     if id_usuario_logado:
-        conn_logout = None
         try:
             id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
-            conn_logout = obter_conexao_eficiente()
-            with conn_logout.cursor() as cursor_logout:
-                cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (id_limpo,))
-                conn_logout.commit()
+            
+            # Força uma busca limpa no banco para atualizar o Session State global
+            dados_quentes = carregar_plano_e_moedas_direto_pool(id_limpo)
+            
+            plano_bruto = str(dados_quentes.get("tipo_plano", "Grátis")).strip()
+            if "credito" in plano_bruto.lower() or "moedas" in plano_bruto.lower():
+                tipo_plano = "Plano Crédito de Moedas"
+            elif "vip" in plano_bruto.lower() or "assinante" in plano_bruto.lower():
+                tipo_plano = "vip"
+            else:
+                tipo_plano = "Grátis"
+                
+            # Sobrescreve as variáveis globais na raiz da memória do Streamlit
+            st.session_state["tipo_plano"] = tipo_plano
+            st.session_state["saldo_moedas"] = int(dados_quentes.get("moedas", 0))
+            if "dados_usuario" in st.session_state:
+                st.session_state.dados_usuario["tipo_plano"] = tipo_plano
+                st.session_state.dados_usuario["moedas"] = int(dados_quentes.get("moedas", 0))
+                
         except Exception:
-            if conn_logout: conn_logout.rollback()
-        finally:
-            if conn_logout: liberar_conexao(conn_logout)
-    
-    st.session_state.usuario_id = None
-    st.session_state.id_usuario = None
-    st.session_state.username = None
-    st.session_state.foto_perfil = ""
-    st.session_state.opcao_menu = "login"
-    st.session_state.form_seed = 42
-    st.rerun()
+            pass
+            
+        # Redireciona o usuário para o Chat com a barra lateral totalmente reconstruída
+        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+        st.rerun()
+
+    # --- Se o ID NÃO existe, aí sim executa o fluxo de logout padrão (Mantenha igual) ---
+    else:
+        st.session_state.usuario_id = None
+        st.session_state.id_usuario = None
+        st.session_state.username = None
+        st.session_state.foto_perfil = ""
+        st.session_state.opcao_menu = "login"
+        st.session_state.form_seed = 42
+        st.rerun()
 
 # Captura o estado de menu para a Sidebar ler de forma estável abaixo
 menu_atual = st.session_state.get("opcao_menu", "home")
@@ -2607,18 +2628,16 @@ with miolo_pagina.container():
                                     st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
                                     tipo = st.session_state.get("tipo_pagamento_pendente")
                                     
-                                    # Escreve o novo plano e saldo no Supabase
+                                    # Escreve o novo plano e saldo de moedas no Supabase
                                     sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo)
                                     
                                     if sucesso_banco:
-                                        # ⚡ A SOLUÇÃO: Modifica a semente do gatilho global. 
-                                        # Isso força o fragmento adormecido da Sidebar a acordar e se reconstruir do zero!
-                                        if "gatilho_atualizar_sidebar" in st.session_state:
-                                            st.session_state["gatilho_atualizar_sidebar"] += 1
-                                        else:
-                                            st.session_state["gatilho_atualizar_sidebar"] = 1
+                                        # ⚡ O SEGREDO DO RESET DEFINITIVO:
+                                        # Mudamos o menu para uma rota fantasma de transição rápida.
+                                        # Isso desliga a Sidebar instantaneamente e força a limpeza física da tela!
+                                        st.session_state.opcao_menu = "executar_logout_imediato"
                                         
-                                        st.toast("Sua conta foi atualizada com sucesso no banco!")
+                                        st.toast("Sua conta foi atualizada com sucesso!")
                                         
                                         # Limpeza de chaves do Pix
                                         for chave in ["qr_code_img", "qr_code_texto", "id_pagamento_pendente", "tipo_pagamento_pendente"]:
@@ -2629,7 +2648,8 @@ with miolo_pagina.container():
                                             st.session_state.abrir_popup_loja = False
                                             
                                         time.sleep(0.5)
-                                        st.rerun() # Executa o Rerun global para redesenhar a Sidebar com o novo valor
+                                        st.rerun() # Dispara o rerun para apagar a barra lateral antiga
+
 
                                     else:
                                         st.error("Erro ao computar créditos no banco. Contate o suporte.")
