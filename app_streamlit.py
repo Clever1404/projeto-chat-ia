@@ -1960,10 +1960,10 @@ except ImportError:
 # ==============================================================================
 
 # # 1. Garante os estados iniciais de navegação
- if "opcao_menu" not in st.session_state:
-     st.session_state.opcao_menu = "home"
+if "opcao_menu" not in st.session_state:
+    st.session_state.opcao_menu = "home"
 
- menu_atual = st.session_state.opcao_menu
+menu_atual = st.session_state.opcao_menu
 
 # # ==============================================================================
 # # 2. BARRA LATERAL PROTEGIDA (BLOQUEIO ANTI-LOOP PARA TELAS PÚBLICAS)
