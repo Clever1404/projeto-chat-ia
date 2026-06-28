@@ -2101,7 +2101,7 @@ if menu_atual not in ["home", "login", "cadastro"]:
                 # ⚡ DEVOLUÇÃO OBRIGATÓRIA AO POOL
                 if conn_foto:
                     liberar_conexao(conn_foto)
-                    
+
         # ==============================================================================
         # --- CONSULTA 2: MOTOR DE BUSCA DA NOTIFICAÇÃO (BLINDADO COM POOL) ---
         # ==============================================================================
@@ -2354,7 +2354,7 @@ with miolo_pagina.container():
       
     elif menu_atual == "📅 Disponibilidade":
         template_disponibilidade()
-        st.stop()
+        
         
     elif menu_atual == "🤝 Gerenciar Conexões":
         template_gerenciar_conexoes()
