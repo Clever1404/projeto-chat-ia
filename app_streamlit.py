@@ -2578,15 +2578,18 @@ with miolo_pagina.container():
                                     st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
                                     tipo = st.session_state.get("tipo_pagamento_pendente")
                                     
-                                    # Escreve o novo plano e saldo de moedas no Supabase
+                                    # Grava o novo plano no Supabase e atualiza as variáveis de sessão
                                     sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo)
                                     
                                     if sucesso_banco:
-                                        # ⚡ O SEGREDO DO RESET DEFINITIVO:
-                                        # Mudamos o menu para uma rota fantasma de transição rápida.
-                                        # Isso desliga a Sidebar instantaneamente e força a limpeza física da tela!
-                                        st.session_state.opcao_menu = "executar_logout_imediato"
-                                        
+                                        # ⚡ SOLUÇÃO DO PROBLEMA: Incrementa a semente do chat.
+                                        # Isso avisa o navegador que a instância antiga do chat morreu e 
+                                        # obriga o Streamlit a recriar o st.chat_input imediatamente!
+                                        if "seed_recarregar_chat" in st.session_state:
+                                            st.session_state["seed_recarregar_chat"] += 1
+                                        else:
+                                            st.session_state["seed_recarregar_chat"] = 1
+                                            
                                         st.toast("Sua conta foi atualizada com sucesso!")
                                         
                                         # Limpeza de chaves do Pix
@@ -2598,7 +2601,10 @@ with miolo_pagina.container():
                                             st.session_state.abrir_popup_loja = False
                                             
                                         time.sleep(0.5)
-                                        st.rerun() # Dispara o rerun para apagar a barra lateral antiga
+                                        
+                                        # Redireciona para o chat de forma imediata
+                                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                                        st.rerun()
 
 
                                     else:
@@ -2620,9 +2626,16 @@ with miolo_pagina.container():
 
 
     elif menu_atual == "💬 Conversar com Lucy":
-        renderizar_chat_lucy_isolado()
+        # ⚡ O SEGREDO DA CAIXA DE TEXTO: Inicializa um contador de re-renderização
+        if "seed_recarregar_chat" not in st.session_state:
+            st.session_state["seed_recarregar_chat"] = 0
+            
+        # Passamos a semente como chave para forçar o Streamlit a desenhar o st.chat_input do zero
+        chave_chat = st.session_state["seed_recarregar_chat"]
+        
+        # Invoque a função passando a chave (garanta que sua função aceite este argumento)
+        renderizar_chat_lucy_isolado(key=f"chat_instancia_{chave_chat}")
         st.stop()
-
 
     elif menu_atual == "🛠️ Painel Admin":
         template_painel_admin()
