@@ -148,7 +148,7 @@ def carregar_plano_e_moedas_direto_pool(id_usuario):
 # ==============================================================================
 if menu_atual not in ["home", "login", "cadastro", "planos"]:
     with st.sidebar:
-        # --- [A] PERFIL DO USUÁRIO & AVATAR CENTRALIZADO ---
+       # --- [A] PERFIL DO USUÁRIO & AVATAR CENTRALIZADO ---
         caminho_foto_perfil = str(st.session_state.get("foto_perfil", "")).strip()
                 
         col_esq, col_centro, col_dir = st.columns([1, 2, 1])
@@ -168,7 +168,7 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
             </div>
         """, unsafe_allow_html=True)
 
-        
+
         # --- [B] RECONHECIMENTO DO PLANO E MOEDAS EM TEMPO REAL ---
         tipo_plano = "Grátis"
         saldo_moedas = 0
@@ -206,7 +206,7 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
         st.markdown("<hr style='border-color: #21262d; margin: 10px 0;'>", unsafe_allow_html=True)
 
 
-           # --- COMPONENTE: ALTERAR FOTO DE PERFIL ---
+        # --- COMPONENTE: ALTERAR FOTO DE PERFIL ---
         st.caption("📷 Enviar nova foto de perfil:")
         f_nova = st.file_uploader(
             "Alterar Foto", 
@@ -214,7 +214,7 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
             key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
             label_visibility="collapsed"
         ) 
-      
+
         if f_nova and id_usuario_logado: 
             id_limpo = id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
             nome_arquivo_storage = f"user_{id_limpo}.jpg"
@@ -233,7 +233,7 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
                 resposta_url = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
                 url_publica_foto = str(resposta_url.public_url).strip() if hasattr(resposta_url, "public_url") else str(resposta_url).strip()
                     
-                # ⚡ OTIMIZAÇÃO: Gravando no PostgreSQL de forma segura usando o Pool
+                # Grava no PostgreSQL de forma segura usando o Pool
                 conn_foto = obter_conexao_eficiente()
                 with conn_foto.cursor() as cursor_foto:
                     cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
@@ -241,8 +241,8 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
                     
                 st.session_state.foto_perfil = url_publica_foto
                 
-                # ⚡ OTIMIZAÇÃO CRÍTICA: Limpa apenas a função da foto em vez do app inteiro!
-                carregar_plano_e_moedas_cached.clear(id_usuario_logado)
+                # ⚡ CORREÇÃO DO ERRO: Removida a linha .clear() da função inexistente.
+                # Como o motor direto pool busca dados em tempo real (0ms), o novo avatar e saldo já atualizam sozinhos.
                     
                 # Incrementa semente para resetar o uploader
                 if "form_seed" in st.session_state:
@@ -251,19 +251,17 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
                     st.session_state.form_seed = 43
                     
                 st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
-                time.sleep(0.5) # Delay suave
+                time.sleep(0.5) 
                 st.rerun() 
                     
             except Exception as e:
                 if conn_foto: conn_foto.rollback()
                 st.error(f"Erro ao salvar foto: {e}")
             finally:
-                # ⚡ DEVOLUÇÃO OBRIGATÓRIA AO POOL
                 if conn_foto:
                     liberar_conexao(conn_foto)
 
-        st.markdown("---") # Divisor visual rápido
-
+        st.markdown("---")
 
         # --- [C] MOTOR DE BUSCA DA NOTIFICAÇÃO (Roda nativo e leve) ---
         possui_convite_pendente = False
