@@ -676,126 +676,126 @@ def renderizar_chat_lucy_isolado():
 
 # ⚡ OTIMIZAÇÃO CRÍTICA: REMOVA o @st.dialog daqui. A função agora é um componente nativo.
 def modal_agendamento_encontro(dados_r):
-    # Criamos uma caixa visual simulando o modal (Estilização GitHub Dark)
-    with st.container(border=True):
-        st.markdown(f"### 📆 Agendar Reunião com **{dados_r['nome_par']}**")
-        st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
+   
+    #with st.container(border=True):
+    st.markdown(f"### 📆 Agendar Reunião com **{dados_r['nome_par']}**")
+        #st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
         
-        # Inputs visuais estáveis
-        dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
-        dia_s = st.selectbox("Escolha o Dia da Semana:", dias, key="dg_res_dia")
+    # Inputs visuais estáveis
+    dias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
+    dia_s = st.selectbox("Escolha o Dia da Semana:", dias, key="dg_res_dia")
+    
+    opcoes_periodo = ["🌅 Manhã (06:00 às 11:59)", "☀️ Tarde (12:00 às 17:59)", "🌙 Noite (18:00 às 23:59)"]
+    per_exibicao = st.selectbox("Escolha o Período:", opcoes_periodo, key="dg_res_per")
+    per_s = "manha" if "Manhã" in per_exibicao else "tarde" if "Tarde" in per_exibicao else "noite"
+    
+    horario_sugestao = datetime.strptime("09:00" if per_s=="manha" else "14:00" if per_s=="tarde" else "20:00", "%H:%M").time()
+    hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
+    
+    def limpar_id_absoluto(id_bruto):
+        while isinstance(id_bruto, (tuple, list)): 
+            id_bruto = id_bruto[0] if len(id_bruto) > 0 else 0
+        return int(id_bruto) if id_bruto is not None else 0
+
+    m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
+    meu_id_limpo = limpar_id_absoluto(st.session_state.get("usuario_id"))
+    parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
+
+    # Inicialização de variáveis de controle
+    meu_registro_existe = False
+    parceiro_registro_existe = False
+    erro_validacao = False
+    mensagem_erro = ""
+
+    # Botão de submissão
+    if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True, key="btn_confirmar_reserva_final"):
         
-        opcoes_periodo = ["🌅 Manhã (06:00 às 11:59)", "☀️ Tarde (12:00 às 17:59)", "🌙 Noite (18:00 às 23:59)"]
-        per_exibicao = st.selectbox("Escolha o Período:", opcoes_periodo, key="dg_res_per")
-        per_s = "manha" if "Manhã" in per_exibicao else "tarde" if "Tarde" in per_exibicao else "noite"
-        
-        horario_sugestao = datetime.strptime("09:00" if per_s=="manha" else "14:00" if per_s=="tarde" else "20:00", "%H:%M").time()
-        hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
-        
-        def limpar_id_absoluto(id_bruto):
-            while isinstance(id_bruto, (tuple, list)): 
-                id_bruto = id_bruto[0] if len(id_bruto) > 0 else 0
-            return int(id_bruto) if id_bruto is not None else 0
+        hora_int = hor_s.hour
+        if per_s == 'manha' and (hora_int < 6 or hora_int >= 12): 
+            st.error("❌ Horário inválido para Manhã (06:00 às 11:59).")
+            return
+        elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18): 
+            st.error("❌ Horário inválido para Tarde (12:00 às 17:59).")
+            return
+        elif per_s == 'noite' and (hora_int < 18 or hora_int > 23): 
+            st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
+            return
 
-        m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
-        meu_id_limpo = limpar_id_absoluto(st.session_state.get("usuario_id"))
-        parceiro_id_limpo = limpar_id_absoluto(dados_r.get('id_par'))
-
-        # Inicialização de variáveis de controle
-        meu_registro_existe = False
-        parceiro_registro_existe = False
-        erro_validacao = False
-        mensagem_erro = ""
-
-        # Botão de submissão
-        if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True, key="btn_confirmar_reserva_final"):
-            
-            hora_int = hor_s.hour
-            if per_s == 'manha' and (hora_int < 6 or hora_int >= 12): 
-                st.error("❌ Horário inválido para Manhã (06:00 às 11:59).")
-                return
-            elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18): 
-                st.error("❌ Horário inválido para Tarde (12:00 às 17:59).")
-                return
-            elif per_s == 'noite' and (hora_int < 18 or hora_int > 23): 
-                st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
-                return
-
-            conn = None
-            try:
-                conn = obter_conexao_eficiente()
-                with conn.cursor() as cursor:
-                    # Verificação de Match
-                    cursor.execute("SELECT COUNT(*) FROM matches WHERE id = %s;", (m_id_limpo,))
-                    match_existe = cursor.fetchone()[0] > 0
-                    
-                    if not match_existe:
-                        cursor.execute("""
-                            SELECT id FROM matches 
-                            WHERE (usuario_1_id = %s AND usuario_2_id = %s) OR (usuario_1_id = %s AND usuario_2_id = %s) 
-                            LIMIT 1;
-                        """, (meu_id_limpo, parceiro_id_limpo, parceiro_id_limpo, meu_id_limpo))
-                        match_recuperado = cursor.fetchone()
-                        
-                        if match_recuperado:
-                            m_id_limpo = int(match_recuperado[0])
-                        else:
-                            cursor.execute("""
-                                INSERT INTO matches (usuario_1_id, usuario_2_id, status_conexao) 
-                                VALUES (%s, %s, 'offline') RETURNING id;
-                            """, (meu_id_limpo, parceiro_id_limpo))
-                            m_id_limpo = int(cursor.fetchone()[0])
-                            conn.commit()
-
-                    # Validações de Disponibilidade
+        conn = None
+        try:
+            conn = obter_conexao_eficiente()
+            with conn.cursor() as cursor:
+                # Verificação de Match
+                cursor.execute("SELECT COUNT(*) FROM matches WHERE id = %s;", (m_id_limpo,))
+                match_existe = cursor.fetchone()[0] > 0
+                
+                if not match_existe:
                     cursor.execute("""
-                        SELECT COUNT(*) FROM disponibilidade_usuarios 
-                        WHERE usuario_id = %s AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-                    """, (meu_id_limpo, str(dia_s), str(per_s)))
-                    meu_registro_existe = cursor.fetchone()[0] > 0
-            
-                    cursor.execute("""
-                        SELECT COUNT(*) FROM disponibilidade_usuarios 
-                        WHERE usuario_id = %s 
-                        AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
-                        AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-                    """, (parceiro_id_limpo, str(dia_s), str(per_s)))
-                    parceiro_registro_existe = cursor.fetchone()[0] > 0
-
-                    if not meu_registro_existe:
-                        erro_validacao = True
-                        mensagem_erro = f"❌ **Agendamento Recusado:** Você configurou este dia/período como indisponível na sua grade."
-                    elif not parceiro_registro_existe:
-                        erro_validacao = True
-                        mensagem_erro = f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado."       
+                        SELECT id FROM matches 
+                        WHERE (usuario_1_id = %s AND usuario_2_id = %s) OR (usuario_1_id = %s AND usuario_2_id = %s) 
+                        LIMIT 1;
+                    """, (meu_id_limpo, parceiro_id_limpo, parceiro_id_limpo, meu_id_limpo))
+                    match_recuperado = cursor.fetchone()
                     
-                    if erro_validacao:
-                        st.error(mensagem_erro)
-                        # ⚡ Importante: Não damos rerun aqui! Mantemos a tela aberta para o admin ler o erro.
+                    if match_recuperado:
+                        m_id_limpo = int(match_recuperado[0])
                     else:
                         cursor.execute("""
-                            INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
-                            VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
-                        """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), hor_s))
-                        
+                            INSERT INTO matches (usuario_1_id, usuario_2_id, status_conexao) 
+                            VALUES (%s, %s, 'offline') RETURNING id;
+                        """, (meu_id_limpo, parceiro_id_limpo))
+                        m_id_limpo = int(cursor.fetchone()[0])
                         conn.commit()
-                        st.success("🎉 Convite enviado com sucesso!")
-                        st.session_state.abrir_reserva_fluxo = None  # Fecha o modal simulado
-                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                        time.sleep(1.0)
-                        st.rerun()
 
-            except Exception as e: 
-                if conn: conn.rollback()
-                st.error(f"Erro crítico ao salvar agendamento: {e}")
-            finally:
-                if conn:
-                    liberar_conexao(conn)
+                # Validações de Disponibilidade
+                cursor.execute("""
+                    SELECT COUNT(*) FROM disponibilidade_usuarios 
+                    WHERE usuario_id = %s AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+                """, (meu_id_limpo, str(dia_s), str(per_s)))
+                meu_registro_existe = cursor.fetchone()[0] > 0
+        
+                cursor.execute("""
+                    SELECT COUNT(*) FROM disponibilidade_usuarios 
+                    WHERE usuario_id = %s 
+                    AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
+                    AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+                """, (parceiro_id_limpo, str(dia_s), str(per_s)))
+                parceiro_registro_existe = cursor.fetchone()[0] > 0
 
-        # Botão de fechar nativo do modal simulado
-        if st.button("🚫 Cancelar e Voltar", use_container_width=True, key="btn_cancelar_modal_reserva_simulado"):
-            st.session_state.abrir_reserva_fluxo = None
-            st.rerun()
+                if not meu_registro_existe:
+                    erro_validacao = True
+                    mensagem_erro = f"❌ **Agendamento Recusado:** Você configurou este dia/período como indisponível na sua grade."
+                elif not parceiro_registro_existe:
+                    erro_validacao = True
+                    mensagem_erro = f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado."       
+                
+                if erro_validacao:
+                    st.error(mensagem_erro)
+                    # ⚡ Importante: Não damos rerun aqui! Mantemos a tela aberta para o admin ler o erro.
+                else:
+                    cursor.execute("""
+                        INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
+                        VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
+                    """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), hor_s))
+                    
+                    conn.commit()
+                    st.success("🎉 Convite enviado com sucesso!")
+                    st.session_state.abrir_reserva_fluxo = None  # Fecha o modal simulado
+                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                    time.sleep(1.0)
+                    st.rerun()
+
+        except Exception as e: 
+            if conn: conn.rollback()
+            st.error(f"Erro crítico ao salvar agendamento: {e}")
+        finally:
+            if conn:
+                liberar_conexao(conn)
+
+    # Botão de fechar nativo do modal simulado
+    if st.button("🚫 Cancelar e Voltar", use_container_width=True, key="btn_cancelar_modal_reserva_simulado"):
+        st.session_state.abrir_reserva_fluxo = None
+        st.rerun()
 
 # ==============================================================================
 # FUNÇÃO AUXILIAR COM CACHE PARA OTIMIZAÇÃO DA GRADE HORÁRIA
@@ -2515,8 +2515,8 @@ with miolo_pagina.container():
                     # PARTE 2: Área de Checkout (Integrada no mesmo retângulo)
                     st.html(
                         """
-                        <div style="text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
-                            <strong style="color: red; font-size: 2.1em;">### 🛒 Realizar Pagamento</strong><br>  
+                        <div style="text-align: left; border-left: 4px solid red; padding-left: 15px;">
+                            <strong style="color: white; font-size: 2.1em;">### 🛒 Realizar Pagamento</strong><br>  
                         </div>
                         """
                     )
