@@ -1856,19 +1856,7 @@ def template_painel_admin():
                 # 3. PADRONIZAÇÃO: Remove espaços e força minúsculas
                 df_usuarios["tipo_plano_limpo"] = df_usuarios["tipo_plano"].astype(str).str.strip().str.lower()
                 df_usuarios["moedas"] = df_usuarios["moedas"].fillna(0).astype(int)
-                
-                # --- FILTRO NA BARRA LATERAL ---
-                # 1. Cabeçalho principal da barra lateral
-                st.sidebar.subheader("⚙️ Configurações do Painel")
-
-                # 2. Caixa de seleção (Selectbox)
-                visao_perfil = st.sidebar.selectbox(
-                    "Visualizar no gráfico:",
-                    options=["Apenas Clientes", "Todos (Incluir Admin)"],
-                    index=0  # Padrão: Mostra apenas clientes para não distorcer a visão comercial
-                )
-
-                
+                               
 
             # 4. CONTAGEM SEPARANDO O ADMIN DO VIP
                 is_admin = df_usuarios["tipo_plano_limpo"].str.contains("admin", na=False)
@@ -2470,145 +2458,142 @@ with miolo_pagina.container():
         # Template de planos sem st.sidebar interno
         # Garante o estado correto da navegação
         st.session_state.opcao_menu = "planos"
-        if "sub_visao" not in st.session_state:
-            st.session_state.sub_visao = "planos"
-
         # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
-            st.markdown('<h1 style="text-align:center; color:#007bff; margin-bottom:15px;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 style="text-align:center; color:#007bff; margin-bottom:15px;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
 
-            # --- CONTÊINER PRINCIPAL ÚNICO ---
-            # Centraliza o container simulando o max-width de 800px via colunas do Streamlit
-            _, col_central, _ = st.columns([1, 8, 1])
+        # --- CONTÊINER PRINCIPAL ÚNICO ---
+        # Centraliza o container simulando o max-width de 800px via colunas do Streamlit
+        _, col_central, _ = st.columns([1, 8, 1])
 
-            with col_central:
-                # st.container com borda cria o retângulo unificado
-                with st.container(border=True):
-                    
-                    # PARTE 1: Descrição dos Planos (Duas partes de benefícios lado a lado)
-                    st.markdown('<h3 style="text-align: center; color: #f0f6fc; margin-bottom: 20px;">Escolha o Plano Ideal para Você</h3>', unsafe_allow_html=True)
-                    
-                    col_plano_1, col_plano_2 = st.columns(2)
-                    
-                    with col_plano_1:
-                        st.html(
-                            """
-                            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px; min-height: 140px;">
-                                <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
-                                <span style="color: #c9d1d9; font-size: 0.95em;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais e Sala Privada por tempo indeterminado.</span>
-                            </div>
-                            """
-                        )
-                        
-                    with col_plano_2:
-                        st.html(
-                            """
-                            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px; min-height: 140px;">
-                                <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
-                                <span style="color: #c9d1d9; font-size: 0.95em;">Busca de matches e encontros inclusos. O uso da Sala Privada consome créditos: <strong>10 moedas equivalem a 10 minutos</strong> de conversa.</span>
-                            </div>
-                            """
-                        )
-
-                    # Divisor visual interno discreto
-                    st.markdown("<hr style='border-color: #30363d; margin: 15px 0;'>", unsafe_allow_html=True)
-                    
-                    # PARTE 2: Área de Checkout (Integrada no mesmo retângulo)
-                    st.markdown("### 🛒 Realizar Pagamento")
-                    id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
-                    
-                    opcoes_compra = st.radio(
-                        "Escolha uma opção para recarga:", 
-                        ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"],
-                        key="radio_opcao_compra_estatico"
+        with col_central:
+            # st.container com borda cria o retângulo unificado
+            with st.container(border=True):
+                
+                # PARTE 1: Descrição dos Planos (Duas partes de benefícios lado a lado)
+                st.markdown('<h3 style="text-align: center; color: #f0f6fc; margin-bottom: 20px;">Escolha o Plano Ideal para Você</h3>', unsafe_allow_html=True)
+                
+                col_plano_1, col_plano_2 = st.columns(2)
+                
+                with col_plano_1:
+                    st.html(
+                        """
+                        <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px; min-height: 140px;">
+                            <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+                            <span style="color: #c9d1d9; font-size: 0.95em;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais e Sala Privada por tempo indeterminado.</span>
+                        </div>
+                        """
                     )
                     
-                    if st.button("Gerar Pix de Pagamento", use_container_width=True, type="secondary", key="btn_gerar_pix_planos"):
-                        valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
-                        id_limpo = id_usuario if not isinstance(id_usuario, (list, tuple)) else id_usuario
+                with col_plano_2:
+                    st.html(
+                        """
+                        <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px; min-height: 140px;">
+                            <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+                            <span style="color: #c9d1d9; font-size: 0.95em;">Busca de matches e encontros inclusos. O uso da Sala Privada consome créditos: <strong>10 moedas equivalem a 10 minutos</strong> de conversa.</span>
+                        </div>
+                        """
+                    )
+
+                # Divisor visual interno discreto
+                st.markdown("<hr style='border-color: #30363d; margin: 15px 0;'>", unsafe_allow_html=True)
+                
+                # PARTE 2: Área de Checkout (Integrada no mesmo retângulo)
+                st.markdown("### 🛒 Realizar Pagamento")
+                id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
+                
+                opcoes_compra = st.radio(
+                    "Escolha uma opção para recarga:", 
+                    ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"],
+                    key="radio_opcao_compra_estatico"
+                )
+                
+                if st.button("Gerar Pix de Pagamento", use_container_width=True, type="secondary", key="btn_gerar_pix_planos"):
+                    valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
+                    id_limpo = id_usuario if not isinstance(id_usuario, (list, tuple)) else id_usuario
+                    
+                    payment_data = {
+                        "transaction_amount": valor, 
+                        "description": desc, 
+                        "payment_method_id": "pix",
+                        "payer": {"email": "cliente@email.com"}, 
+                        "external_reference": f"{id_limpo}:{tipo}"
+                    }
                         
-                        payment_data = {
-                            "transaction_amount": valor, 
-                            "description": desc, 
-                            "payment_method_id": "pix",
-                            "payer": {"email": "cliente@email.com"}, 
-                            "external_reference": f"{id_limpo}:{tipo}"
-                        }
+                    try:
+                        payment_response = sdk.payment().create(payment_data)
+                        payment = payment_response["response"]
                             
-                        try:
-                            payment_response = sdk.payment().create(payment_data)
-                            payment = payment_response["response"]
-                                
-                            if "point_of_interaction" in payment:
-                                st.session_state.id_pagamento_pendente = payment["id"]
-                                st.session_state.tipo_pagamento_pendente = tipo
-                                st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
-                                st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
-                                st.success("Pix gerado com sucesso!")
-                                st.rerun()
-                        except Exception as e: 
-                            st.error(f"Erro ao gerar pagamento: {e}")
+                        if "point_of_interaction" in payment:
+                            st.session_state.id_pagamento_pendente = payment["id"]
+                            st.session_state.tipo_pagamento_pendente = tipo
+                            st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+                            st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+                            st.success("Pix gerado com sucesso!")
+                            st.rerun()
+                    except Exception as e: 
+                        st.error(f"Erro ao gerar pagamento: {e}")
 
-                    # Renderiza o QR Code dentro do mesmo bloco se estiver ativo
-                    if st.session_state.get("qr_code_img"):
-                        st.markdown("<hr style='border-color: #30363d; margin: 15px 0;'>", unsafe_allow_html=True)
-                        st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
-                        
-                        col_qr, col_txt = st.columns([1, 1.5])
-                        with col_qr:
-                            import base64
-                            st.image(base64.b64decode(st.session_state.qr_code_img), width=200)
-                        with col_txt:
-                            st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=80, key="txt_area_copia_cola_estatica")
-                                    
-                            if st.button("🔄 Já realizei o pagamento", type="primary", use_container_width=True, key="btn_verificar_status_pix_final"):
-                                id_pagamento = st.session_state.get("id_pagamento_pendente")
+                # Renderiza o QR Code dentro do mesmo bloco se estiver ativo
+                if st.session_state.get("qr_code_img"):
+                    st.markdown("<hr style='border-color: #30363d; margin: 15px 0;'>", unsafe_allow_html=True)
+                    st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
+                    
+                    col_qr, col_txt = st.columns([1, 1.5])
+                    with col_qr:
+                        import base64
+                        st.image(base64.b64decode(st.session_state.qr_code_img), width=200)
+                    with col_txt:
+                        st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=80, key="txt_area_copia_cola_estatica")
                                 
-                                if id_pagamento:
-                                    with st.spinner("Verificando compensação do Pix..."):
-                                        status = verificar_status_pix(id_pagamento)
+                        if st.button("🔄 Já realizei o pagamento", type="primary", use_container_width=True, key="btn_verificar_status_pix_final"):
+                            id_pagamento = st.session_state.get("id_pagamento_pendente")
+                            
+                            if id_pagamento:
+                                with st.spinner("Verificando compensação do Pix..."):
+                                    status = verificar_status_pix(id_pagamento)
+                                
+                                if status == "approved":
+                                    st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
+                                    tipo = st.session_state.get("tipo_pagamento_pendente")
                                     
-                                    if status == "approved":
-                                        st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
-                                        tipo = st.session_state.get("tipo_pagamento_pendente")
+                                    sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo)
+                                    
+                                    if sucesso_banco:
+                                        st.toast("Sua conta foi atualizada com sucesso!")
                                         
-                                        sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo)
-                                        
-                                        if sucesso_banco:
-                                            st.toast("Sua conta foi atualizada com sucesso!")
-                                            
-                                            for chave in ["qr_code_img", "qr_code_texto", "id_pagamento_pendente", "tipo_pagamento_pendente"]:
-                                                if chave in st.session_state:
-                                                    del st.session_state[chave]
-                                                    
-                                            if "abrir_popup_loja" in st.session_state:
-                                                st.session_state.abrir_popup_loja = False
+                                        for chave in ["qr_code_img", "qr_code_texto", "id_pagamento_pendente", "tipo_pagamento_pendente"]:
+                                            if chave in st.session_state:
+                                                del st.session_state[chave]
                                                 
-                                            import time
-                                            time.sleep(0.5)
-                                            st.rerun()
-                                        else:
-                                            st.error("Erro ao computar créditos no banco. Contate o suporte.")
-                                                                
-                                    elif status == "pending":
-                                        st.warning("⏳ O pagamento ainda consta como pendente. Aguarde um instante e tente novamente.")
+                                        if "abrir_popup_loja" in st.session_state:
+                                            st.session_state.abrir_popup_loja = False
+                                            
+                                        import time
+                                        time.sleep(0.5)
+                                        st.rerun()
                                     else:
-                                        st.error(f"❌ O status do pagamento é: {status}.")
+                                        st.error("Erro ao computar créditos no banco. Contate o suporte.")
+                                                            
+                                elif status == "pending":
+                                    st.warning("⏳ O pagamento ainda consta como pendente. Aguarde um instante e tente novamente.")
                                 else:
-                                    st.error("Nenhum ID de pagamento encontrado na sessão.")
-            
-            # Botões de navegação inferiores organizados por colunas estáveis
-            st.markdown("<br>", unsafe_allow_html=True)
-            col_nav1, col_nav2 = st.columns(2)
-            with col_nav1:
-                if st.button("⬅️ Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_desde_planos"):
-                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                    st.rerun() 
-            with col_nav2:
-                if st.button("🔑 Voltar para o Login", use_container_width=True):
-                    st.session_state.opcao_menu = "login"
-                    st.rerun()
+                                    st.error(f"❌ O status do pagamento é: {status}.")
+                            else:
+                                st.error("Nenhum ID de pagamento encontrado na sessão.")
+        
+        # Botões de navegação inferiores organizados por colunas estáveis
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_nav1, col_nav2 = st.columns(2)
+        with col_nav1:
+            if st.button("⬅️ Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_desde_planos"):
+                st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                st.rerun() 
+        with col_nav2:
+            if st.button("🔑 Voltar para o Login", use_container_width=True):
+                st.session_state.opcao_menu = "login"
+                st.rerun()
 
-        st.stop()
+    st.stop()
 
 
     elif menu_atual == "💬 Conversar com Lucy":
