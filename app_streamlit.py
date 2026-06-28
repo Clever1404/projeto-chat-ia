@@ -2095,7 +2095,7 @@ def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
         st.rerun()
             
     if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True):
-        st.session_state.sub_visao == "planos"
+        st.session_state.opcao_menu = "planos"
         st.rerun()
             
     eh_admin = st.session_state.get("eh_admin", False)
@@ -2436,7 +2436,7 @@ with miolo_pagina.container():
                                     st.session_state.genero = genero
                                         
                                     # Redirecionamento limpo para a tela de planos
-                                    st.session_state.sub_visao == "planos"
+                                    st.session_state.opcao_menu = "planos"
                                     st.rerun()
                                         
                         except Exception as e: 
@@ -2457,7 +2457,7 @@ with miolo_pagina.container():
     elif menu_atual == "planos":
         # Template de planos sem st.sidebar interno
         # Garante o estado correto da navegação
-        st.session_state.sub_visao == "planos"
+        st.session_state.opcao_menu = "planos"
         # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
         st.markdown('<h1 style="text-align:center; color:#007bff; margin-bottom:15px;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
 
@@ -2615,21 +2615,11 @@ with miolo_pagina.container():
                 st.session_state.opcao_menu = "💬 Conversar com Lucy"
                 st.rerun() 
         with col_nav2:
-         ## ⚡ SOLUÇÃO INABALÁVEL PARA A TELA DE PLANOS
-            if st.button("🔑 Voltar para o Login", use_container_width=True, key="btn_quebra_trava_planos_login"):
-                # 1. Força a rota a mudar no exato milissegundo do clique
+         # ⚡ CORREÇÃO DEFINTIVA: Altere a rota global e use chaves estáveis
+            if st.button("🔑 Voltar para o Login", use_container_width=True, key="btn_retornar_login_desde_planos_final"):
                 st.session_state.opcao_menu = "login"
-                
-                # 2. Destrói o cache da sub-visão para não dar conflito gráfico no retorno
-                if "sub_visao" in st.session_state:
-                    st.session_state.sub_visao = "planos"
-                    
-                # 3. Limpa o UUID de visualização para a tela de login nascer 100% nova
-                if "login_view_uuid" in st.session_state:
-                    del st.session_state["login_view_uuid"]
-                    
-                # 4. Dispara o Rerun Global para o arquivo principal ler as novas configurações
-                st.rerun()
+                st.rerun()  # Reinicia o script global para o roteador ler a nova tela
+
         st.stop()
 
 
