@@ -594,7 +594,21 @@ def renderizar_chat_lucy_isolado():
             st.rerun(scope="fragment")
         return # Interrompe o resto do chat se estiver no fale conosco
 
-    meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
+    
+    #meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
+
+# ⚡ PROVIMENTO DE SEGURANÇA CONTRA DESLOGAMENTO SÚBITO (LINHA 597)
+    # Substitui a leitura crua por um resgate imune a falhas de atributo .get()
+    id_bruto = st.session_state.get("usuario_id")
+    
+    # Se o ID não existir ou for nulo (após logout), aborta a renderização do chat na hora
+    if id_bruto is None:
+        st.session_state.opcao_menu = "login"
+        st.st_stop() if hasattr(st, "st_stop") else st.stop()
+        
+    # Desempacota com segurança caso o banco retorne formatos em lista/tupla
+    meu_id_limpo = int(id_bruto if not isinstance(id_bruto, (tuple, list)) else id_bruto)
+
 
     # 2. ÁREA VISUAL FIXA DO TOPO (Nunca some)
     col_titulos, col_botoes_topo = st.columns([2, 1])
