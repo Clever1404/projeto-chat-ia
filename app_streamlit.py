@@ -2051,7 +2051,7 @@ menu_atual = st.session_state.opcao_menu
 # ==============================================================================
 if menu_atual not in ["home", "login", "cadastro"]:
     with st.sidebar:
-        # ... (código do seu avatar, perfil e plano cached que organizamos antes) ...
+        # 1. Perfil, Avatar e Consulta Cached do Plano (Mantenha aqui)
         # ==========================================================================
         # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO E MAIOR ---
         # ==========================================================================
@@ -2178,12 +2178,16 @@ if menu_atual not in ["home", "login", "cadastro"]:
                 if conn_foto:
                     liberar_conexao(conn_foto)
 
-   
+        st.markdown("---") # Divisor visual rápido
+
+        # 2. ⚡ CHAMADA ÚNICA DO FRAGMENTO DOS BOTÕES
         # ⚡ EXECUÇÃO DO FRAGMENTO: Substitua os botões soltos por esta chamada única
         renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual)
         
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
-        
+
+
+         # 3. Botão Encerrar Sessão (Mantido aqui fora por segurança global)
         # Botão Encerrar Sessão (Mantido fora do fragmento para limpar a sessão global do app)
          # ... (código do seu logout que estruturamos com pool) ...
         # ==========================================================================
