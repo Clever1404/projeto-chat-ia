@@ -1847,7 +1847,7 @@ def template_painel_admin():
 
         # --- COLUNA DO SEGUNDO GRÁFICO (PIZZA COMERCIAL) ---
         with g2: 
-             if salas_query.data:
+            if salas_query.data:
                 # 2. Cria o DataFrame dos usuários
                 df_usuarios = pd.DataFrame(salas_query.data)
                 
@@ -1869,7 +1869,7 @@ def template_painel_admin():
 
                 
 
-            # 4. CONTAGEM SEPARANDO O ADMIN DO VIP
+                # 4. CONTAGEM SEPARANDO O ADMIN DO VIP
                 is_admin = df_usuarios["tipo_plano_limpo"].str.contains("admin", na=False)
                 is_vip = df_usuarios["tipo_plano_limpo"].str.contains("vip", na=False) & (~is_admin) # VIP puro (sem admin)
                 is_gratis_puro = df_usuarios["tipo_plano_limpo"].str.contains("grátis|gratis", na=False)
