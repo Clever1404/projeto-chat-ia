@@ -1959,110 +1959,23 @@ except ImportError:
 # 8. ROTEADOR DE FLUXO GLOBAL (CORREÇÃO DE DIALOGS DUPLICADOS)
 # ==============================================================================
 
-# # 1. Garante os estados iniciais de navegação
+# 1. Garante os estados iniciais de navegação
 if "opcao_menu" not in st.session_state:
     st.session_state.opcao_menu = "home"
 
 menu_atual = st.session_state.opcao_menu
 
-# # ==============================================================================
-# # 2. BARRA LATERAL PROTEGIDA (BLOQUEIO ANTI-LOOP PARA TELAS PÚBLICAS)
-# # ==============================================================================
-# # Se o usuário estiver na Home, Login ou Cadastro, a Sidebar É IGNORADA por completo.
-# # Isso impede que o app tente ler dados inexistentes e trave a tela de login.
-# if menu_atual not in ["home", "login", "cadastro"]:
-    
-#     with st.sidebar:
-        
-
-
 # ==============================================================================
-# SUB-COMPONENTE: NOTIFICAÇÕES E BOTÕES DA SIDEBAR (ISOLADO EM FRAGMENTO)
+# 2. BARRA LATERAL PROTEGIDA (BLOQUEIO ANTI-LOOP PARA TELAS PÚBLICAS)
 # ==============================================================================
-# Ao isolar essa área, o Streamlit pode atualizar os botões e os alertas de convite
-# sem reiniciar o DOM global, impedindo que o modal @st.dialog feche sozinho.
-@st.fragment
-def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
-    possui_convite_pendente = False
-    
-    if id_usuario_logado:
-        conn_b = None
-        try:
-            meu_id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
-            conn_b = obter_conexao_eficiente()
-            with conn_b.cursor() as cursor_b:
-                cursor_b.execute(
-                    "SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", 
-                    (meu_id_limpo,)
-                )
-                count_res = cursor_b.fetchone()
-                if count_res and count_res[0] > 0: 
-                    possui_convite_pendente = True
-        except Exception: 
-            pass
-        finally:
-            if conn_b:
-                liberar_conexao(conn_b)
-
-    # Configura o rótulo do botão baseado na presença de convites
-    if possui_convite_pendente:
-        label_gestao = "🤝 ABRIR GESTÃO 🔴"
-        st.markdown("""
-            <div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'>
-                <span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        label_gestao = "🤝 ABRIR GESTÃO"
-
-    # Botões de Navegação Interna com chaves estáveis
-    if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel_final"):
-        st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
-        st.rerun()
-            
-    if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria_final"): 
-        st.session_state.opcao_menu = "📅 Disponibilidade"
-        st.rerun()
-            
-    if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_sidebar_loja_planos_final"):
-        st.session_state.opcao_menu = "planos"
-        st.rerun()
-            
-    eh_admin = st.session_state.get("eh_admin", False)
-    if eh_admin or str(username_atual).lower() in ['admin', 'cleverson', 'clever1404']:
-        if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm_final"):
-            st.session_state.opcao_menu = "🛠️ Painel Admin"
-            st.rerun()     
-
-    if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True, key="btn_limpar_ia_final"):
-        if id_usuario_logado:
-            conn = None
-            try:
-                id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
-                conn = obter_conexao_eficiente()
-                with conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (id_limpo,))
-                    conn.commit()
-                st.toast("Histórico limpo!")
-                time.sleep(0.5)
-                st.rerun()
-            except Exception as e: 
-                if conn: conn.rollback()
-                st.error(f"Erro ao limpar histórico: {e}")
-            finally:
-                if conn:
-                    liberar_conexao(conn)
-
-
-# ==============================================================================
-# CHAMADA DENTRO DO SEU WITH ST.SIDEBAR GLOBAL
-# ==============================================================================
+# Se o usuário estiver na Home, Login ou Cadastro, a Sidebar É IGNORADA por completo.
+# Isso impede que o app tente ler dados inexistentes e trave a tela de login.
 if menu_atual not in ["home", "login", "cadastro"]:
+    
     with st.sidebar:
-        # ... (código do seu avatar, perfil e plano cached que organizamos antes) ...
         # Coloque AQUI dentro todo aquele código da barra lateral que otimizamos:
         # (Avatar do usuário, busca cached de moedas, upload de foto, botão de logout, etc.)
-
+ 
         # ==========================================================================
         # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO E MAIOR ---
         # ==========================================================================
@@ -2188,15 +2101,84 @@ if menu_atual not in ["home", "login", "cadastro"]:
                 # ⚡ DEVOLUÇÃO OBRIGATÓRIA AO POOL
                 if conn_foto:
                     liberar_conexao(conn_foto)
+                    
+        # ==============================================================================
+        # --- CONSULTA 2: MOTOR DE BUSCA DA NOTIFICAÇÃO (BLINDADO COM POOL) ---
+        # ==============================================================================
+        possui_convite_pendente = False
+        if id_usuario_logado:
+            conn_b = None
+            try:
+                meu_id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
+                
+                # Busca instantânea reutilizando uma conexão aquecida do Pool
+                conn_b = obter_conexao_eficiente()
+                with conn_b.cursor() as cursor_b:
+                    cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
+                    count_res = cursor_b.fetchone()
+                    if count_res and count_res > 0: 
+                        possui_convite_pendente = True
+            except Exception: 
+                pass
+            finally:
+                if conn_b:
+                    liberar_conexao(conn_b)  # ⚡ DEVOLUÇÃO OBRIGATÓRIA AO POOL
 
+        # Configura o rótulo do botão baseado na presença de convites
+        if possui_convite_pendente:
+            label_gestao = "🤝 ABRIR GESTÃO 🔴"
+            st.markdown("""
+                <div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'>
+                    <span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            label_gestao = "🤝 ABRIR GESTÃO"
 
-        # ⚡ EXECUÇÃO DO FRAGMENTO: Substitua os botões soltos por esta chamada única
-        renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual)
-        
+        # ==========================================================================
+        # --- BOTÕES DE NAVEGAÇÃO INTERNA (TODOS COM CHAVES FIXAS ESTÁVEIS) ---
+        # ==========================================================================              
+        if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel"):
+                st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
+                st.rerun()
+                
+        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria_final"): 
+            st.session_state.opcao_menu = "📅 Disponibilidade"
+            st.rerun()
+                
+        if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_sidebar_loja_planos_final"):
+            st.session_state.opcao_menu = "planos"
+            st.rerun()
+                
+        # Validação de privilégios administrativos segura
+        eh_admin = st.session_state.get("eh_admin", False)
+        if eh_admin or str(st.session_state.get("username", "")).lower() in ['admin', 'cleverson', 'clever1404']:
+            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm_final"):
+                st.session_state.opcao_menu = "🛠️ Painel Admin"
+                st.rerun()     
+
+        if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True, key="btn_limpar_ia_final"):
+            if id_usuario_logado:
+                conn = None
+                try:
+                    id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
+                    conn = obter_conexao_eficiente()
+                    with conn.cursor() as cursor:
+                        cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (id_limpo,))
+                        conn.commit()
+                    
+                    st.toast("Histórico limpo!")
+                    time.sleep(0.5)
+                    st.rerun()
+                except Exception as e: 
+                    if conn: conn.rollback()
+                    st.error(f"Erro ao limpar histórico: {e}")
+                finally:
+                    if conn:
+                        liberar_conexao(conn)  # ⚡ DEVOLUÇÃO OBRIGATÓRIA AO POOL
+
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
-        
-        # Botão Encerrar Sessão (Mantido fora do fragmento para limpar a sessão global do app)
-        # ... (código do seu logout que estruturamos com pool) ..      
+            
         # ==========================================================================
         # --- BOTÃO: ENCERRAR SESSÃO (LOGOUT 100% BLINDADO E SEGURO) ---
         # ==========================================================================
