@@ -2505,7 +2505,7 @@ with miolo_pagina.container():
                     st.html(
                         """
                         <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
-                            <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+                            <strong style="color: #6e7681; font-size: 3.1em;">⚪ Plano Grátis</strong><br>
                             <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
                         </div>
                         """
@@ -2515,8 +2515,8 @@ with miolo_pagina.container():
                     # PARTE 2: Área de Checkout (Integrada no mesmo retângulo)
                     st.html(
                         """
-                        <div style="text-align: left; border-left: 4px solid primary; padding-left: 15px;">
-                            <strong style="color: #6e7681; font-size: 1.1em;">### 🛒 Realizar Pagamento</strong><br>  
+                        <div style="text-align: left; border-left: 4px solid #ffffff; padding-left: 15px;">
+                            <strong style="color: #007bff; font-size: 1.1em;">### 🛒 Realizar Pagamento</strong><br>  
                         </div>
                         """
                     )
@@ -2615,9 +2615,10 @@ with miolo_pagina.container():
                 st.session_state.opcao_menu = "💬 Conversar com Lucy"
                 st.rerun() 
         with col_nav2:
-            if st.button("🔑 Voltar para o Login", use_container_width=True):
-                renderizar_tela_login_definitiva()
-                st.rerun()
+         # ⚡ CORREÇÃO DEFINTIVA: Altere a rota global e use chaves estáveis
+            if st.button("🔑 Voltar para o Login", use_container_width=True, key="btn_retornar_login_desde_planos_final"):
+                st.session_state.opcao_menu = "login"
+                st.rerun()  # Reinicia o script global para o roteador ler a nova tela
 
         st.stop()
 
