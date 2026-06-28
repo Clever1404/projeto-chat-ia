@@ -2521,7 +2521,7 @@ with miolo_pagina.container():
                         """
                     )
                     #st.markdown("### 🛒 Realizar Pagamento")
-                        id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
+                    id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
                     
                         opcoes_compra = st.radio(
                             "Escolha uma opção para recarga:", 
