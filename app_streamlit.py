@@ -47,6 +47,56 @@ if "foto_perfil" not in st.session_state:
 # Armazena o menu em uma variável local limpa
 menu_atual = st.session_state.opcao_menu
 
+# ==============================================================================
+# 1. GERENCIADOR DE LOGOUT RÁPIDO (TOPO DO SCRIPT - ANTES DA SIDEBAR)
+# ==============================================================================
+# Se a rota de logout for acionada, ela limpa tudo aqui no topo em microssegundos
+if st.session_state.get("opcao_menu") == "executar_logout_imediato":
+    id_usuario_logado = st.session_state.get("usuario_id")
+    
+    if id_usuario_logado:
+        conn_logout = None
+        try:
+            id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
+            conn_logout = obter_conexao_eficiente()
+            with conn_logout.cursor() as cursor_logout:
+                cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (id_limpo,))
+                conn_logout.commit()
+        except Exception:
+            if conn_logout: conn_logout.rollback()
+        finally:
+            if conn_logout: 
+                liberar_conexao(conn_logout)
+    
+    # Reseta as chaves essenciais na memória sem destruir o dicionário do Streamlit
+    st.session_state.usuario_id = None
+    st.session_state.id_usuario = None
+    st.session_state.username = None
+    st.session_state.foto_perfil = ""
+    st.session_state.opcao_menu = "login"
+    st.session_state.form_seed = 42
+    st.rerun()
+
+# Captura o menu estável para o restante do arquivo
+menu_atual = st.session_state.get("opcao_menu", "home")
+
+# ==============================================================================
+# 2. BARRA LATERAL PROTEGIDA
+# ==============================================================================
+if menu_atual not in ["home", "login", "cadastro", "executar_logout_imediato"]:
+    with st.sidebar:
+        # ... (código do seu avatar, perfil e plano cached que organizamos) ...
+        
+        # ⚡ EXECUÇÃO DO FRAGMENTO DOS BOTÕES INTERNOS
+        renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual)
+        
+        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
+        
+        # ⚡ BOTÃO DE LOGOUT OTIMIZADO: Apenas altera a rota para o gatilho do topo interceptar
+        if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema_final"):
+            st.session_state.opcao_menu = "executar_logout_imediato"
+            st.rerun()
+
 
 # st.title("⚡ Diagnóstico de Conexão: Streamlit ⇄ Supabase")
 # # --- INICIALIZAÇÃO DO SUPABASE ---
@@ -2320,33 +2370,33 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
 
 
-         # 3. Botão Encerrar Sessão (Mantido aqui fora por segurança global)
-        # Botão Encerrar Sessão (Mantido fora do fragmento para limpar a sessão global do app)
-         # ... (código do seu logout que estruturamos com pool) ...
-        # ==========================================================================
-        # --- BOTÃO: ENCERRAR SESSÃO (LOGOUT 100% BLINDADO E SEGURO) ---
-        # ==========================================================================
-        if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema_final"):
-            if id_usuario_logado:
-                conn_logout = None
-                try:
-                    id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
+        #  # 3. Botão Encerrar Sessão (Mantido aqui fora por segurança global)
+        # # Botão Encerrar Sessão (Mantido fora do fragmento para limpar a sessão global do app)
+        #  # ... (código do seu logout que estruturamos com pool) ...
+        # # ==========================================================================
+        # # --- BOTÃO: ENCERRAR SESSÃO (LOGOUT 100% BLINDADO E SEGURO) ---
+        # # ==========================================================================
+        # if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema_final"):
+        #     if id_usuario_logado:
+        #         conn_logout = None
+        #         try:
+        #             id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
                     
-                    conn_logout = obter_conexao_eficiente()
-                    with conn_logout.cursor() as cursor_logout:
-                        cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (id_limpo,))
-                        conn_logout.commit()
-                except Exception as e:
-                    if conn_logout: 
-                        conn_logout.rollback()
-                    st.sidebar.error(f"Erro no banco ao deslogar: {e}")
-                finally:
-                    if conn_logout:
-                        liberar_conexao(conn_logout)  # ⚡ DEVOLUÇÃO OBRIGATÓRIA AO POOL
+        #             conn_logout = obter_conexao_eficiente()
+        #             with conn_logout.cursor() as cursor_logout:
+        #                 cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (id_limpo,))
+        #                 conn_logout.commit()
+        #         except Exception as e:
+        #             if conn_logout: 
+        #                 conn_logout.rollback()
+        #             st.sidebar.error(f"Erro no banco ao deslogar: {e}")
+        #         finally:
+        #             if conn_logout:
+        #                 liberar_conexao(conn_logout)  # ⚡ DEVOLUÇÃO OBRIGATÓRIA AO POOL
             
-            # Limpa toda a memória residual do navegador
-            for chave in list(st.session_state.keys()):
-                del st.session_state[chave]
+        #     # Limpa toda a memória residual do navegador
+        #     for chave in list(st.session_state.keys()):
+        #         del st.session_state[chave]
                 
             # # Restabelece os estados padrão iniciais para o roteador abrir o Login limpo
             # st.session_state.usuario_id = None
