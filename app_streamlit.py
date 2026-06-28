@@ -2137,7 +2137,7 @@ menu_atual = st.session_state.opcao_menu
 # ==============================================================================
 # CHAMADA DENTRO DO SEU WITH ST.SIDEBAR GLOBAL
 # ==============================================================================
-if menu_atual not in ["home", "login", "cadastro"]:
+if menu_atual not in ["home", "login", "cadastro", "planos"]:
     with st.sidebar:
         # 1. Perfil, Avatar e Consulta Cached do Plano (Mantenha aqui)
         # ==========================================================================
@@ -2497,15 +2497,36 @@ with miolo_pagina.container():
                 # Divisor visual interno discreto
                 st.markdown("<hr style='border-color: #30363d; margin: 15px 0;'>", unsafe_allow_html=True)
                 
-                # PARTE 2: Área de Checkout (Integrada no mesmo retângulo)
-                st.markdown("### 🛒 Realizar Pagamento")
-                id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
                 
-                opcoes_compra = st.radio(
-                    "Escolha uma opção para recarga:", 
-                    ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"],
-                    key="radio_opcao_compra_estatico"
-                )
+                # PARTE 2: Descrição dos Planos (Duas partes de benefícios lado a lado)
+                st.markdown('<h3 style="text-align: center; color: #f0f6fc; margin-bottom: 20px;">Escolha o Plano Ideal para Você</h3>', unsafe_allow_html=True)
+                
+                col_plano_3, col_plano_4 = st.columns(2)
+                
+                with col_plano_3:
+                    st.html(
+                        """
+                        <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+                            <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
+                            <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+                        </div>
+                        """
+                    )
+                    
+                with col_plano_4:
+                     # PARTE 2: Área de Checkout (Integrada no mesmo retângulo)
+                    st.markdown("### 🛒 Realizar Pagamento")
+                    id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
+                    
+                    opcoes_compra = st.radio(
+                        "Escolha uma opção para recarga:", 
+                        ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"],
+                        key="radio_opcao_compra_estatico"
+                    )
+
+                # Divisor visual interno discreto
+                st.markdown("<hr style='border-color: #30363d; margin: 15px 0;'>", unsafe_allow_html=True)             
+               
                 
                 if st.button("Gerar Pix de Pagamento", use_container_width=True, type="secondary", key="btn_gerar_pix_planos"):
                     valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
@@ -2590,7 +2611,7 @@ with miolo_pagina.container():
                 st.rerun() 
         with col_nav2:
             if st.button("🔑 Voltar para o Login", use_container_width=True):
-                st.session_state.opcao_menu = "login"
+                renderizar_tela_login_definitiva()
                 st.rerun()
 
         st.stop()
