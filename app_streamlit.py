@@ -1263,7 +1263,7 @@ def template_sala_privada():
                 
         if st.button("🚪 Sair da Sala Privada", type="primary", use_container_width=True, key="btn_sair_sala_p"):
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
-            st.rerun(scope="fragment") # Fecha o escopo isoladamente
+            st.rerun() 
             
         if st.button("🗑️ Limpar Histórico do Chat", type="secondary", use_container_width=True, key="btn_limpar_hist_p"):
             if limpar_historico_sala(match_id):
@@ -1749,76 +1749,185 @@ def template_painel_admin():
         g1, g2 = st.columns(2)
         with g1:
             pode_gerar_grafico = False
-            if usuarios_planos_brutos:
-                df_dados_brutos = pd.DataFrame(usuarios_planos_brutos)
+
+            if salas_query.data:
+                df_dados_brutos = pd.DataFrame(salas_query.data)
+                
                 if "ultima_recarga" in df_dados_brutos.columns and "moedas" in df_dados_brutos.columns:
                     df_filtrado = df_dados_brutos.dropna(subset=["ultima_recarga"]).copy()
+                    
                     if not df_filtrado.empty:
+                        # Converte para data real
                         df_filtrado["data"] = pd.to_datetime(df_filtrado["ultima_recarga"]).dt.date
-                        df_creditos = df_filtrado.groupby("data")["moedas"].sum().reset_index(name="quantidade_creditos")
+                        
+                        # Agrupa moedas por dia
+                        df_creditos = (
+                            df_filtrado.groupby("data")["moedas"]
+                            .sum()
+                            .reset_index(name="quantidade_creditos")
+                        )
+                        
+                        # Ordena por data antes de calcular o dia da semana
                         df_creditos = df_creditos.sort_values("data")
                         
+                        # --- TRATAMENTO DOS DIAS DA SEMANA EM PORTUGUÊS ---
+                        # Converte a coluna agrupada para datetime para extrair o nome do dia
                         df_creditos["data_dt"] = pd.to_datetime(df_creditos["data"])
-                        dias_pt = {"Monday": "Segunda", "Tuesday": "Terça", "Wednesday": "Quarta", "Thursday": "Quinta", "Friday": "Sexta", "Saturday": "Sábado", "Sunday": "Domingo"}
+                        
+                        # Mapeamento de inglês (padrão do pandas) para português
+                        dias_pt = {
+                            "Monday": "Segunda",
+                            "Tuesday": "Terça",
+                            "Wednesday": "Quarta",
+                            "Thursday": "Quinta",
+                            "Friday": "Sexta",
+                            "Saturday": "Sábado",
+                            "Sunday": "Domingo"
+                        }
+                        
+                        # Cria a nova coluna com os nomes em português
                         df_creditos["dia_semana"] = df_creditos["data_dt"].dt.day_name().map(dias_pt)
+                        # --------------------------------------------------
 
                         if df_creditos["quantidade_creditos"].sum() > 0:
                             pode_gerar_grafico = True
 
             if pode_gerar_grafico:
                 try:
+                    # Cálculos do acumulado da semana
                     df_creditos["cum_sum"] = df_creditos["quantidade_creditos"].cumsum()
-                    df_creditos["cum_percentage"] = (df_creditos["cum_sum"] / df_creditos["quantidade_creditos"].sum()) * 100
+                    df_creditos["cum_percentage"] = (
+                        df_creditos["cum_sum"] / df_creditos["quantidade_creditos"].sum()
+                    ) * 100
 
                     fig_pareto = go.Figure()
-                    fig_pareto.add_trace(go.Bar(x=df_creditos["dia_semana"], y=df_creditos["quantidade_creditos"], name="Recargas no Dia", marker_color="#007bff"))
-                    fig_pareto.add_trace(go.Scatter(x=df_creditos["dia_semana"], y=df_creditos["cum_percentage"], name="% Acumulada", yaxis="y2", line=dict(color="#28a745", width=3)))
+                        
+                    # Barras de volume individual usando 'dia_semana' no eixo X
+                    fig_pareto.add_trace(
+                        go.Bar(
+                            x=df_creditos["dia_semana"],
+                            y=df_creditos["quantidade_creditos"],
+                            name="Recargas no Dia",
+                            marker_color="#007bff",
+                        )
+                    )
+                        
+                    # Linha de tendência acumulada usando 'dia_semana' no eixo X
+                    fig_pareto.add_trace(
+                        go.Scatter(
+                            x=df_creditos["dia_semana"],
+                            y=df_creditos["cum_percentage"],
+                            name="% Acumulada da Semana",
+                            yaxis="y2",
+                            line=dict(color="#28a745", width=3),
+                        )
+                    )
 
-                    # Configuração segura do layout do gráfico de Pareto
+                    # Configuração segura do layout
                     fig_pareto.update_layout(
-                        title="Soma de Recargas Semanal",
-                        yaxis=dict(title="Moedas"),
-                        yaxis2=dict(title="Acumulado (%)", overlaying="y", side="right", range=[0, 105]),
-                        template="plotly_dark", 
-                        paper_bgcolor="#161b22", 
+                        title="Soma de Recargas e Tendência Acumulada Semanal",
+                        yaxis=dict(title="Quantidade de Moedas"),
+                        yaxis2=dict(
+                            title="Percentual Acumulado (%)",
+                            overlaying="y",
+                            side="right",
+                            range=[0, 105],
+                        ),
+                        template="plotly_dark",
+                        paper_bgcolor="#161b22",
                         plot_bgcolor="#161b22",
                         legend=dict(orientation="h", y=1.1), 
-                        height=240 
                     )
                     st.plotly_chart(fig_pareto, use_container_width=True)
-                except Exception as err: 
-                    st.warning(f"⚠️ Erro no gráfico: {err}") 
-            else: 
-                st.info("ℹ️ Nenhuma atividade de recarga registrada.") 
+                        
+                except Exception as erro_plotly:
+                    st.warning(f"⚠️ Erro interno ao desenhar o gráfico: {erro_plotly}")
+            else:
+                st.info("ℹ️ Nenhuma atividade de recarga registrada para esta semana.")
 
         # --- COLUNA DO SEGUNDO GRÁFICO (PIZZA COMERCIAL) ---
         with g2: 
-            if usuarios_planos_brutos: 
-                df_usuarios = pd.DataFrame(usuarios_planos_brutos) 
-                df_usuarios["tipo_plano_limpo"] = df_usuarios["tipo_plano"].astype(str).str.strip().str.lower() 
-                df_usuarios["moedas"] = df_usuarios["moedas"].fillna(0).astype(int) 
+             if salas_query.data:
+                # 2. Cria o DataFrame dos usuários
+                df_usuarios = pd.DataFrame(salas_query.data)
+                
+                # --- PROCESSAMENTO DO GRÁFICO DE PIZZA CORRIGIDO ---
+                # 3. PADRONIZAÇÃO: Remove espaços e força minúsculas
+                df_usuarios["tipo_plano_limpo"] = df_usuarios["tipo_plano"].astype(str).str.strip().str.lower()
+                df_usuarios["moedas"] = df_usuarios["moedas"].fillna(0).astype(int)
+                
+                # --- FILTRO NA BARRA LATERAL ---
+                # 1. Cabeçalho principal da barra lateral
+                st.sidebar.subheader("⚙️ Configurações do Painel")
 
-                is_admin = df_usuarios["tipo_plano_limpo"].str.contains("admin", na=False) 
-                is_vip = df_usuarios["tipo_plano_limpo"].str.contains("vip", na=False) & (~is_admin) 
-                is_gratis_puro = df_usuarios["tipo_plano_limpo"].str.contains("grátis|gratis", na=False) 
-                is_plano_credito = df_usuarios["tipo_plano_limpo"].str.contains("crédito|credito|moeda", na=False) | (is_gratis_puro & (df_usuarios["moedas"] > 0)) 
-                is_gratis_real = is_gratis_puro & (df_usuarios["moedas"] == 0) 
+                # 2. Caixa de seleção (Selectbox)
+                visao_perfil = st.sidebar.selectbox(
+                    "Visualizar no gráfico:",
+                    options=["Apenas Clientes", "Todos (Incluir Admin)"],
+                    index=0 # Padrão: Mostra apenas clientes para não distorcer a visão comercial
+                )
 
-                # Aplicação segura da configuração do seletor lateral extraindo [0] para dimensão do shape
-                if visao_perfil == "Apenas Clientes": 
-                    labels = ["Assinantes VIP", "Plano Créditos", "Plano Grátis"] 
-                    values = [int(df_usuarios[is_vip].shape[0]), int(df_usuarios[is_plano_credito].shape[0]), int(df_usuarios[is_gratis_real].shape[0])] 
-                    colors = ["#e3b341", "#1f6feb", "#6e7681"] 
-                else: 
-                    labels = ["Assinantes VIP", "Plano Créditos", "Plano Grátis", "Administradores"] 
-                    values = [int(df_usuarios[is_vip].shape[0]), int(df_usuarios[is_plano_credito].shape[0]), int(df_usuarios[is_gratis_real].shape[0]), int(df_usuarios[is_admin].shape[0])] 
-                    colors = ["#e3b341", "#1f6feb", "#6e7681", "#ef4444"] 
+                
 
-                # Renderização correta da pizza usando go.Pie com hole parametrizado
-                fig_pizza = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.3, marker=dict(colors=colors))]) 
-                fig_pizza.update_layout(title="Distribuição Comercial de Planos", template="plotly_dark", paper_bgcolor="#161b22", plot_bgcolor="#161b22", height=240, legend=dict(orientation="h", y=-0.1)) 
-                st.plotly_chart(fig_pizza, use_container_width=True) 
+            # 4. CONTAGEM SEPARANDO O ADMIN DO VIP
+                is_admin = df_usuarios["tipo_plano_limpo"].str.contains("admin", na=False)
+                is_vip = df_usuarios["tipo_plano_limpo"].str.contains("vip", na=False) & (~is_admin) # VIP puro (sem admin)
+                is_gratis_puro = df_usuarios["tipo_plano_limpo"].str.contains("grátis|gratis", na=False)
+                
+                is_plano_credito = (
+                    df_usuarios["tipo_plano_limpo"].str.contains("crédito|credito|moeda", na=False) | 
+                    (is_gratis_puro & (df_usuarios["moedas"] > 0))
+                )
+                is_gratis_real = is_gratis_puro & (df_usuarios["moedas"] == 0)
+                
+                # Criação das 4 variáveis para evitar o NameError
+                val_vip = int(df_usuarios[is_vip].shape[0])
+                val_admin = int(df_usuarios[is_admin].shape[0]) # 🌟 Criada a variável que faltava!
+                val_credito = int(df_usuarios[is_plano_credito].shape[0])
+                val_gratis = int(df_usuarios[is_gratis_real].shape[0])
+                
+                # 5. Monta o DataFrame final da pizza com as 4 categorias livres de erros
+                df_pizza = pd.DataFrame({
+                    "Categoria": ["VIP", "Admin", "Plano Crédito de Moedas", "Grátis"],
+                    "Total": [val_vip, val_admin, val_credito, val_gratis]
+                })
+                
+                # Quatro cores para mapear as quatro fatias (Amarelo adicionado para o Admin)
+                cores_pizza = ["#6f42c1", "#ffc107", "#28a745", "#007bff"]
+                
+                # 6. Monta a estrutura de dados baseada na escolha do filtro lateral
+                if visao_perfil == "Apenas Clientes":
+                    df_pizza = pd.DataFrame({
+                        "Categoria": ["VIP", "Plano Crédito de Moedas", "Grátis"],
+                        "Total": [val_vip, val_credito, val_gratis]
+                    })
+                    cores_pizza = ["#6f42c1", "#28a745", "#007bff"]  # Roxo, Verde, Azul
+                else:
+                    df_pizza = pd.DataFrame({
+                        "Categoria": ["VIP", "Admin", "Plano Crédito de Moedas", "Grátis"],
+                        "Total": [val_vip, val_admin, val_credito, val_gratis]
+                    })
+                    cores_pizza = ["#6f42c1", "#ffc107", "#28a745", "#007bff"]  # Roxo, Amarelo, Verde, Azul
+                
+                # 7. Gera e estiliza o gráfico de pizza
+                if df_pizza["Total"].sum() > 0:
+                    fig_pizza = px.pie(
+                        df_pizza, 
+                        values="Total", 
+                        names="Categoria",
+                        title=f"Distribuição de Perfis ({visao_perfil})",
+                        color_discrete_sequence=cores_pizza
+                    )
+                    fig_pizza.update_layout(template="plotly_dark", paper_bgcolor="#161b22")
+                    st.plotly_chart(fig_pizza, use_container_width=True)
+                else:
+                    st.info("ℹ️ Nenhum dado de perfil disponível para gerar a distribuição.")
+            else:
+                st.warning("⚠️ Não foi possível recuperar dados do banco.")
 
+
+
+        st.markdown("---")
  
     # ==============================================================================
     # ABA 2: MODERAÇÃO DE CONTAS E BARRA DE BUSCA AVANÇADA
@@ -2354,7 +2463,153 @@ with miolo_pagina.container():
             st.rerun()
 
         st.stop()
-        
+
+
+    elif menu_atual == "planos":
+        # Template de planos sem st.sidebar interno
+        # Garante o estado correto da navegação
+        st.session_state.opcao_menu = "planos"
+        if "sub_visao" not in st.session_state:
+            st.session_state.sub_visao = "planos"
+
+        # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
+            st.markdown('<h1 style="text-align:center; color:#007bff; margin-bottom:15px;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
+
+            # --- CONTÊINER PRINCIPAL ÚNICO ---
+            # Centraliza o container simulando o max-width de 800px via colunas do Streamlit
+            _, col_central, _ = st.columns([1, 8, 1])
+
+            with col_central:
+                # st.container com borda cria o retângulo unificado
+                with st.container(border=True):
+                    
+                    # PARTE 1: Descrição dos Planos (Duas partes de benefícios lado a lado)
+                    st.markdown('<h3 style="text-align: center; color: #f0f6fc; margin-bottom: 20px;">Escolha o Plano Ideal para Você</h3>', unsafe_allow_html=True)
+                    
+                    col_plano_1, col_plano_2 = st.columns(2)
+                    
+                    with col_plano_1:
+                        st.html(
+                            """
+                            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px; min-height: 140px;">
+                                <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
+                                <span style="color: #c9d1d9; font-size: 0.95em;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais e Sala Privada por tempo indeterminado.</span>
+                            </div>
+                            """
+                        )
+                        
+                    with col_plano_2:
+                        st.html(
+                            """
+                            <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px; min-height: 140px;">
+                                <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
+                                <span style="color: #c9d1d9; font-size: 0.95em;">Busca de matches e encontros inclusos. O uso da Sala Privada consome créditos: <strong>10 moedas equivalem a 10 minutos</strong> de conversa.</span>
+                            </div>
+                            """
+                        )
+
+                    # Divisor visual interno discreto
+                    st.markdown("<hr style='border-color: #30363d; margin: 15px 0;'>", unsafe_allow_html=True)
+                    
+                    # PARTE 2: Área de Checkout (Integrada no mesmo retângulo)
+                    st.markdown("### 🛒 Realizar Pagamento")
+                    id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
+                    
+                    opcoes_compra = st.radio(
+                        "Escolha uma opção para recarga:", 
+                        ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"],
+                        key="radio_opcao_compra_estatico"
+                    )
+                    
+                    if st.button("Gerar Pix de Pagamento", use_container_width=True, type="secondary", key="btn_gerar_pix_planos"):
+                        valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
+                        id_limpo = id_usuario if not isinstance(id_usuario, (list, tuple)) else id_usuario
+                        
+                        payment_data = {
+                            "transaction_amount": valor, 
+                            "description": desc, 
+                            "payment_method_id": "pix",
+                            "payer": {"email": "cliente@email.com"}, 
+                            "external_reference": f"{id_limpo}:{tipo}"
+                        }
+                            
+                        try:
+                            payment_response = sdk.payment().create(payment_data)
+                            payment = payment_response["response"]
+                                
+                            if "point_of_interaction" in payment:
+                                st.session_state.id_pagamento_pendente = payment["id"]
+                                st.session_state.tipo_pagamento_pendente = tipo
+                                st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+                                st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+                                st.success("Pix gerado com sucesso!")
+                                st.rerun()
+                        except Exception as e: 
+                            st.error(f"Erro ao gerar pagamento: {e}")
+
+                    # Renderiza o QR Code dentro do mesmo bloco se estiver ativo
+                    if st.session_state.get("qr_code_img"):
+                        st.markdown("<hr style='border-color: #30363d; margin: 15px 0;'>", unsafe_allow_html=True)
+                        st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
+                        
+                        col_qr, col_txt = st.columns([1, 1.5])
+                        with col_qr:
+                            import base64
+                            st.image(base64.b64decode(st.session_state.qr_code_img), width=200)
+                        with col_txt:
+                            st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=80, key="txt_area_copia_cola_estatica")
+                                    
+                            if st.button("🔄 Já realizei o pagamento", type="primary", use_container_width=True, key="btn_verificar_status_pix_final"):
+                                id_pagamento = st.session_state.get("id_pagamento_pendente")
+                                
+                                if id_pagamento:
+                                    with st.spinner("Verificando compensação do Pix..."):
+                                        status = verificar_status_pix(id_pagamento)
+                                    
+                                    if status == "approved":
+                                        st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
+                                        tipo = st.session_state.get("tipo_pagamento_pendente")
+                                        
+                                        sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo)
+                                        
+                                        if sucesso_banco:
+                                            st.toast("Sua conta foi atualizada com sucesso!")
+                                            
+                                            for chave in ["qr_code_img", "qr_code_texto", "id_pagamento_pendente", "tipo_pagamento_pendente"]:
+                                                if chave in st.session_state:
+                                                    del st.session_state[chave]
+                                                    
+                                            if "abrir_popup_loja" in st.session_state:
+                                                st.session_state.abrir_popup_loja = False
+                                                
+                                            import time
+                                            time.sleep(0.5)
+                                            st.rerun()
+                                        else:
+                                            st.error("Erro ao computar créditos no banco. Contate o suporte.")
+                                                                
+                                    elif status == "pending":
+                                        st.warning("⏳ O pagamento ainda consta como pendente. Aguarde um instante e tente novamente.")
+                                    else:
+                                        st.error(f"❌ O status do pagamento é: {status}.")
+                                else:
+                                    st.error("Nenhum ID de pagamento encontrado na sessão.")
+            
+            # Botões de navegação inferiores organizados por colunas estáveis
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_nav1, col_nav2 = st.columns(2)
+            with col_nav1:
+                if st.button("⬅️ Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_desde_planos"):
+                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                    st.rerun() 
+            with col_nav2:
+                if st.button("🔑 Voltar para o Login", use_container_width=True):
+                    st.session_state.opcao_menu = "login"
+                    st.rerun()
+
+        st.stop()
+
+
     elif menu_atual == "💬 Conversar com Lucy":
         renderizar_chat_lucy_isolado()
         st.stop()
@@ -2366,145 +2621,8 @@ with miolo_pagina.container():
     elif menu_atual == "🤝 Gerenciar Conexões":
         template_gerenciar_conexoes()
         st.stop()
-        
-        
-    elif menu_atual == "planos":
-        # Template de planos sem st.sidebar interno
-        # Garante o estado correto da navegação
-        st.session_state.opcao_menu = "planos"
-        if "sub_visao" not in st.session_state:
-            st.session_state.sub_visao = "planos"
-
-        # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
-        if st.session_state.sub_visao == "planos":
-            st.markdown('<h1 style="text-align:center; color:#007bff; margin-bottom:15px;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
-
-            # Texto descritivo dos planos centralizado
-            st.html(
-                """
-                <div style="text-align: center; max-width: 800px; margin: 0 auto; background-color: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 25px;">
-                    <h3 style="color: #f0f6fc; margin-bottom: 15px;">Escolha o Plano Ideal para Você</h3>
-                        
-                    <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #28a745; padding-left: 15px;">
-                        <strong style="color: #28a745; font-size: 1.1em;">⭐ Plano Assinante (Acesso Total)</strong><br>
-                        <span style="color: #c9d1d9;">Acesso ilimitado à conversa com a Lucy IA, busca de matches, agendamento de encontros virtuais com videochamada e tempo indeterminado de uso na Sala Privada.</span>
-                    </div>
-                        
-                    <div style="margin-bottom: 20px; text-align: left; border-left: 4px solid #007bff; padding-left: 15px;">
-                        <strong style="color: #007bff; font-size: 1.1em;">🪙 Plano Crédito de Moedas</strong><br>
-                        <span style="color: #c9d1d9;">Conversa com a Lucy IA, busca de matches e agendamento de encontros com videochamada. O uso da Sala Privada consome créditos: <strong>a cada 10 moedas, você ganha 10 minutos de conversa</strong> na sala privada.</span>
-                    </div>
-                        
-                    <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
-                        <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
-                        <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
-                    </div>
-                </div>
-                """        
-            )
-
-            # ==========================================================================
-            # --- ÁREA DE CHECKOUT (Mover do st.sidebar para o contêiner principal) ---
-            # ==========================================================================
-            
-            st.markdown("### 🛒 Realizar Pagamento")
-            id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
-            
-            opcoes_compra = st.radio(
-                "Escolha uma opção para recarga:", 
-                ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"],
-                key="radio_opcao_compra_estatico"
-            )
-            
-            if st.button("Gerar Pix de Pagamento", use_container_width=True, type="secondary", key="btn_gerar_pix_planos"):
-                valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
-                id_limpo = id_usuario if not isinstance(id_usuario, (list, tuple)) else id_usuario
-                
-                payment_data = {
-                    "transaction_amount": valor, 
-                    "description": desc, 
-                    "payment_method_id": "pix",
-                    "payer": {"email": "cliente@email.com"}, 
-                    "external_reference": f"{id_limpo}:{tipo}"
-                }
-                    
-                try:
-                    payment_response = sdk.payment().create(payment_data)
-                    payment = payment_response["response"]
-                        
-                    if "point_of_interaction" in payment:
-                        st.session_state.id_pagamento_pendente = payment["id"]
-                        st.session_state.tipo_pagamento_pendente = tipo
-                        st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
-                        st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
-                        st.success("Pix gerado com sucesso!")
-                        st.rerun()
-                except Exception as e: 
-                    st.error(f"Erro ao gerar pagamento: {e}")
-
-            # Renderiza o QR Code e o formulário de validação no corpo da página
-            if st.session_state.get("qr_code_img"):
-                st.markdown("---")
-                st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
-                
-                col_qr, col_txt = st.columns([1, 2])
-                with col_qr:
-                    st.image(base64.b64decode(st.session_state.qr_code_img), width=220)
-                with col_txt:
-                    st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=90, key="txt_area_copia_cola_estatica")
-                            
-                    if st.button("🔄 Já realizei o pagamento", type="primary", use_container_width=True, key="btn_verificar_status_pix_final"):
-                        id_pagamento = st.session_state.get("id_pagamento_pendente")
-                        
-                        if id_pagamento:
-                            with st.spinner("Verificando compensação do Pix..."):
-                                status = verificar_status_pix(id_pagamento)
-                            
-                            if status == "approved":
-                                st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
-                                tipo = st.session_state.get("tipo_pagamento_pendente")
-                                
-                                # Chama a atualização atômica de banco e sessão que otimizamos
-                                sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo)
-                                
-                                if sucesso_banco:
-                                    st.toast("Sua conta foi atualizada com sucesso!")
-                                    
-                                    # Limpeza explícita de chaves após sucesso
-                                    for chave in ["qr_code_img", "qr_code_texto", "id_pagamento_pendente", "tipo_pagamento_pendente"]:
-                                        if chave in st.session_state:
-                                            del st.session_state[chave]
-                                            
-                                    if "abrir_popup_loja" in st.session_state:
-                                        st.session_state.abrir_popup_loja = False
-                                        
-                                    time.sleep(0.5)  # Delay reduzido drasticamente para resposta imediata
-                                    st.rerun()
-                                else:
-                                    st.error("Erro ao computar créditos no banco. Contate o suporte.")
-                                                        
-                            elif status == "pending":
-                                st.warning("⏳ O pagamento ainda consta como pendente. Aguarde um instante e tente novamente.")
-                            else:
-                                st.error(f"❌ O status do pagamento é: {status}.")
-                        else:
-                            st.error("Nenhum ID de pagamento encontrado na sessão.")
-                st.markdown("---")
-            
-            # Botões de navegação inferiores organizados por colunas estáveis
-            st.markdown("<br>", unsafe_allow_html=True)
-            col_nav1, col_nav2 = st.columns(2)
-            with col_nav1:
-                if st.button("⬅️ Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_desde_planos"):
-                    st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                    st.rerun() 
-            with col_nav2:
-                if st.button("🔑 Voltar para o Login", use_container_width=True, key="btn_voltar_login_desde_planos"):
-                    st.session_state.opcao_menu = "login"
-                    st.rerun()
-
-        st.stop()
-
+     
+         
     elif menu_atual == "🤝 Sala Privada":
         if st.session_state.get("match_id_atual"):
             template_sala_privada()
