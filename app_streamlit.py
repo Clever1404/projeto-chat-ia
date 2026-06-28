@@ -2523,11 +2523,11 @@ with miolo_pagina.container():
                     #st.markdown("### 🛒 Realizar Pagamento")
                     id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
                     
-                        opcoes_compra = st.radio(
-                            "Escolha uma opção para recarga:", 
-                            ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"],
-                            key="radio_opcao_compra_estatico"
-                        )
+                    opcoes_compra = st.radio(
+                        "Escolha uma opção para recarga:", 
+                        ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"],
+                        key="radio_opcao_compra_estatico"
+                    )
 
                 # Divisor visual interno discreto
                 st.markdown("<hr style='border-color: #30363d; margin: 15px 0;'>", unsafe_allow_html=True)             
