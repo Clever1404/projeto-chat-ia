@@ -88,63 +88,67 @@ def carregar_plano_e_moedas_direto_pool(id_usuario):
 # ==============================================================================
 @st.fragment
 def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
-    possui_convite_pendente = False
-    if id_usuario_logado:
-        conn_b = None
-        try:
-            meu_id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
-            conn_b = obter_conexao_eficiente()
-            with conn_b.cursor() as cursor_b:
-                cursor_b.execute(
-                    "SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", 
-                    (meu_id_limpo,)
-                )
-                count_res = cursor_b.fetchone()
-                if count_res and count_res[0] > 0: 
-                    possui_convite_pendente = True
-        except Exception: 
-            pass
-        finally:
-            if conn_b: liberar_conexao(conn_b)
+    # ⚡ O SEGREDO DO RERUN: Se o gatilho de planos mudar, o fragmento é destruído e recriado na hora!
+    gatilho_atualizacao = st.session_state.get("gatilho_atualizar_sidebar", 0)
+    
+    # Criamos um slot isolado indexado com o gatilho
+    with st.container(key=f"container_sidebar_dinamico_{gatilho_atualizacao}"):
+        possui_convite_pendente = False
+        if id_usuario_logado:
+            conn_b = None
+            try:
+                meu_id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
+                conn_b = obter_conexao_eficiente()
+                with conn_b.cursor() as cursor_b:
+                    cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
+                    count_res = cursor_b.fetchone()
+                    if count_res and count_res[0] > 0: 
+                        possui_convite_pendente = True
+            except Exception: 
+                pass
+            finally:
+                if conn_b: 
+                    liberar_conexao(conn_b)
 
-    label_gestao = "🤝 ABRIR GESTÃO 🔴" if possui_convite_pendente else "🤝 ABRIR GESTÃO"
-    if possui_convite_pendente:
-        st.markdown("<div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'><span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span></div>", unsafe_allow_html=True)
+        label_gestao = "🤝 ABRIR GESTÃO 🔴" if possui_convite_pendente else "🤝 ABRIR GESTÃO"
+        if possui_convite_pendente:
+            st.markdown("<div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'><span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span></div>", unsafe_allow_html=True)
 
-    if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel_final"):
-        st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
-        st.rerun()
-    if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria_final"): 
-        st.session_state.opcao_menu = "📅 Disponibilidade"
-        st.rerun()
-    if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_sidebar_loja_planos_final"):
-        st.session_state.opcao_menu = "planos"
-        st.rerun()
-        
-    eh_admin = st.session_state.get("eh_admin", False)
-    if eh_admin or str(username_atual).lower() in ['admin', 'cleverson', 'clever1404']:
-        if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm_final"):
-            st.session_state.opcao_menu = "🛠️ Painel Admin"
-            st.rerun()     
+        # Botões estáveis mapeados com a chave dinâmica do gatilho
+        if st.button(label_gestao, type="secondary", use_container_width=True, key=f"btn_side_gestao_{gatilho_atualizacao}"):
+            st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
+            st.rerun()
+        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria_final"): 
+            st.session_state.opcao_menu = "📅 Disponibilidade"
+            st.rerun()
+        if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_sidebar_loja_planos_final"):
+            st.session_state.opcao_menu = "planos"
+            st.rerun()
+                
+        eh_admin = st.session_state.get("eh_admin", False)
+        if eh_admin or str(username_atual).lower() in ['admin', 'cleverson', 'clever1404']:
+            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm_final"):
+                st.session_state.opcao_menu = "🛠️ Painel Admin"
+                st.rerun()     
 
-    if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True, key="btn_limpar_ia_final"):
-            if id_usuario_logado:
-                conn = None
-                try:
-                    id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
-                    conn = obter_conexao_eficiente()
-                    with conn.cursor() as cursor:
-                        cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (id_limpo,))
-                        conn.commit()
-                    st.toast("Histórico limpo!")
-                    time.sleep(0.5)
-                    st.rerun()
-                except Exception as e: 
-                    if conn: conn.rollback()
-                    st.error(f"Erro ao limpar histórico: {e}")
-                finally:
-                    if conn:
-                        liberar_conexao(conn)
+        if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True, key="btn_limpar_ia_final"):
+                if id_usuario_logado:
+                    conn = None
+                    try:
+                        id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
+                        conn = obter_conexao_eficiente()
+                        with conn.cursor() as cursor:
+                            cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (id_limpo,))
+                            conn.commit()
+                        st.toast("Histórico limpo!")
+                        time.sleep(0.5)
+                        st.rerun()
+                    except Exception as e: 
+                        if conn: conn.rollback()
+                        st.error(f"Erro ao limpar histórico: {e}")
+                    finally:
+                        if conn:
+                            liberar_conexao(conn)
 
 # ==============================================================================
 # 3. GERENCIADOR DE LOGOUT RÁPIDO INTERCEPTADOR
