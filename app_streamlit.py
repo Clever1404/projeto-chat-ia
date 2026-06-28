@@ -2611,19 +2611,11 @@ with miolo_pagina.container():
                             else:
                                 st.error("Nenhum ID de pagamento encontrado na sessão.")
         
-        # Botões de navegação inferiores organizados por colunas estáveis
-        st.markdown("<br>", unsafe_allow_html=True)
-        col_nav1, col_nav2 = st.columns(2)
-        with col_nav1:
-            if st.button("⬅️ Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_desde_planos"):
-                st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                st.rerun() 
-        with col_nav2:
-         # ⚡ CORREÇÃO DEFINTIVA: Altere a rota global e use chaves estáveis
-            if st.button("← Voltar para o Login", use_container_width=True):
-                st.session_state.opcao_menu = "login"
-                st.rerun()
-                
+                   
+        if st.button("⬅️ Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_desde_planos"):
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun() 
+                      
         st.stop()
 
 
