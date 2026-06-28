@@ -23,7 +23,65 @@ import plotly.express as px
 import altair as alt
 from psycopg2 import pool
 
+# ==============================================================================
+# 3. CONEXÕES DE APIs E BANCO DE DADOS
+# ==============================================================================
+UPLOAD_FOLDER = 'static/uploads/perfis'
+load_dotenv()
 
+OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+if not OPENAI_API_KEY or "sua_chave" in OPENAI_API_KEY:
+    st.error("ERRO: Chave API da OpenAI não configurada nos Secrets!")
+    st.stop()
+
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+url: str = st.secrets.get("SUPABASE_URL")
+key: str = st.secrets.get("SUPABASE_KEY")
+supabase = create_client(url, key)
+
+if url and key:
+    try:
+        supabase = create_client(url, key)
+    except Exception as e:
+        st.error(f"Erro ao conectar com o Supabase Client: {e}")
+else:
+    st.warning("⚠️ Atenção: As credenciais do Supabase não estão configuradas nos Secrets.")
+
+try:
+    sdk = mercadopago.SDK(st.secrets["TOKEN_MERCADO_PAGO"])
+except Exception as e:
+    st.error(f"Erro ao carregar credenciais do Mercado Pago: {e}")
+    sdk = None
+
+# 1. Cria um Pool de conexões global (Carrega apenas UMA vez no início do servidor)
+@st.cache_resource
+def inicializar_pool_banco():
+    return psycopg2.pool.SimpleConnectionPool(
+        minconn=1,
+        maxconn=10,  # Permite até 10 conexões simultâneas reutilizáveis
+        host=st.secrets["postgres"]["host"],
+        database=st.secrets["postgres"]["database"],
+        user=st.secrets["postgres"]["user"],
+        password=st.secrets["postgres"]["password"],
+        port=st.secrets["postgres"]["port"],
+        sslmode="require"
+    )
+
+# 2. Função ultra-rápida que você chamará nas telas
+def obter_conexao_eficiente():
+    # Busca o pool gerenciado pelo cache do Streamlit (instantâneo)
+    pool_db = inicializar_pool_banco()
+    # Pega uma conexão que já está aberta e aquecida na memória
+    return pool_db.getconn()
+
+# 3. Função auxiliar para devolver a conexão ao pool (Não fecha ela, apenas libera)
+def liberar_conexao(conn):
+    try:
+        pool_db = inicializar_pool_banco()
+        pool_db.putconn(conn)
+    except Exception:
+        pass
 
 # ==============================================================================
 # 0. INICIALIZAÇÃO SEGURA DO SESSION STATE (ANTI-ATTRIBUTE ERROR)
@@ -109,7 +167,45 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
                 <p style="color: #48bb78; font-weight: bold; font-size: 13px; margin: 4px 0 0 0;">🟢 Online</p>
             </div>
         """, unsafe_allow_html=True)
+
         
+        # --- [B] RECONHECIMENTO DO PLANO E MOEDAS EM TEMPO REAL ---
+        tipo_plano = "Grátis"
+        saldo_moedas = 0
+        id_usuario_logado = st.session_state.get("usuario_id")
+
+        if id_usuario_logado is not None:
+            try:
+                # Busca instantânea direta do Pool de Conexões (Leva menos de 1ms)
+                dados_reais = carregar_plano_e_moedas_direto_pool(id_usuario_logado)
+                
+                plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
+                plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
+                    
+                if "credito" in plano_norm or "moedas" in plano_norm:
+                    tipo_plano = "Plano Crédito de Moedas"
+                elif "vip" in plano_norm or "assinante" in plano_norm:
+                    tipo_plano = "vip"
+                else:
+                    tipo_plano = "Grátis"
+                        
+                saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
+                        
+            except Exception as e:
+                st.error(f"Erro ao ler saldo real: {e}")
+
+        # Sincroniza e trava os estados na memória raiz do Streamlit
+        st.session_state["tipo_plano"] = tipo_plano
+        st.session_state["saldo_moedas"] = saldo_moedas
+        if "dados_usuario" in st.session_state:
+            st.session_state.dados_usuario["tipo_plano"] = tipo_plano
+            st.session_state.dados_usuario["moedas"] = saldo_moedas
+
+        # Exibe o cabeçalho comercial de créditos
+        st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+        st.markdown("<hr style='border-color: #21262d; margin: 10px 0;'>", unsafe_allow_html=True)
+
+
            # --- COMPONENTE: ALTERAR FOTO DE PERFIL ---
         st.caption("📷 Enviar nova foto de perfil:")
         f_nova = st.file_uploader(
@@ -168,41 +264,6 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
 
         st.markdown("---") # Divisor visual rápido
 
-        # --- [B] RECONHECIMENTO DO PLANO E MOEDAS EM TEMPO REAL ---
-        tipo_plano = "Grátis"
-        saldo_moedas = 0
-        id_usuario_logado = st.session_state.get("usuario_id")
-
-        if id_usuario_logado is not None:
-            try:
-                # Busca instantânea direta do Pool de Conexões (Leva menos de 1ms)
-                dados_reais = carregar_plano_e_moedas_direto_pool(id_usuario_logado)
-                
-                plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
-                plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
-                    
-                if "credito" in plano_norm or "moedas" in plano_norm:
-                    tipo_plano = "Plano Crédito de Moedas"
-                elif "vip" in plano_norm or "assinante" in plano_norm:
-                    tipo_plano = "vip"
-                else:
-                    tipo_plano = "Grátis"
-                        
-                saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
-                        
-            except Exception as e:
-                st.error(f"Erro ao ler saldo real: {e}")
-
-        # Sincroniza e trava os estados na memória raiz do Streamlit
-        st.session_state["tipo_plano"] = tipo_plano
-        st.session_state["saldo_moedas"] = saldo_moedas
-        if "dados_usuario" in st.session_state:
-            st.session_state.dados_usuario["tipo_plano"] = tipo_plano
-            st.session_state.dados_usuario["moedas"] = saldo_moedas
-
-        # Exibe o cabeçalho comercial de créditos
-        st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
-        st.markdown("<hr style='border-color: #21262d; margin: 10px 0;'>", unsafe_allow_html=True)
 
         # --- [C] MOTOR DE BUSCA DA NOTIFICAÇÃO (Roda nativo e leve) ---
         possui_convite_pendente = False
@@ -442,65 +503,7 @@ if "saldo_moedas" not in st.session_state: st.session_state.saldo_moedas = 0
 dias_semana_map = {0: 'Segunda-feira', 1: 'Terça-feira', 2: 'Quarta-feira', 3: 'Quinta-feira', 4: 'Sexta-feira', 5: 'Sábado', 6: 'Domingo'}
 dia_atual_servidor = dias_semana_map[datetime.now().weekday()]
 
-# ==============================================================================
-# 3. CONEXÕES DE APIs E BANCO DE DADOS
-# ==============================================================================
-UPLOAD_FOLDER = 'static/uploads/perfis'
-load_dotenv()
 
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
-if not OPENAI_API_KEY or "sua_chave" in OPENAI_API_KEY:
-    st.error("ERRO: Chave API da OpenAI não configurada nos Secrets!")
-    st.stop()
-
-client = OpenAI(api_key=OPENAI_API_KEY)
-
-url: str = st.secrets.get("SUPABASE_URL")
-key: str = st.secrets.get("SUPABASE_KEY")
-supabase = create_client(url, key)
-
-if url and key:
-    try:
-        supabase = create_client(url, key)
-    except Exception as e:
-        st.error(f"Erro ao conectar com o Supabase Client: {e}")
-else:
-    st.warning("⚠️ Atenção: As credenciais do Supabase não estão configuradas nos Secrets.")
-
-try:
-    sdk = mercadopago.SDK(st.secrets["TOKEN_MERCADO_PAGO"])
-except Exception as e:
-    st.error(f"Erro ao carregar credenciais do Mercado Pago: {e}")
-    sdk = None
-
-# 1. Cria um Pool de conexões global (Carrega apenas UMA vez no início do servidor)
-@st.cache_resource
-def inicializar_pool_banco():
-    return psycopg2.pool.SimpleConnectionPool(
-        minconn=1,
-        maxconn=10,  # Permite até 10 conexões simultâneas reutilizáveis
-        host=st.secrets["postgres"]["host"],
-        database=st.secrets["postgres"]["database"],
-        user=st.secrets["postgres"]["user"],
-        password=st.secrets["postgres"]["password"],
-        port=st.secrets["postgres"]["port"],
-        sslmode="require"
-    )
-
-# 2. Função ultra-rápida que você chamará nas telas
-def obter_conexao_eficiente():
-    # Busca o pool gerenciado pelo cache do Streamlit (instantâneo)
-    pool_db = inicializar_pool_banco()
-    # Pega uma conexão que já está aberta e aquecida na memória
-    return pool_db.getconn()
-
-# 3. Função auxiliar para devolver a conexão ao pool (Não fecha ela, apenas libera)
-def liberar_conexao(conn):
-    try:
-        pool_db = inicializar_pool_banco()
-        pool_db.putconn(conn)
-    except Exception:
-        pass
 
 # ==============================================================================
 # 4. FUNÇÕES DE SUPORTE E MECANISMO DE INTELIGÊNCIA ARTIFICIAL (4 PILARES)
