@@ -2303,13 +2303,13 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
             for chave in list(st.session_state.keys()):
                 del st.session_state[chave]
                 
-            # Restabelece os estados padrão iniciais para o roteador abrir o Login limpo
-            st.session_state.usuario_id = None
-            st.session_state.username = None
-            st.session_state.opcao_menu = "login"
-            st.session_state.form_seed = 42
+            # # Restabelece os estados padrão iniciais para o roteador abrir o Login limpo
+            # st.session_state.usuario_id = None
+            # st.session_state.username = None
+            # st.session_state.opcao_menu = "login"
+            # st.session_state.form_seed = 42
             
-            st.rerun()          
+            # st.rerun()          
         
 # ==============================================================================
 # 3. ROTEADOR DE INTERFACE DO MIOLO (GESTÃO CENTRALIZADA)
@@ -2498,9 +2498,7 @@ with miolo_pagina.container():
                 st.markdown("<hr style='border-color: #30363d; margin: 15px 0;'>", unsafe_allow_html=True)
                 
                 
-                # PARTE 2: Descrição dos Planos (Duas partes de benefícios lado a lado)
-                st.markdown('<h3 style="text-align: center; color: #f0f6fc; margin-bottom: 20px;">Escolha o Plano Ideal para Você</h3>', unsafe_allow_html=True)
-                
+                     
                 col_plano_3, col_plano_4 = st.columns(2)
                 
                 with col_plano_3:
@@ -2514,8 +2512,15 @@ with miolo_pagina.container():
                     )
                     
                 with col_plano_4:
-                     # PARTE 2: Área de Checkout (Integrada no mesmo retângulo)
-                    st.markdown("### 🛒 Realizar Pagamento")
+                    # PARTE 2: Área de Checkout (Integrada no mesmo retângulo)
+                    st.html(
+                        """
+                        <div style="text-align: left; border-left: 4px solid primary; padding-left: 15px;">
+                            <strong style="color: #6e7681; font-size: 1.1em;">### 🛒 Realizar Pagamento</strong><br>  
+                        </div>
+                        """
+                    )
+                    #st.markdown("### 🛒 Realizar Pagamento")
                     id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
                     
                     opcoes_compra = st.radio(
