@@ -829,136 +829,149 @@ def processar_match_lucy(dados_m):
 # ==============================================================================
 # FUNÇÃO ISOLADA COM BUFFER DE MEMÓRIA (INPUT EMBAIXO E MENSAGENS EM CIMA)
 # ==============================================================================
-# ⚡ O SEGREDO: O decorador do fragmento agora assiste à semente de recarga global
-# Se a semente mudar na tela de planos, o fragmento inteiro se reconstrói com o st.chat_input ativo!
-@st.fragment(key=f"chat_fragmento_instancia_{st.session_state.get('seed_recarregar_chat', 0)}")
+# ⚡ CORREÇÃO DO DECORADOR: Deixe o fragment puro e limpo, sem argumentos
+@st.fragment
 def renderizar_chat_lucy_isolado():
-    # Mantenha TODA a sua lógica interna do chat exatamente igual, sem mexer em nada!
-    if "opcao_menu" not in st.session_state:
-        st.session_state.opcao_menu = "chat"
-    
-    # 1. TRATAMENTO DE TELAS SECUNDÁRIAS DENTRO DO FRAGMENTO
-    if st.session_state.opcao_menu == "✉️ Fale Conosco":
-        template_fale_conosco()
-        if st.button("⬅️ Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_fc"):
+    # Inicializa a semente caso ela não exista na memória
+    semente_atual = st.session_state.get("seed_recarregar_chat", 0)
+
+    # ⚡ O SEGREDO DO PROCESSO: O container de layout ganha a key baseada na semente.
+    # Quando o Pix é aprovado e a semente muda para 1, o Streamlit é obrigado a
+    # apagar este container e reconstruir todos os inputs (inclusive o chat_input) do zero!
+    with st.container(key=f"container_interno_chat_{semente_atual}"):
+        
+        if "opcao_menu" not in st.session_state:
             st.session_state.opcao_menu = "chat"
-            st.rerun(scope="fragment")
-        return # Interrompe o resto do chat se estiver no fale conosco
+            
+        # ----------------------------------------------------------------------
+        # MANTENHA AQUI DENTRO TODO O RESTO DO SEU CÓDIGO DO CHAT IGUAL:
+        # (Histórico, área visual de rolagem, st.chat_input, etc.)
+        # Certifique-se apenas de que TODO o código do chat fique indentado (com recuo)
+        # para dentro deste bloco 'with st.container'
+        # -------------------------------------------
+    
+        # 1. TRATAMENTO DE TELAS SECUNDÁRIAS DENTRO DO FRAGMENTO
+        if st.session_state.opcao_menu == "✉️ Fale Conosco":
+            template_fale_conosco()
+            if st.button("⬅️ Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_fc"):
+                st.session_state.opcao_menu = "chat"
+                st.rerun(scope="fragment")
+            return # Interrompe o resto do chat se estiver no fale conosco
 
     
     #meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
 
-# ⚡ PROVIMENTO DE SEGURANÇA CONTRA DESLOGAMENTO SÚBITO (LINHA 597)
-    # Substitui a leitura crua por um resgate imune a falhas de atributo .get()
-    id_bruto = st.session_state.get("usuario_id")
-    
-    # Se o ID não existir ou for nulo (após logout), aborta a renderização do chat na hora
-    if id_bruto is None:
-        st.session_state.opcao_menu = "login"
-        st.st_stop() if hasattr(st, "st_stop") else st.stop()
+    # ⚡ PROVIMENTO DE SEGURANÇA CONTRA DESLOGAMENTO SÚBITO (LINHA 597)
+        # Substitui a leitura crua por um resgate imune a falhas de atributo .get()
+        id_bruto = st.session_state.get("usuario_id")
         
-    # Desempacota com segurança caso o banco retorne formatos em lista/tupla
-    meu_id_limpo = int(id_bruto if not isinstance(id_bruto, (tuple, list)) else id_bruto)
+        # Se o ID não existir ou for nulo (após logout), aborta a renderização do chat na hora
+        if id_bruto is None:
+            st.session_state.opcao_menu = "login"
+            st.st_stop() if hasattr(st, "st_stop") else st.stop()
+            
+        # Desempacota com segurança caso o banco retorne formatos em lista/tupla
+        meu_id_limpo = int(id_bruto if not isinstance(id_bruto, (tuple, list)) else id_bruto)
 
 
-    # 2. ÁREA VISUAL FIXA DO TOPO (Nunca some)
-    col_titulos, col_botoes_topo = st.columns([2, 1])
-    with col_titulos:
-        st.markdown("<h2 style='margin-top:0; margin-bottom:2px; font-size: 24px;'>🤖 Olá, Seja bem-vindo ao Lucy Chat IA</h2>", unsafe_allow_html=True)
-        st.caption("Lucy conversa com você e armazena os seus interesses para encontrar matches.")
-    
-    with col_botoes_topo:
-        c_refresh, c_fc = st.columns(2)
-        with c_refresh:
-            if st.button("🔄 Atualizar", type="tertiary", help="Sincronizar mensagens", key="btn_refresh_chat"):
-                st.rerun(scope="fragment")
-        with c_fc:
-            if st.button("✉️ Contato", type="tertiary", key="btn_fale_conosco_chat"):
-                st.session_state.opcao_menu = "✉️ Fale Conosco"
-                st.rerun(scope="fragment")
-    
-    st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
+        # 2. ÁREA VISUAL FIXA DO TOPO (Nunca some)
+        col_titulos, col_botoes_topo = st.columns([2, 1])
+        with col_titulos:
+            st.markdown("<h2 style='margin-top:0; margin-bottom:2px; font-size: 24px;'>🤖 Olá, Seja bem-vindo ao Lucy Chat IA</h2>", unsafe_allow_html=True)
+            st.caption("Lucy conversa com você e armazena os seus interesses para encontrar matches.")
+        
+        with col_botoes_topo:
+            c_refresh, c_fc = st.columns(2)
+            with c_refresh:
+                if st.button("🔄 Atualizar", type="tertiary", help="Sincronizar mensagens", key="btn_refresh_chat"):
+                    st.rerun(scope="fragment")
+            with c_fc:
+                if st.button("✉️ Contato", type="tertiary", key="btn_fale_conosco_chat"):
+                    st.session_state.opcao_menu = "✉️ Fale Conosco"
+                    st.rerun(scope="fragment")
+        
+        st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
 
-    # 3. BUSCA RÁPIDA E EXIBIÇÃO DO HISTÓRICO (Feedback Visual Instantâneo)
-    historico_banco = buscar_memoria(meu_id_limpo, limite=20)
-    
-    # Criamos um container invisível para as mensagens antigas
-    area_mensagens = st.container(height=450, border=False)
-    with area_mensagens:
-        for pergunta_antiga, resposta_antiga in historico_banco:
-            with st.chat_message("user"):
-                st.markdown(pergunta_antiga)
-            with st.chat_message("assistant", avatar="🤖"):
-                st.markdown(resposta_antiga)
-
-    # 4. CAPTURA E PROCESSAMENTO IMEDIATO NO RODAPÉ
-    prompt_capturado = st.chat_input("Digite sua mensagem para a Lucy...")
-    
-    if prompt_capturado:
-        # Adiciona a mensagem do usuário na tela IMEDIATAMENTE (Sem esperar a IA)
+        # 3. BUSCA RÁPIDA E EXIBIÇÃO DO HISTÓRICO (Feedback Visual Instantâneo)
+        historico_banco = buscar_memoria(meu_id_limpo, limite=20)
+        
+        # Criamos um container invisível para as mensagens antigas
+        area_mensagens = st.container(height=450, border=False)
         with area_mensagens:
-            with st.chat_message("user"):
-                st.markdown(prompt_capturado)
-            # Cria um placeholder com efeito de carregamento para a resposta da IA
-            with st.chat_message("assistant", avatar="🤖"):
-                placeholder_resposta = st.empty()
-                with placeholder_resposta.container():
-                    st.markdown("⏳ *Lucy está pensando...*")
+            for pergunta_antiga, resposta_antiga in historico_banco:
+                with st.chat_message("user"):
+                    st.markdown(pergunta_antiga)
+                with st.chat_message("assistant", avatar="🤖"):
+                    st.markdown(resposta_antiga)
 
-        # Inicia o processamento pesado com o banco de dados livre
-        try:
-            # Pega o contexto rápido baseado nas últimas mensagens lidas acima
-            contexto_mensagens = [
-                {"role": "system", "content": "Você é a Lucy, uma IA psicóloga e assistente de relacionamentos altamente empática. Seu objetivo é entender o estilo de vida, gostos e rotina do usuário através de uma conversa natural. Seja acolhedora, faça perguntas abertas e ajude-o a se expressar para encontrar o par ideal."}
-            ]
-            
-            # Alimenta as últimas 5 mensagens para a OpenAI ter contexto recente
-            for p, r in historico_banco[-5:]:
-                contexto_mensagens.append({"role": "user", "content": p})
-                contexto_mensagens.append({"role": "assistant", "content": r})
-            
-            contexto_mensagens.append({"role": "user", "content": prompt_capturado})
+        # 4. CAPTURA E PROCESSAMENTO IMEDIATO NO RODAPÉ
+        prompt_capturado = st.chat_input("Digite sua mensagem para a Lucy...")
+        
+        if prompt_capturado:
+            # Adiciona a mensagem do usuário na tela IMEDIATAMENTE (Sem esperar a IA)
+            with area_mensagens:
+                with st.chat_message("user"):
+                    st.markdown(prompt_capturado)
+                # Cria um placeholder com efeito de carregamento para a resposta da IA
+                with st.chat_message("assistant", avatar="🤖"):
+                    placeholder_resposta = st.empty()
+                    with placeholder_resposta.container():
+                        st.markdown("⏳ *Lucy está pensando...*")
 
-            # Chamada de API externa
-            resposta_openai = client.chat.completions.create(
-                model='gpt-4o-mini',
-                messages=contexto_mensagens,
-                temperature=0.7
-            )
-            resposta_lucy = resposta_openai.choices[0].message.content
-
-            # Salva no histórico usando a função estável de Pool com try/finally
-            conn_salvar = None
+            # Inicia o processamento pesado com o banco de dados livre
             try:
-                conn_salvar = obter_conexao_eficiente()
-                with conn_salvar.cursor() as cursor_salvar:
-                    cursor_salvar.execute("""
-                        INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta) 
-                        VALUES (%s, %s, %s);
-                    """, (meu_id_limpo, prompt_capturado, resposta_lucy))
-                    conn_salvar.commit()
-            except Exception as e_db:
-                if conn_salvar: conn_salvar.rollback()
-                raise e_db
-            finally:
-                if conn_salvar: liberar_conexao(conn_salvar)
-
-            # Substitui o "Lucy está pensando..." pela resposta real da IA instantaneamente
-            placeholder_resposta.markdown(resposta_lucy)
-
-            # Executa o motor de afinidade pós-mensagem de forma assíncrona
-            dados_match = processar_afinidade_e_match(meu_id_limpo, prompt_capturado)
-            if dados_match and dados_match.get("match"):
-                st.session_state.alerta_match = {
-                    "match_id": dados_match.get("match_id", random.randint(1000, 9999)),
-                    "id_par": dados_match.get("id_par"),
-                    "nome": dados_match.get("nome_par"),
-                    "online": dados_match.get("online", False)
-                }
-                processar_match_lucy(st.session_state.alerta_match)
+                # Pega o contexto rápido baseado nas últimas mensagens lidas acima
+                contexto_mensagens = [
+                    {"role": "system", "content": "Você é a Lucy, uma IA psicóloga e assistente de relacionamentos altamente empática. Seu objetivo é entender o estilo de vida, gostos e rotina do usuário através de uma conversa natural. Seja acolhedora, faça perguntas abertas e ajude-o a se expressar para encontrar o par ideal."}
+                ]
                 
-        except Exception as e:
-            st.error(f"Erro ao processar conversa com a IA: {e}")
+                # Alimenta as últimas 5 mensagens para a OpenAI ter contexto recente
+                for p, r in historico_banco[-5:]:
+                    contexto_mensagens.append({"role": "user", "content": p})
+                    contexto_mensagens.append({"role": "assistant", "content": r})
+                
+                contexto_mensagens.append({"role": "user", "content": prompt_capturado})
+
+                # Chamada de API externa
+                resposta_openai = client.chat.completions.create(
+                    model='gpt-4o-mini',
+                    messages=contexto_mensagens,
+                    temperature=0.7
+                )
+                resposta_lucy = resposta_openai.choices[0].message.content
+
+                # Salva no histórico usando a função estável de Pool com try/finally
+                conn_salvar = None
+                try:
+                    conn_salvar = obter_conexao_eficiente()
+                    with conn_salvar.cursor() as cursor_salvar:
+                        cursor_salvar.execute("""
+                            INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta) 
+                            VALUES (%s, %s, %s);
+                        """, (meu_id_limpo, prompt_capturado, resposta_lucy))
+                        conn_salvar.commit()
+                except Exception as e_db:
+                    if conn_salvar: conn_salvar.rollback()
+                    raise e_db
+                finally:
+                    if conn_salvar: liberar_conexao(conn_salvar)
+
+                # Substitui o "Lucy está pensando..." pela resposta real da IA instantaneamente
+                placeholder_resposta.markdown(resposta_lucy)
+
+                # Executa o motor de afinidade pós-mensagem de forma assíncrona
+                dados_match = processar_afinidade_e_match(meu_id_limpo, prompt_capturado)
+                if dados_match and dados_match.get("match"):
+                    st.session_state.alerta_match = {
+                        "match_id": dados_match.get("match_id", random.randint(1000, 9999)),
+                        "id_par": dados_match.get("id_par"),
+                        "nome": dados_match.get("nome_par"),
+                        "online": dados_match.get("online", False)
+                    }
+                    processar_match_lucy(st.session_state.alerta_match)
+                    
+            except Exception as e:
+                st.error(f"Erro ao processar conversa com a IA: {e}")
 
 
 
