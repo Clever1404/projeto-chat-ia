@@ -64,18 +64,23 @@ except ImportError:
 # ==============================================================================
 # 1. FUNÇÕES DE CACHE E BANCO DE DADOS DE ALTA PERFORMANCE (PRECISAM FICAR AQUI)
 # ==============================================================================
-@st.cache_data(ttl=15)  # Guarda os dados na memória por 15 segundos reduzindo requisições ao Supabase
-def carregar_plano_e_moedas_cached(id_usuario):
+# ⚡ OTIMIZAÇÃO: REMOVIDO @st.cache_data. Agora a busca é em tempo real via SQL Pool (0ms de lag)
+def carregar_plano_e_moedas_direto_pool(id_usuario):
+    conn = None
     try:
-        id_limpo = id_usuario if not isinstance(id_usuario, (tuple, list)) else id_usuario
-        if id_limpo is not None:
-            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_limpo)).execute()
-            if user_data.data:
-                return user_data.data[0] # Retorna o dicionário com os dados
+        id_limpo = int(id_usuario if not isinstance(id_usuario, (tuple, list)) else id_usuario)
+        conn = obter_conexao_eficiente()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT tipo_plano, moedas FROM usuarios WHERE id = %s;", (id_limpo,))
+            res = cursor.fetchone()
+            if res:
+                return {"tipo_plano": str(res[0]).strip(), "moedas": int(res[1] or 0)}
     except Exception:
         pass
+    finally:
+        if conn:
+            liberar_conexao(conn) # Devolve a conexão instantaneamente ao Pool
     return {"tipo_plano": "Grátis", "moedas": 0}
-
 
 
 # ==============================================================================
