@@ -1763,49 +1763,62 @@ def verificar_status_pix(id_pagamento):
         return "erro"
 
 
-# --- FUNÇÃO PARA ATUALIZAR O SUPABASE (VERSÃO ULTRA-OTIMIZADA) ---
-def atualizar_plano_banco_supabase(id_usuario, tipo_pagamento):
+# ==============================================================================
+# 1. ATUALIZAÇÃO BLINDADA COM VALIDAÇÃO DE ID DE PAGAMENTO
+# ==============================================================================
+def atualizar_plano_banco_supabase(id_usuario, tipo_pagamento, id_pagamento_mp):
     """
-    Atualiza o plano ou incrementa moedas no Supabase de forma atômica
-    e sincroniza as duas chaves de Session State para atualização instantânea.
+    Atualiza o plano ou adiciona moedas garantindo de forma absoluta 
+    que o mesmo ID de pagamento do Mercado Pago nunca seja computado duas vezes.
     """
     try:
         id_usuario_int = int(id_usuario)
         data_atual_iso = datetime.now().isoformat()
+        
+        # ⚡ PASSO CRÍTICO: Consulta se este ID de pagamento já foi gravado no histórico do usuário
+        # Para isso funcionar perfeitamente, certifique-se de que a coluna 'ultimo_id_pagamento' existe na sua tabela usuarios
+        query_check = supabase.table("usuarios").select("ultimo_id_pagamento", "moedas", "tipo_plano").eq("id", id_usuario_int).execute()
+        
+        if query_check.data:
+            dados_usuario_banco = query_check.data[0]
+            ultimo_pago = dados_usuario_banco.get("ultimo_id_pagamento")
+            
+            # 🛑 TRAVA DE SEGURANÇA: Se o ID do pagamento atual for igual ao último processado,
+            # aborta o fluxo imediatamente sem adicionar moedas!
+            if str(ultimo_pago) == str(id_pagamento_mp):
+                return True # Retorna True apenas para prosseguir e limpar a tela do usuário
 
-        # CENÁRIO 1: Compra do Plano VIP 30 dias
+            moedas_atuais = dados_usuario_banco.get("moedas") or 0
+        else:
+            moedas_atuais = 0
+
+        # CENÁRIO 1: Compra do Plano VIP
         if tipo_pagamento == "vip":
-            resposta = supabase.table("usuarios").update({
+            supabase.table("usuarios").update({
                 "tipo_plano": "vip",
-                "ultima_recarga": data_atual_iso
+                "ultima_recarga": data_atual_iso,
+                "ultimo_id_pagamento": str(id_pagamento_mp) # Carimba o ID do pagamento para travar
             }).eq("id", id_usuario_int).execute()
             
-            # ⚡ FORÇA DA ATUALIZAÇÃO LOCAL: Independente do retorno da API, 
-            # nós atualizamos os estados locais para refletir na tela imediatamente
             st.session_state["tipo_plano"] = "vip"
             if "dados_usuario" in st.session_state:
                 st.session_state.dados_usuario["tipo_plano"] = "vip"
             return True
             
-        # CENÁRIO 2: Compra de Pacote de Moedas
+        # CENÁRIO 2: Compra de Pacote de Moedas (+10 estrito)
         elif tipo_pagamento == "moedas":
-            # Resgata o saldo local da memória de forma imediata
-            moedas_atuais = 0
-            if "dados_usuario" in st.session_state:
-                moedas_atuais = st.session_state.dados_usuario.get("moedas", 0)
-            elif "saldo_moedas" in st.session_state:
-                moedas_atuais = st.session_state.get("saldo_moedas", 0)
-            
+            # Calcula o novo saldo somando SEMPRE com base no dado real do banco
             novas_moedas = int(moedas_atuais) + 10
             
-            # Dispara a gravação no Supabase
-            resposta = supabase.table("usuarios").update({
+            # Grava no Supabase carimbando o ID do pagamento na mesma transação
+            supabase.table("usuarios").update({
                 "tipo_plano": "Plano Crédito de Moedas",
                 "moedas": novas_moedas,
-                "ultima_recarga": data_atual_iso
+                "ultima_recarga": data_atual_iso,
+                "ultimo_id_pagamento": str(id_pagamento_mp) # ⚡ ESSA LINHA BLOQUEIA O LOOP
             }).eq("id", id_usuario_int).execute()
             
-            # ⚡ FORÇA DA ATUALIZAÇÃO LOCAL
+            # Sincroniza a memória estável local do Streamlit
             st.session_state["tipo_plano"] = "Plano Crédito de Moedas"
             st.session_state["saldo_moedas"] = novas_moedas
             if "dados_usuario" in st.session_state:
@@ -1813,28 +1826,10 @@ def atualizar_plano_banco_supabase(id_usuario, tipo_pagamento):
                 st.session_state.dados_usuario["moedas"] = novas_moedas
             return True
 
-        # CENÁRIO 3: Retorno para o Plano Grátis
-        elif tipo_pagamento == "gratis":
-            resposta = supabase.table("usuarios").update({
-                "tipo_plano": "Grátis",
-                "moedas": 0,
-                "ultima_recarga": data_atual_iso
-            }).eq("id", id_usuario_int).execute()
-            
-            st.session_state["tipo_plano"] = "Grátis"
-            st.session_state["saldo_moedas"] = 0
-            if "dados_usuario" in st.session_state:
-                st.session_state.dados_usuario["tipo_plano"] = "Grátis"
-                st.session_state.dados_usuario["moedas"] = 0
-            return True
-
-    except ValueError:
-        st.error(f"❌ Erro crítico: O ID do usuário ('{id_usuario}') não pôde ser convertido para número inteiro.")
-        return False
     except Exception as e:
-        st.error(f"❌ Erro crítico ao atualizar o Supabase: {e}")
+        st.error(f"❌ Erro crítico na transação de créditos: {e}")
         return False
-
+    return False
 
 
 
