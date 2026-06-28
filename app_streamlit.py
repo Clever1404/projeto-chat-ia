@@ -48,7 +48,7 @@ if "foto_perfil" not in st.session_state:
 menu_atual = st.session_state.opcao_menu
 
 # ==============================================================================
-# 0. DECLARAÇÃO GLOBAL DE SEGURANÇA (TOP DO ARQUIVO)
+# 0. DECLARAÇÕES GLOBAIS DE SEGURANÇA & CRIPTOGRAFIA
 # ==============================================================================
 try:
     from werkzeug.security import check_password_hash, generate_password_hash
@@ -60,8 +60,25 @@ except ImportError:
     def generate_password_hash(senha_digitada):
         return bcrypt.hashpw(senha_digitada.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
+
 # ==============================================================================
-# 1. FUNÇÃO FRAGMENTADA DA SIDEBAR (PRECISA FICAR AQUI NO TOPO)
+# 1. FUNÇÕES DE CACHE E BANCO DE DADOS DE ALTA PERFORMANCE (PRECISAM FICAR AQUI)
+# ==============================================================================
+@st.cache_data(ttl=15)  # Guarda os dados na memória por 15 segundos reduzindo requisições ao Supabase
+def carregar_plano_e_moedas_cached(id_usuario):
+    try:
+        id_limpo = id_usuario if not isinstance(id_usuario, (tuple, list)) else id_usuario
+        if id_limpo is not None:
+            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_limpo)).execute()
+            if user_data.data:
+                return user_data.data[0] # Retorna o dicionário com os dados
+    except Exception:
+        pass
+    return {"tipo_plano": "Grátis", "moedas": 0}
+
+
+# ==============================================================================
+# 2. FUNÇÃO FRAGMENTADA DA SIDEBAR (BOTÕES INTERNOS)
 # ==============================================================================
 @st.fragment
 def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
@@ -104,8 +121,9 @@ def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
             st.session_state.opcao_menu = "🛠️ Painel Admin"
             st.rerun()     
 
+
 # ==============================================================================
-# 2. GERENCIADOR DE LOGOUT RÁPIDO INTERCEPTADOR
+# 3. GERENCIADOR DE LOGOUT RÁPIDO INTERCEPTADOR
 # ==============================================================================
 if st.session_state.get("opcao_menu") == "executar_logout_imediato":
     id_usuario_logado = st.session_state.get("usuario_id")
@@ -130,15 +148,16 @@ if st.session_state.get("opcao_menu") == "executar_logout_imediato":
     st.session_state.form_seed = 42
     st.rerun()
 
-# Capture o estado de menu para a Sidebar ler com segurança abaixo
+# Captura o estado de menu para a Sidebar ler de forma estável abaixo
 menu_atual = st.session_state.get("opcao_menu", "home")
 
+
 # ==============================================================================
-# 3. BLOCO DA SIDEBAR GLOBAL (AQUI ELA JÁ ENXERGA A FUNÇÃO ACIMA)
+# 4. BLOCO DA SIDEBAR GLOBAL (AQUI ELA JÁ ENXERGA TODAS AS FUNÇÕES ACIMA)
 # ==============================================================================
 if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_imediato"]:
     with st.sidebar:
-        # (Seu código do perfil, avatar e plano_cached)
+        # (Seu código do perfil e avatar...)
         id_usuario_logado = st.session_state.get("usuario_id")
         username_atual = st.session_state.get("username", "Usuário")
 
@@ -167,47 +186,7 @@ if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_im
             </div>
         """, unsafe_allow_html=True)
 
-        # ==========================================================================
-        # --- CONSULTA 1: PLANO E SALDO REAL (CACHED E ACELERADO NO POOL) ---
-        # ==========================================================================
-        tipo_plano = "Grátis"
-        saldo_moedas = 0
-        id_usuario_logado = st.session_state.get("usuario_id")
-
-        if id_usuario_logado is not None:
-            try:
-                registro_banco = carregar_plano_e_moedas_cached(id_usuario_logado)
-                    
-                if isinstance(registro_banco, list) and len(registro_banco) > 0:
-                    dados_reais = registro_banco[0]
-                elif isinstance(registro_banco, dict):
-                    dados_reais = registro_banco
-                else:
-                    dados_reais = {}
-
-                plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
-                    
-                # Normalização total imune a erros
-                plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
-                    
-                if "credito" in plano_norm or "moedas" in plano_norm:
-                    tipo_plano = "Plano Crédito de Moedas"
-                elif "vip" in plano_norm or "assinante" in plano_norm:
-                    tipo_plano = "vip"
-                else:
-                    tipo_plano = "Grátis"
-                        
-                saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
-                        
-            except Exception as e:
-                st.error(f"Erro ao mapear cache de saldo: {e}")
-        else:
-            st.warning("⚠️ Usuário não identificado na sessão.")
-
-        st.session_state["tipo_plano"] = tipo_plano
-        st.session_state["saldo_moedas"] = saldo_moedas
-
-        st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+        
                             
         # ==========================================================================
         # --- COMPONENTE: ALTERAR FOTO DE PERFIL (CORREÇÃO ANTI-LOOP NO POOL) ---
@@ -270,9 +249,50 @@ if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_im
 
         st.markdown("---") # Divisor visual rápido
 
-        
-        # ⚡ CHAMADA DO FRAGMENTO (O Python agora localiza perfeitamente)
-        renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual)
+        # ==========================================================================
+        # --- CONSULTA 1: PLANO E SALDO REAL (CACHED E ACELERADO NO POOL) ---
+        # ==========================================================================
+        tipo_plano = "Grátis"
+        saldo_moedas = 0
+        id_usuario_logado = st.session_state.get("usuario_id")
+        # ⚡ EXECUÇÃO DE PLANO CACHED: Encontrada com sucesso porque foi movida para cima!
+        if id_usuario_logado is not None:
+            try:
+                registro_banco = carregar_plano_e_moedas_cached(id_usuario_logado)
+                # ... (suas lógicas normais de desempacotamento de plano e moedas que organizamos antes) .. 
+                  
+                if isinstance(registro_banco, list) and len(registro_banco) > 0:
+                    dados_reais = registro_banco[0]
+                elif isinstance(registro_banco, dict):
+                    dados_reais = registro_banco
+                else:
+                    dados_reais = {}
+
+                plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
+                    
+                # Normalização total imune a erros
+                plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
+                    
+                if "credito" in plano_norm or "moedas" in plano_norm:
+                    tipo_plano = "Plano Crédito de Moedas"
+                elif "vip" in plano_norm or "assinante" in plano_norm:
+                    tipo_plano = "vip"
+                else:
+                    tipo_plano = "Grátis"
+                        
+                saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
+                        
+            except Exception as e:
+                st.error(f"Erro ao mapear cache de saldo: {e}")
+        else:
+            st.warning("⚠️ Usuário não identificado na sessão.")
+
+        st.session_state["tipo_plano"] = tipo_plano
+        st.session_state["saldo_moedas"] = saldo_moedas
+
+        st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+          
+
         
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
         if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema_final"):
@@ -1809,22 +1829,6 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
             st.rerun()
 
 
-# ==============================================================================
-# 3. CONEXÕES DE APIs E BANCO DE DADOS (ÁREA DO ESCOPO GLOBAL OTIMIZADA)
-# ==============================================================================
-
-@st.cache_data(ttl=15)  # Guarda os dados na memória por 15 segundos reduzindo requisições ao Supabase
-def carregar_plano_e_moedas_cached(id_usuario):
-    try:
-        # Fatiamento limpo e seguro sem recursão infinita de loops
-        id_limpo = id_usuario if not isinstance(id_usuario, (tuple, list)) else id_usuario
-        if id_limpo is not None:
-            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_limpo)).execute()
-            if user_data.data:
-                return user_data.data[0]
-    except Exception:
-        pass
-    return {"tipo_plano": "Grátis", "moedas": 0}
 
 
 # ==============================================================================
@@ -2303,13 +2307,6 @@ def template_fale_conosco():
     # ⚡ REMOVIDO: O st.button("← Voltar") solto foi retirado daqui.
     # O controle de retorno agora é feito de forma centralizada pelo contêiner pai (o fragmento do chat),
     # impedindo que o botão duplique ou pisque a interface ao trocar de tela.
-
-
-
-
-
-
-
 
 
 
