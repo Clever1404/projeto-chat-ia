@@ -76,92 +76,6 @@ def carregar_plano_e_moedas_cached(id_usuario):
         pass
     return {"tipo_plano": "Grátis", "moedas": 0}
 
-# --- FUNÇÃO PARA VERIFICAR O PAGAMENTO (Mantida limpa e direta) ---
-def verificar_status_pix(id_pagamento):
-    """Consulta a API do Mercado Pago e retorna o status atualizado de forma instantânea."""
-    try:
-        payment_info = sdk.payment().get(id_pagamento)
-        return payment_info["response"]["status"]
-    except Exception as e:
-        st.error(f"Erro ao consultar Mercado Pago: {e}")
-        return "erro"
-
-
-# --- FUNÇÃO PARA ATUALIZAR O SUPABASE (VERSÃO ULTRA-OTIMIZADA) ---
-def atualizar_plano_banco_supabase(id_usuario, tipo_pagamento):
-    """
-    Atualiza o plano ou incrementa moedas no Supabase de forma atômica
-    e sincroniza o Session State do Streamlit para transição instantânea.
-    """
-    try:
-        id_usuario_int = int(id_usuario)
-        data_atual_iso = datetime.now().isoformat()
-
-        # CENÁRIO 1: Compra do Plano VIP 30 dias
-        if tipo_pagamento == "vip":
-            resposta = supabase.table("usuarios").update({
-                "tipo_plano": "vip",
-                "ultima_recarga": data_atual_iso
-            }).eq("id", id_usuario_int).execute()
-            
-            if resposta.data:
-                # ⚡ OTIMIZAÇÃO VISUAL: Sincroniza o estado da sessão local na mesma hora
-                if "dados_usuario" in st.session_state:
-                    st.session_state.dados_usuario["tipo_plano"] = "vip"
-                return True
-            return False
-            
-        # CENÁRIO 2: Compra de Pacote de Moedas
-        elif tipo_pagamento == "moedas":
-            # ⚡ OTIMIZAÇÃO CRÍTICA: Se já temos o saldo em memória no st.session_state,
-            # nós o usamos diretamente em vez de fazer um SELECT lento na API do Supabase!
-            moedas_atuais = 0
-            if "dados_usuario" in st.session_state:
-                moedas_atuais = st.session_state.dados_usuario.get("moedas", 0)
-            else:
-                # Fallback seguro por rede apenas se a sessão local estiver limpa
-                query = supabase.table("usuarios").select("moedas").eq("id", id_usuario_int).execute()
-                if query.data:
-                    moedas_atuais = query.data[0].get("moedas") or 0
-            
-            novas_moedas = moedas_atuais + 10
-            
-            # Dispara um único UPDATE atômico na rede
-            resposta = supabase.table("usuarios").update({
-                "tipo_plano": "Plano Crédito de Moedas",
-                "moedas": novas_moedas,
-                "ultima_recarga": data_atual_iso
-            }).eq("id", id_usuario_int).execute()
-            
-            if resposta.data:
-                # ⚡ OTIMIZAÇÃO VISUAL: Atualiza a memória local para a Sala Privada liberar na hora
-                if "dados_usuario" in st.session_state:
-                    st.session_state.dados_usuario["tipo_plano"] = "Plano Crédito de Moedas"
-                    st.session_state.dados_usuario["moedas"] = novas_moedas
-                return True
-            return False
-
-        # CENÁRIO 3: Retorno ou rebaixamento para o Plano Grátis
-        elif tipo_pagamento == "gratis":
-            resposta = supabase.table("usuarios").update({
-                "tipo_plano": "Grátis",
-                "moedas": 0,
-                "ultima_recarga": data_atual_iso
-            }).eq("id", id_usuario_int).execute()
-            
-            if resposta.data:
-                if "dados_usuario" in st.session_state:
-                    st.session_state.dados_usuario["tipo_plano"] = "Grátis"
-                    st.session_state.dados_usuario["moedas"] = 0
-                return True
-            return False
-
-    except ValueError:
-        st.error(f"❌ Erro crítico: O ID do usuário ('{id_usuario}') não pôde ser convertido para número inteiro.")
-        return False
-    except Exception as e:
-        st.error(f"❌ Erro crítico ao atualizar o Supabase: {e}")
-        return False 
 
 
 # ==============================================================================
@@ -1516,6 +1430,52 @@ def template_gerenciar_conexoes():
 
 
 
+@st.fragment(run_every=5.0)
+def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int):
+    # 1. INICIALIZAÇÃO SEGURA DO TEMPO
+    if "tempo_inicio_sala" not in st.session_state: 
+        st.session_state.tempo_inicio_sala = time.time()
+        
+    tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
+    tempo_restante = 600 - tempo_decorrido  # 10 minutos = 600 segundos
+    
+    if tempo_restante > 0:
+        # Exibe o cronômetro regressivo de forma limpa
+        st.warning(f"⏳ Tempo Restante: {int(tempo_restante // 60)}m {int(tempo_restante % 60)}s | Saldo: 🪙 {saldo_moedas_sala} moedas")
+    else:
+        # O tempo esgotou, tenta renovar
+        if saldo_moedas_sala >= 10:
+            try:
+                novo_saldo = saldo_moedas_sala - 10
+                id_limpo = id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
+                
+                # Executa o débito no Supabase
+                supabase.table("usuarios").update({"moedas": novo_saldo}).eq("id", int(id_limpo)).execute()
+                
+                # Sincroniza a memória instantaneamente para a Sala Privada ler o novo saldo
+                if "dados_usuario" in st.session_state: 
+                    st.session_state.dados_usuario["moedas"] = novo_saldo
+                    
+                # Reseta o cronômetro para mais 10 minutos
+                st.session_state.tempo_inicio_sala = time.time()
+                st.toast("🪙 Mais 10 minutos adicionados!", icon="🪙")
+                
+                # ⚡ OTIMIZAÇÃO CRÍTICA: Recarrega APENAS o fragmento, sem piscar ou travar o fundo do site
+                st.rerun(scope="fragment")
+                
+            except Exception as e: 
+                st.error(f"Erro ao debitar moedas: {e}")
+        else:
+            # Sem saldo: Redireciona o usuário imediatamente alterando o estado global
+            st.error("🔒 Tempo esgotado e sem moedas para renovação.")
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            
+            # Limpa o cronômetro da memória para a próxima sessão
+            if "tempo_inicio_sala" in st.session_state:
+                del st.session_state.tempo_inicio_sala
+                
+            # ⚡ OTIMIZAÇÃO CRÍTICA: Como mudamos de menu, aqui sim forçamos o rerun da tela inteira
+            st.rerun()
 
 
 # ==============================================================================
@@ -1800,53 +1760,92 @@ def template_sala_privada():
     #         st.rerun()
 
 
+# --- FUNÇÃO PARA VERIFICAR O PAGAMENTO (Mantida limpa e direta) ---
+def verificar_status_pix(id_pagamento):
+    """Consulta a API do Mercado Pago e retorna o status atualizado de forma instantânea."""
+    try:
+        payment_info = sdk.payment().get(id_pagamento)
+        return payment_info["response"]["status"]
+    except Exception as e:
+        st.error(f"Erro ao consultar Mercado Pago: {e}")
+        return "erro"
 
-@st.fragment(run_every=5.0)
-def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int):
-    # 1. INICIALIZAÇÃO SEGURA DO TEMPO
-    if "tempo_inicio_sala" not in st.session_state: 
-        st.session_state.tempo_inicio_sala = time.time()
-        
-    tempo_decorrido = time.time() - st.session_state.tempo_inicio_sala
-    tempo_restante = 600 - tempo_decorrido  # 10 minutos = 600 segundos
-    
-    if tempo_restante > 0:
-        # Exibe o cronômetro regressivo de forma limpa
-        st.warning(f"⏳ Tempo Restante: {int(tempo_restante // 60)}m {int(tempo_restante % 60)}s | Saldo: 🪙 {saldo_moedas_sala} moedas")
-    else:
-        # O tempo esgotou, tenta renovar
-        if saldo_moedas_sala >= 10:
-            try:
-                novo_saldo = saldo_moedas_sala - 10
-                id_limpo = id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
-                
-                # Executa o débito no Supabase
-                supabase.table("usuarios").update({"moedas": novo_saldo}).eq("id", int(id_limpo)).execute()
-                
-                # Sincroniza a memória instantaneamente para a Sala Privada ler o novo saldo
-                if "dados_usuario" in st.session_state: 
-                    st.session_state.dados_usuario["moedas"] = novo_saldo
-                    
-                # Reseta o cronômetro para mais 10 minutos
-                st.session_state.tempo_inicio_sala = time.time()
-                st.toast("🪙 Mais 10 minutos adicionados!", icon="🪙")
-                
-                # ⚡ OTIMIZAÇÃO CRÍTICA: Recarrega APENAS o fragmento, sem piscar ou travar o fundo do site
-                st.rerun(scope="fragment")
-                
-            except Exception as e: 
-                st.error(f"Erro ao debitar moedas: {e}")
-        else:
-            # Sem saldo: Redireciona o usuário imediatamente alterando o estado global
-            st.error("🔒 Tempo esgotado e sem moedas para renovação.")
-            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+
+# --- FUNÇÃO PARA ATUALIZAR O SUPABASE (VERSÃO ULTRA-OTIMIZADA) ---
+def atualizar_plano_banco_supabase(id_usuario, tipo_pagamento):
+    """
+    Atualiza o plano ou incrementa moedas no Supabase de forma atômica
+    e sincroniza o Session State do Streamlit para transição instantânea.
+    """
+    try:
+        id_usuario_int = int(id_usuario)
+        data_atual_iso = datetime.now().isoformat()
+
+        # CENÁRIO 1: Compra do Plano VIP 30 dias
+        if tipo_pagamento == "vip":
+            resposta = supabase.table("usuarios").update({
+                "tipo_plano": "vip",
+                "ultima_recarga": data_atual_iso
+            }).eq("id", id_usuario_int).execute()
             
-            # Limpa o cronômetro da memória para a próxima sessão
-            if "tempo_inicio_sala" in st.session_state:
-                del st.session_state.tempo_inicio_sala
-                
-            # ⚡ OTIMIZAÇÃO CRÍTICA: Como mudamos de menu, aqui sim forçamos o rerun da tela inteira
-            st.rerun()
+            if resposta.data:
+                # ⚡ OTIMIZAÇÃO VISUAL: Sincroniza o estado da sessão local na mesma hora
+                if "dados_usuario" in st.session_state:
+                    st.session_state.dados_usuario["tipo_plano"] = "vip"
+                return True
+            return False
+            
+        # CENÁRIO 2: Compra de Pacote de Moedas
+        elif tipo_pagamento == "moedas":
+            # ⚡ OTIMIZAÇÃO CRÍTICA: Se já temos o saldo em memória no st.session_state,
+            # nós o usamos diretamente em vez de fazer um SELECT lento na API do Supabase!
+            moedas_atuais = 0
+            if "dados_usuario" in st.session_state:
+                moedas_atuais = st.session_state.dados_usuario.get("moedas", 0)
+            else:
+                # Fallback seguro por rede apenas se a sessão local estiver limpa
+                query = supabase.table("usuarios").select("moedas").eq("id", id_usuario_int).execute()
+                if query.data:
+                    moedas_atuais = query.data[0].get("moedas") or 0
+            
+            novas_moedas = moedas_atuais + 10
+            
+            # Dispara um único UPDATE atômico na rede
+            resposta = supabase.table("usuarios").update({
+                "tipo_plano": "Plano Crédito de Moedas",
+                "moedas": novas_moedas,
+                "ultima_recarga": data_atual_iso
+            }).eq("id", id_usuario_int).execute()
+            
+            if resposta.data:
+                # ⚡ OTIMIZAÇÃO VISUAL: Atualiza a memória local para a Sala Privada liberar na hora
+                if "dados_usuario" in st.session_state:
+                    st.session_state.dados_usuario["tipo_plano"] = "Plano Crédito de Moedas"
+                    st.session_state.dados_usuario["moedas"] = novas_moedas
+                return True
+            return False
+
+        # CENÁRIO 3: Retorno ou rebaixamento para o Plano Grátis
+        elif tipo_pagamento == "gratis":
+            resposta = supabase.table("usuarios").update({
+                "tipo_plano": "Grátis",
+                "moedas": 0,
+                "ultima_recarga": data_atual_iso
+            }).eq("id", id_usuario_int).execute()
+            
+            if resposta.data:
+                if "dados_usuario" in st.session_state:
+                    st.session_state.dados_usuario["tipo_plano"] = "Grátis"
+                    st.session_state.dados_usuario["moedas"] = 0
+                return True
+            return False
+
+    except ValueError:
+        st.error(f"❌ Erro crítico: O ID do usuário ('{id_usuario}') não pôde ser convertido para número inteiro.")
+        return False
+    except Exception as e:
+        st.error(f"❌ Erro crítico ao atualizar o Supabase: {e}")
+        return False 
 
 
 
@@ -2640,10 +2639,10 @@ with miolo_pagina.container():
                 st.rerun() 
         with col_nav2:
          # ⚡ CORREÇÃO DEFINTIVA: Altere a rota global e use chaves estáveis
-            if st.button("🔑 Voltar para o Login", use_container_width=True, key="btn_retornar_login_desde_planos_final"):
+            if st.button("← Voltar para o Login", use_container_width=True):
                 st.session_state.opcao_menu = "login"
-                st.rerun()  # Reinicia o script global para o roteador ler a nova tela
-
+                st.rerun()
+                
         st.stop()
 
 
