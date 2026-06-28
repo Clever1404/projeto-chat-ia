@@ -208,25 +208,17 @@ if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_im
             </div>
         """, unsafe_allow_html=True)
 
-        # --- RECONHECIMENTO DO PLANO E MOEDAS (ZONA QUENTE) ---
+        # --- RECONHECIMENTO DO PLANO E MOEDAS (EM TEMPO REAL) ---
         tipo_plano = "Grátis"
         saldo_moedas = 0
         id_usuario_logado = st.session_state.get("usuario_id")
 
         if id_usuario_logado is not None:
             try:
-                registro_banco = carregar_plano_e_moedas_cached(id_usuario_logado)
-                    
-                if isinstance(registro_banco, list) and len(registro_banco) > 0:
-                    dados_reais = registro_banco[0]
-                elif isinstance(registro_banco, dict):
-                    dados_reais = registro_banco
-                else:
-                    dados_reais = {}
-
+                # ⚡ CHAMADA EM TEMPO REAL: Busca o dado direto do banco a cada render
+                dados_reais = carregar_plano_e_moedas_direto_pool(id_usuario_logado)
+                
                 plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
-                    
-                # Normalização total imune a erros
                 plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
                     
                 if "credito" in plano_norm or "moedas" in plano_norm:
@@ -239,14 +231,19 @@ if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_im
                 saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
                         
             except Exception as e:
-                st.error(f"Erro ao mapear cache de saldo: {e}")
-        else:
-            st.warning("⚠️ Usuário não identificado na sessão.")
+                st.error(f"Erro ao mapear saldo real: {e}")
 
+        # Sincroniza e força os estados locais na mesma hora
         st.session_state["tipo_plano"] = tipo_plano
         st.session_state["saldo_moedas"] = saldo_moedas
+        if "dados_usuario" in st.session_state:
+            st.session_state.dados_usuario["tipo_plano"] = tipo_plano
+            st.session_state.dados_usuario["moedas"] = saldo_moedas
 
+        # Exibe o cabeçalho comercial de créditos
         st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+        st.markdown("<hr style='border-color: #21262d; margin: 10px 0;'>", unsafe_allow_html=True)
+
         
         # --- COMPONENTE: ALTERAR FOTO DE PERFIL ---
         st.caption("📷 Enviar nova foto de perfil:")
