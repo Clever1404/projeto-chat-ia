@@ -2607,11 +2607,20 @@ with miolo_pagina.container():
                                     st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
                                     tipo = st.session_state.get("tipo_pagamento_pendente")
                                     
+                                    # Escreve o novo plano e saldo no Supabase
                                     sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo)
                                     
                                     if sucesso_banco:
-                                        st.toast("Sua conta foi atualizada com sucesso!")
+                                        # ⚡ A SOLUÇÃO: Modifica a semente do gatilho global. 
+                                        # Isso força o fragmento adormecido da Sidebar a acordar e se reconstruir do zero!
+                                        if "gatilho_atualizar_sidebar" in st.session_state:
+                                            st.session_state["gatilho_atualizar_sidebar"] += 1
+                                        else:
+                                            st.session_state["gatilho_atualizar_sidebar"] = 1
                                         
+                                        st.toast("Sua conta foi atualizada com sucesso no banco!")
+                                        
+                                        # Limpeza de chaves do Pix
                                         for chave in ["qr_code_img", "qr_code_texto", "id_pagamento_pendente", "tipo_pagamento_pendente"]:
                                             if chave in st.session_state:
                                                 del st.session_state[chave]
@@ -2619,9 +2628,9 @@ with miolo_pagina.container():
                                         if "abrir_popup_loja" in st.session_state:
                                             st.session_state.abrir_popup_loja = False
                                             
-                                        import time
                                         time.sleep(0.5)
-                                        st.rerun()
+                                        st.rerun() # Executa o Rerun global para redesenhar a Sidebar com o novo valor
+
                                     else:
                                         st.error("Erro ao computar créditos no banco. Contate o suporte.")
                                                             
