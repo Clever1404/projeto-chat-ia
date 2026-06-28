@@ -83,137 +83,14 @@ def carregar_plano_e_moedas_direto_pool(id_usuario):
     return {"tipo_plano": "Grátis", "moedas": 0}
 
 
-# ==============================================================================
-# 2. FUNÇÃO FRAGMENTADA DA SIDEBAR (BOTÕES INTERNOS)
-# ==============================================================================
-@st.fragment
-def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
-    # ⚡ O SEGREDO DO RERUN: Se o gatilho de planos mudar, o fragmento é destruído e recriado na hora!
-    gatilho_atualizacao = st.session_state.get("gatilho_atualizar_sidebar", 0)
-    
-    # Criamos um slot isolado indexado com o gatilho
-    with st.container(key=f"container_sidebar_dinamico_{gatilho_atualizacao}"):
-        possui_convite_pendente = False
-        if id_usuario_logado:
-            conn_b = None
-            try:
-                meu_id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
-                conn_b = obter_conexao_eficiente()
-                with conn_b.cursor() as cursor_b:
-                    cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
-                    count_res = cursor_b.fetchone()
-                    if count_res and count_res[0] > 0: 
-                        possui_convite_pendente = True
-            except Exception: 
-                pass
-            finally:
-                if conn_b: 
-                    liberar_conexao(conn_b)
-
-        label_gestao = "🤝 ABRIR GESTÃO 🔴" if possui_convite_pendente else "🤝 ABRIR GESTÃO"
-        if possui_convite_pendente:
-            st.markdown("<div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'><span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span></div>", unsafe_allow_html=True)
-
-        # Botões estáveis mapeados com a chave dinâmica do gatilho
-        if st.button(label_gestao, type="secondary", use_container_width=True, key=f"btn_side_gestao_{gatilho_atualizacao}"):
-            st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
-            st.rerun()
-        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria_final"): 
-            st.session_state.opcao_menu = "📅 Disponibilidade"
-            st.rerun()
-        if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_sidebar_loja_planos_final"):
-            st.session_state.opcao_menu = "planos"
-            st.rerun()
-                
-        eh_admin = st.session_state.get("eh_admin", False)
-        if eh_admin or str(username_atual).lower() in ['admin', 'cleverson', 'clever1404']:
-            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm_final"):
-                st.session_state.opcao_menu = "🛠️ Painel Admin"
-                st.rerun()     
-
-        if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True, key="btn_limpar_ia_final"):
-                if id_usuario_logado:
-                    conn = None
-                    try:
-                        id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
-                        conn = obter_conexao_eficiente()
-                        with conn.cursor() as cursor:
-                            cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (id_limpo,))
-                            conn.commit()
-                        st.toast("Histórico limpo!")
-                        time.sleep(0.5)
-                        st.rerun()
-                    except Exception as e: 
-                        if conn: conn.rollback()
-                        st.error(f"Erro ao limpar histórico: {e}")
-                    finally:
-                        if conn:
-                            liberar_conexao(conn)
-
-# ==============================================================================
-# 2. GERENCIADOR DE ROTA E REFRESH ATÔMICO (TOPO DO SCRIPT - LINHA 1)
-# ==============================================================================
-if st.session_state.get("opcao_menu") == "executar_logout_imediato":
-    id_usuario_logado = st.session_state.get("usuario_id")
-    
-    # ⚡ SEGUNDO SEGREDO: Se o ID existe, significa que veio da tela de Planos!
-    # Nós NÃO deslogamos o usuário. Apenas atualizamos a presença e mudamos a rota.
-    if id_usuario_logado:
-        try:
-            id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
-            
-            # Força uma busca limpa no banco para atualizar o Session State global
-            dados_quentes = carregar_plano_e_moedas_direto_pool(id_limpo)
-            
-            plano_bruto = str(dados_quentes.get("tipo_plano", "Grátis")).strip()
-            if "credito" in plano_bruto.lower() or "moedas" in plano_bruto.lower():
-                tipo_plano = "Plano Crédito de Moedas"
-            elif "vip" in plano_bruto.lower() or "assinante" in plano_bruto.lower():
-                tipo_plano = "vip"
-            else:
-                tipo_plano = "Grátis"
-                
-            # Sobrescreve as variáveis globais na raiz da memória do Streamlit
-            st.session_state["tipo_plano"] = tipo_plano
-            st.session_state["saldo_moedas"] = int(dados_quentes.get("moedas", 0))
-            if "dados_usuario" in st.session_state:
-                st.session_state.dados_usuario["tipo_plano"] = tipo_plano
-                st.session_state.dados_usuario["moedas"] = int(dados_quentes.get("moedas", 0))
-                
-        except Exception:
-            pass
-            
-        # Redireciona o usuário para o Chat com a barra lateral totalmente reconstruída
-        st.session_state.opcao_menu = "💬 Conversar com Lucy"
-        st.rerun()
-
-    # --- Se o ID NÃO existe, aí sim executa o fluxo de logout padrão (Mantenha igual) ---
-    else:
-        st.session_state.usuario_id = None
-        st.session_state.id_usuario = None
-        st.session_state.username = None
-        st.session_state.foto_perfil = ""
-        st.session_state.opcao_menu = "login"
-        st.session_state.form_seed = 42
-        st.rerun()
-
-# Captura o estado de menu para a Sidebar ler de forma estável abaixo
-menu_atual = st.session_state.get("opcao_menu", "home")
 
 
 # ==============================================================================
-# 4. BLOCO DA SIDEBAR GLOBAL (AQUI ELA JÁ ENXERGA TODAS AS FUNÇÕES ACIMA)
+# 2. BARRA LATERAL REATIVA GLOBAL (FULL WIDTH LOCKDOWN SEM FRAGMENTOS)
 # ==============================================================================
-if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_imediato"]:
+if menu_atual not in ["home", "login", "cadastro", "planos"]:
     with st.sidebar:
-        # (Seu código do perfil e avatar...)
-        id_usuario_logado = st.session_state.get("usuario_id")
-        username_atual = st.session_state.get("username", "Usuário")
-
-        # ==========================================================================
-        # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO E MAIOR ---
-        # ==========================================================================
-        # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO ---
+        # --- [A] PERFIL DO USUÁRIO & AVATAR CENTRALIZADO ---
         caminho_foto_perfil = str(st.session_state.get("foto_perfil", "")).strip()
                 
         col_esq, col_centro, col_dir = st.columns([1, 2, 1])
@@ -232,45 +109,8 @@ if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_im
                 <p style="color: #48bb78; font-weight: bold; font-size: 13px; margin: 4px 0 0 0;">🟢 Online</p>
             </div>
         """, unsafe_allow_html=True)
-
-        # --- RECONHECIMENTO DO PLANO E MOEDAS (EM TEMPO REAL) ---
-        tipo_plano = "Grátis"
-        saldo_moedas = 0
-        id_usuario_logado = st.session_state.get("usuario_id")
-
-        if id_usuario_logado is not None:
-            try:
-                # ⚡ CHAMADA EM TEMPO REAL: Busca o dado direto do banco a cada render
-                dados_reais = carregar_plano_e_moedas_direto_pool(id_usuario_logado)
-                
-                plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
-                plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
-                    
-                if "credito" in plano_norm or "moedas" in plano_norm:
-                    tipo_plano = "Plano Crédito de Moedas"
-                elif "vip" in plano_norm or "assinante" in plano_norm:
-                    tipo_plano = "vip"
-                else:
-                    tipo_plano = "Grátis"
-                        
-                saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
-                        
-            except Exception as e:
-                st.error(f"Erro ao mapear saldo real: {e}")
-
-        # Sincroniza e força os estados locais na mesma hora
-        st.session_state["tipo_plano"] = tipo_plano
-        st.session_state["saldo_moedas"] = saldo_moedas
-        if "dados_usuario" in st.session_state:
-            st.session_state.dados_usuario["tipo_plano"] = tipo_plano
-            st.session_state.dados_usuario["moedas"] = saldo_moedas
-
-        # Exibe o cabeçalho comercial de créditos
-        st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
-        st.markdown("<hr style='border-color: #21262d; margin: 10px 0;'>", unsafe_allow_html=True)
-
         
-        # --- COMPONENTE: ALTERAR FOTO DE PERFIL ---
+           # --- COMPONENTE: ALTERAR FOTO DE PERFIL ---
         st.caption("📷 Enviar nova foto de perfil:")
         f_nova = st.file_uploader(
             "Alterar Foto", 
@@ -328,24 +168,131 @@ if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_im
 
         st.markdown("---") # Divisor visual rápido
 
-        # ======================================================================
-        # ⚡ 🚀 A CORREÇÃO: CHAMADA REAL E OBRIGATÓRIA DO FRAGMENTO 🚀 ⚡
-        # ======================================================================
-        # Certifique-se de que esta linha NÃO tenha recuo excessivo. Ela deve estar 
-        # alinhada estritamente sob o recuo do "with st.sidebar:"
-        renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual) 
+        # --- [B] RECONHECIMENTO DO PLANO E MOEDAS EM TEMPO REAL ---
+        tipo_plano = "Grátis"
+        saldo_moedas = 0
+        id_usuario_logado = st.session_state.get("usuario_id")
 
-        # ======================================================================
+        if id_usuario_logado is not None:
+            try:
+                # Busca instantânea direta do Pool de Conexões (Leva menos de 1ms)
+                dados_reais = carregar_plano_e_moedas_direto_pool(id_usuario_logado)
+                
+                plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
+                plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
+                    
+                if "credito" in plano_norm or "moedas" in plano_norm:
+                    tipo_plano = "Plano Crédito de Moedas"
+                elif "vip" in plano_norm or "assinante" in plano_norm:
+                    tipo_plano = "vip"
+                else:
+                    tipo_plano = "Grátis"
+                        
+                saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
+                        
+            except Exception as e:
+                st.error(f"Erro ao ler saldo real: {e}")
 
-        st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True) 
-            
-        # Botão Encerrar Sessão (Logout global mantido na base externa do fragmento)
-        if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema_final"):
-            st.session_state.opcao_menu = "executar_logout_imediato"
+        # Sincroniza e trava os estados na memória raiz do Streamlit
+        st.session_state["tipo_plano"] = tipo_plano
+        st.session_state["saldo_moedas"] = saldo_moedas
+        if "dados_usuario" in st.session_state:
+            st.session_state.dados_usuario["tipo_plano"] = tipo_plano
+            st.session_state.dados_usuario["moedas"] = saldo_moedas
+
+        # Exibe o cabeçalho comercial de créditos
+        st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+        st.markdown("<hr style='border-color: #21262d; margin: 10px 0;'>", unsafe_allow_html=True)
+
+        # --- [C] MOTOR DE BUSCA DA NOTIFICAÇÃO (Roda nativo e leve) ---
+        possui_convite_pendente = False
+        if id_usuario_logado:
+            conn_b = None
+            try:
+                meu_id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
+                conn_b = obter_conexao_eficiente()
+                with conn_b.cursor() as cursor_b:
+                    cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
+                    count_res = cursor_b.fetchone()
+                    if count_res and count_res[0] > 0: 
+                        possui_convite_pendente = True
+            except Exception: 
+                pass
+            finally:
+                if conn_b:
+                    liberar_conexao(conn_b)
+
+        label_gestao = "🤝 ABRIR GESTÃO 🔴" if possui_convite_pendente else "🤝 ABRIR GESTÃO"
+        if possui_convite_pendente:
+            st.markdown("""
+                <div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'>
+                    <span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # --- [D] BOTÕES DE NAVEGAÇÃO REATIVOS (CHAVES FIXAS ESTÁVEIS) ---
+        # Como estão fora de fragmentos, um único clique altera a rota global e redesenha o miolo instantaneamente!
+        if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_final_real"):
+            st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
             st.rerun()
-        
-    
+                
+        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_sidebar_grade_final_real"): 
+            st.session_state.opcao_menu = "📅 Disponibilidade"
+            st.rerun()
+                
+        if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_sidebar_loja_final_real"):
+            st.session_state.opcao_menu = "planos"
+            st.rerun()
+                
+        # Validação administrativa
+        eh_admin = st.session_state.get("eh_admin", False)
+        if eh_admin or str(username_atual).lower() in ['admin', 'cleverson', 'clever1404']:
+            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_sidebar_adm_final_real"):
+                st.session_state.opcao_menu = "🛠️ Painel Admin"
+                st.rerun()  
 
+        if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True, key="btn_limpar_ia_final"):
+            if id_usuario_logado:
+                conn = None
+                try:
+                    id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
+                    conn = obter_conexao_eficiente()
+                    with conn.cursor() as cursor:
+                        cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (id_limpo,))
+                        conn.commit()
+                    
+                    st.toast("Histórico limpo!")
+                    time.sleep(0.5)
+                    st.rerun()
+                except Exception as e: 
+                    if conn: conn.rollback()
+                    st.error(f"Erro ao limpar histórico: {e}")
+                        
+
+        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
+            
+        # Botão de Logout Nativo
+        if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema_final_real"):
+            conn_logout = None
+            try:
+                id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
+                conn_logout = obter_conexao_eficiente()
+                with conn_logout.cursor() as cursor_logout:
+                    cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (id_limpo,))
+                    conn_logout.commit()
+            except Exception:
+                if conn_logout: conn_logout.rollback()
+            finally:
+                if conn_logout: liberar_conexao(conn_logout)
+            
+            # Reseta a sessão de forma limpa
+            st.session_state.usuario_id = None
+            st.session_state.id_usuario = None
+            st.session_state.username = None
+            st.session_state.foto_perfil = ""
+            st.session_state.opcao_menu = "login"
+            st.rerun() 
+    
 
 # st.title("⚡ Diagnóstico de Conexão: Streamlit ⇄ Supabase")
 # # --- INICIALIZAÇÃO DO SUPABASE ---
