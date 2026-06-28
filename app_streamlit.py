@@ -2026,7 +2026,6 @@ def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
                     liberar_conexao(conn)
 
 
-
 # ==============================================================================
 # 8. ROTEADOR DE FLUXO GLOBAL (CORREÇÃO DE DIALOGS DUPLICADOS)
 # ==============================================================================
@@ -2214,20 +2213,25 @@ if menu_atual not in ["home", "login", "cadastro"]:
             
             st.rerun()          
         
-        
 # ==============================================================================
-# 3. ROTEADOR DE INTERFACE DO MIOLO (ESTRUTURA RADICAL ANTI-FANTASMA)
+# 3. ROTEADOR DE INTERFACE DO MIOLO (GESTÃO CENTRALIZADA)
 # ==============================================================================
-
-# Se o usuário acabou de logar, limpamos o contêiner de login antes de desenhar o resto
-if st.session_state.get("usuario_id") and "contener_login_ativo" in st.session_state:
-    st.session_state.contener_login_ativo.empty()  # ⚡ Destrói fisicamente o HTML do login do navegador
-    del st.session_state["contener_login_ativo"]   # Remove o rastreador da memória
-
-# Criamos o slot dinâmico para o miolo do site
 miolo_pagina = st.empty()
 
 with miolo_pagina.container():
+    
+    # ⚡ MODAL SIMULADO RESTRITO: Se o dicionário de agendamento existir, ele assume a tela toda 
+    # e corta fisicamente a execução ali (st.stop), impedindo que qualquer botão ou clique o feche.
+    if st.session_state.get("abrir_reserva_fluxo"):
+        modal_agendamento_encontro(st.session_state.abrir_reserva_fluxo)
+        st.stop()  # 👈 ISSO AQUI PRENDE O FORMULÁRIO NA TELA INDEPENDENTE DOS CLIQUES!        
+
+
+# # Se o usuário acabou de logar, limpamos o contêiner de login antes de desenhar o resto
+# if st.session_state.get("usuario_id") and "contener_login_ativo" in st.session_state:
+#     st.session_state.contener_login_ativo.empty()  # ⚡ Destrói fisicamente o HTML do login do navegador
+#     del st.session_state["contener_login_ativo"]   # Remove o rastreador da memória
+
     
     if menu_atual == "home":
         # Código otimizado da sua Home (aquele com markdown unificado e sem else)
