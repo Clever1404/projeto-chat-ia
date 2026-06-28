@@ -102,24 +102,24 @@ def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
             if conn_b: liberar_conexao(conn_b)
 
     label_gestao = "🤝 ABRIR GESTÃO 🔴" if possui_convite_pendente else "🤝 ABRIR GESTÃO"
-    if possui_convite_pendente:
-        st.markdown("<div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'><span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span></div>", unsafe_allow_html=True)
+        if possui_convite_pendente:
+            st.markdown("<div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'><span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span></div>", unsafe_allow_html=True)
 
-    if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel_final"):
-        st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
-        st.rerun()
-    if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria_final"): 
-        st.session_state.opcao_menu = "📅 Disponibilidade"
-        st.rerun()
-    if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_sidebar_loja_planos_final"):
-        st.session_state.opcao_menu = "planos"
-        st.rerun()
+        if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel_final"):
+            st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
+            st.rerun()
+        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria_final"): 
+            st.session_state.opcao_menu = "📅 Disponibilidade"
+            st.rerun()
+        if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_sidebar_loja_planos_final"):
+            st.session_state.opcao_menu = "planos"
+            st.rerun()
             
-    eh_admin = st.session_state.get("eh_admin", False)
-    if eh_admin or str(username_atual).lower() in ['admin', 'cleverson', 'clever1404']:
-        if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm_final"):
-            st.session_state.opcao_menu = "🛠️ Painel Admin"
-            st.rerun()     
+        eh_admin = st.session_state.get("eh_admin", False)
+        if eh_admin or str(username_atual).lower() in ['admin', 'cleverson', 'clever1404']:
+            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm_final"):
+                st.session_state.opcao_menu = "🛠️ Painel Admin"
+                st.rerun()     
 
 
 # ==============================================================================
