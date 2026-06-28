@@ -1847,6 +1847,7 @@ def template_painel_admin():
 
         # --- COLUNA DO SEGUNDO GRÁFICO (PIZZA COMERCIAL) ---
         with g2: 
+
             if salas_query.data:
                 # 2. Cria o DataFrame dos usuários
                 df_usuarios = pd.DataFrame(salas_query.data)
@@ -1864,12 +1865,12 @@ def template_painel_admin():
                 visao_perfil = st.sidebar.selectbox(
                     "Visualizar no gráfico:",
                     options=["Apenas Clientes", "Todos (Incluir Admin)"],
-                    index=0 # Padrão: Mostra apenas clientes para não distorcer a visão comercial
+                    index=0  # Padrão: Mostra apenas clientes para não distorcer a visão comercial
                 )
 
                 
 
-                # 4. CONTAGEM SEPARANDO O ADMIN DO VIP
+            # 4. CONTAGEM SEPARANDO O ADMIN DO VIP
                 is_admin = df_usuarios["tipo_plano_limpo"].str.contains("admin", na=False)
                 is_vip = df_usuarios["tipo_plano_limpo"].str.contains("vip", na=False) & (~is_admin) # VIP puro (sem admin)
                 is_gratis_puro = df_usuarios["tipo_plano_limpo"].str.contains("grátis|gratis", na=False)
@@ -2105,7 +2106,7 @@ def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
         st.session_state.opcao_menu = "📅 Disponibilidade"
         st.rerun()
             
-    if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_sidebar_loja_planos_final"):
+    if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True):
         st.session_state.opcao_menu = "planos"
         st.rerun()
             
