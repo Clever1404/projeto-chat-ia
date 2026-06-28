@@ -829,9 +829,11 @@ def processar_match_lucy(dados_m):
 # ==============================================================================
 # FUNÇÃO ISOLADA COM BUFFER DE MEMÓRIA (INPUT EMBAIXO E MENSAGENS EM CIMA)
 # ==============================================================================
-@st.fragment
+# ⚡ O SEGREDO: O decorador do fragmento agora assiste à semente de recarga global
+# Se a semente mudar na tela de planos, o fragmento inteiro se reconstrói com o st.chat_input ativo!
+@st.fragment(key=f"chat_fragmento_instancia_{st.session_state.get('seed_recarregar_chat', 0)}")
 def renderizar_chat_lucy_isolado():
-    # Inicializa variáveis de controle de estado do fragmento
+    # Mantenha TODA a sua lógica interna do chat exatamente igual, sem mexer em nada!
     if "opcao_menu" not in st.session_state:
         st.session_state.opcao_menu = "chat"
     
@@ -2626,15 +2628,12 @@ with miolo_pagina.container():
 
 
     elif menu_atual == "💬 Conversar com Lucy":
-        # ⚡ O SEGREDO DA CAIXA DE TEXTO: Inicializa um contador de re-renderização
+       # ⚡ Inicializa a semente caso ela não exista
         if "seed_recarregar_chat" not in st.session_state:
             st.session_state["seed_recarregar_chat"] = 0
             
-        # Passamos a semente como chave para forçar o Streamlit a desenhar o st.chat_input do zero
-        chave_chat = st.session_state["seed_recarregar_chat"]
-        
-        # Invoque a função passando a chave (garanta que sua função aceite este argumento)
-        renderizar_chat_lucy_isolado(key=f"chat_instancia_{chave_chat}")
+        # ⚡ CORREÇÃO: Chame a função pura, sem passar argumentos dentro dela!
+        renderizar_chat_lucy_isolado()
         st.stop()
 
     elif menu_atual == "🛠️ Painel Admin":
