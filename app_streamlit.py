@@ -2354,7 +2354,7 @@ with miolo_pagina.container():
       
     elif menu_atual == "📅 Disponibilidade":
         template_disponibilidade()
-        
+        st.stop()
         
     elif menu_atual == "🤝 Gerenciar Conexões":
         template_gerenciar_conexoes()
