@@ -2593,7 +2593,7 @@ with miolo_pagina.container():
                 st.session_state.opcao_menu = "login"
                 st.rerun()
 
-    st.stop()
+        st.stop()
 
 
     elif menu_atual == "💬 Conversar com Lucy":
