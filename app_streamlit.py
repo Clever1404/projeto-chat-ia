@@ -121,6 +121,24 @@ def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
             st.session_state.opcao_menu = "🛠️ Painel Admin"
             st.rerun()     
 
+    if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True, key="btn_limpar_ia_final"):
+            if id_usuario_logado:
+                conn = None
+                try:
+                    id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
+                    conn = obter_conexao_eficiente()
+                    with conn.cursor() as cursor:
+                        cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (id_limpo,))
+                        conn.commit()
+                    st.toast("Histórico limpo!")
+                    time.sleep(0.5)
+                    st.rerun()
+                except Exception as e: 
+                    if conn: conn.rollback()
+                    st.error(f"Erro ao limpar histórico: {e}")
+                finally:
+                    if conn:
+                        liberar_conexao(conn)
 
 # ==============================================================================
 # 3. GERENCIADOR DE LOGOUT RÁPIDO INTERCEPTADOR
@@ -191,13 +209,18 @@ if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_im
 
         if id_usuario_logado is not None:
             try:
-                # Dispara a função global de cache que movemos para o topo
-                dados_reais = carregar_plano_e_moedas_cached(id_usuario_logado)
-                
-                if isinstance(dados_reais, list) and len(dados_reais) > 0:
-                    dados_reais = dados_reais[0]
+                registro_banco = carregar_plano_e_moedas_cached(id_usuario_logado)
+                    
+                if isinstance(registro_banco, list) and len(registro_banco) > 0:
+                    dados_reais = registro_banco[0]
+                elif isinstance(registro_banco, dict):
+                    dados_reais = registro_banco
+                else:
+                    dados_reais = {}
 
                 plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
+                    
+                # Normalização total imune a erros
                 plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
                     
                 if "credito" in plano_norm or "moedas" in plano_norm:
@@ -211,15 +234,14 @@ if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_im
                         
             except Exception as e:
                 st.error(f"Erro ao mapear cache de saldo: {e}")
+        else:
+            st.warning("⚠️ Usuário não identificado na sessão.")
 
-        # Sincroniza estados globais
         st.session_state["tipo_plano"] = tipo_plano
         st.session_state["saldo_moedas"] = saldo_moedas
 
-        # Exibe o cabeçalho comercial de créditos
         st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
-        st.markdown("<hr style='border-color: #21262d; margin: 10px 0;'>", unsafe_allow_html=True)
-
+        
         # --- COMPONENTE: ALTERAR FOTO DE PERFIL ---
         st.caption("📷 Enviar nova foto de perfil:")
         f_nova = st.file_uploader(
