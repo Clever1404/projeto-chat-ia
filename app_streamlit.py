@@ -73,7 +73,8 @@ def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
             conn_b = obter_conexao_eficiente()
             with conn_b.cursor() as cursor_b:
                 cursor_b.execute(
-                    "SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo sunsets,)
+                    "SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", 
+                    (meu_id_limpo,)
                 )
                 count_res = cursor_b.fetchone()
                 if count_res and count_res[0] > 0: 
