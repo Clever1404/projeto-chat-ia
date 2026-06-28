@@ -102,24 +102,24 @@ def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
             if conn_b: liberar_conexao(conn_b)
 
     label_gestao = "🤝 ABRIR GESTÃO 🔴" if possui_convite_pendente else "🤝 ABRIR GESTÃO"
-        if possui_convite_pendente:
-            st.markdown("<div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'><span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span></div>", unsafe_allow_html=True)
+    if possui_convite_pendente:
+        st.markdown("<div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'><span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span></div>", unsafe_allow_html=True)
 
-        if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel_final"):
-            st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
-            st.rerun()
-        if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria_final"): 
-            st.session_state.opcao_menu = "📅 Disponibilidade"
-            st.rerun()
-        if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_sidebar_loja_planos_final"):
-            st.session_state.opcao_menu = "planos"
-            st.rerun()
-            
-        eh_admin = st.session_state.get("eh_admin", False)
-        if eh_admin or str(username_atual).lower() in ['admin', 'cleverson', 'clever1404']:
-            if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm_final"):
-                st.session_state.opcao_menu = "🛠️ Painel Admin"
-                st.rerun()     
+    if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel_final"):
+        st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
+        st.rerun()
+    if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria_final"): 
+        st.session_state.opcao_menu = "📅 Disponibilidade"
+        st.rerun()
+    if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_sidebar_loja_planos_final"):
+        st.session_state.opcao_menu = "planos"
+        st.rerun()
+        
+    eh_admin = st.session_state.get("eh_admin", False)
+    if eh_admin or str(username_atual).lower() in ['admin', 'cleverson', 'clever1404']:
+        if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm_final"):
+            st.session_state.opcao_menu = "🛠️ Painel Admin"
+            st.rerun()     
 
 
 # ==============================================================================
@@ -164,18 +164,16 @@ if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_im
         # ==========================================================================
         # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO E MAIOR ---
         # ==========================================================================
+        # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO ---
         caminho_foto_perfil = str(st.session_state.get("foto_perfil", "")).strip()
                 
-        # Alinhamento no centro absoluto da barra lateral via colunas
         col_esq, col_centro, col_dir = st.columns([1, 2, 1])
         with col_centro:
-            # Otimizado: Verifica apenas links web estáveis válidos de forma nativa e segura
             if caminho_foto_perfil and caminho_foto_perfil.startswith("http"):
                 st.image(caminho_foto_perfil, width=85)
             else:
                 st.markdown('<div style="font-size: 65px; text-align:center; margin-top: -10px;">👩</div>', unsafe_allow_html=True)
 
-        # Extração limpa do nome do usuário antes do '@'
         username_atual = st.session_state.get("username", "Usuário")
         nome_usuario_puro = str(username_atual).split('@')[0].capitalize()
 
@@ -186,20 +184,51 @@ if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_im
             </div>
         """, unsafe_allow_html=True)
 
-        
-                            
-        # ==========================================================================
-        # --- COMPONENTE: ALTERAR FOTO DE PERFIL (CORREÇÃO ANTI-LOOP NO POOL) ---
-        # ==========================================================================
+        # --- RECONHECIMENTO DO PLANO E MOEDAS (ZONA QUENTE) ---
+        tipo_plano = "Grátis"
+        saldo_moedas = 0
+        id_usuario_logado = st.session_state.get("usuario_id")
+
+        if id_usuario_logado is not None:
+            try:
+                # Dispara a função global de cache que movemos para o topo
+                dados_reais = carregar_plano_e_moedas_cached(id_usuario_logado)
+                
+                if isinstance(dados_reais, list) and len(dados_reais) > 0:
+                    dados_reais = dados_reais[0]
+
+                plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
+                plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
+                    
+                if "credito" in plano_norm or "moedas" in plano_norm:
+                    tipo_plano = "Plano Crédito de Moedas"
+                elif "vip" in plano_norm or "assinante" in plano_norm:
+                    tipo_plano = "vip"
+                else:
+                    tipo_plano = "Grátis"
+                        
+                saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
+                        
+            except Exception as e:
+                st.error(f"Erro ao mapear cache de saldo: {e}")
+
+        # Sincroniza estados globais
+        st.session_state["tipo_plano"] = tipo_plano
+        st.session_state["saldo_moedas"] = saldo_moedas
+
+        # Exibe o cabeçalho comercial de créditos
+        st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+        st.markdown("<hr style='border-color: #21262d; margin: 10px 0;'>", unsafe_allow_html=True)
+
+        # --- COMPONENTE: ALTERAR FOTO DE PERFIL ---
         st.caption("📷 Enviar nova foto de perfil:")
-            
         f_nova = st.file_uploader(
             "Alterar Foto", 
             type=["png","jpg","jpeg"], 
             key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
             label_visibility="collapsed"
         ) 
-            
+      
         if f_nova and id_usuario_logado: 
             id_limpo = id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
             nome_arquivo_storage = f"user_{id_limpo}.jpg"
@@ -249,56 +278,23 @@ if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_im
 
         st.markdown("---") # Divisor visual rápido
 
-        # ==========================================================================
-        # --- CONSULTA 1: PLANO E SALDO REAL (CACHED E ACELERADO NO POOL) ---
-        # ==========================================================================
-        tipo_plano = "Grátis"
-        saldo_moedas = 0
-        id_usuario_logado = st.session_state.get("usuario_id")
-        # ⚡ EXECUÇÃO DE PLANO CACHED: Encontrada com sucesso porque foi movida para cima!
-        if id_usuario_logado is not None:
-            try:
-                registro_banco = carregar_plano_e_moedas_cached(id_usuario_logado)
-                # ... (suas lógicas normais de desempacotamento de plano e moedas que organizamos antes) .. 
-                  
-                if isinstance(registro_banco, list) and len(registro_banco) > 0:
-                    dados_reais = registro_banco[0]
-                elif isinstance(registro_banco, dict):
-                    dados_reais = registro_banco
-                else:
-                    dados_reais = {}
+        # ======================================================================
+        # ⚡ 🚀 A CORREÇÃO: CHAMADA REAL E OBRIGATÓRIA DO FRAGMENTO 🚀 ⚡
+        # ======================================================================
+        # Certifique-se de que esta linha NÃO tenha recuo excessivo. Ela deve estar 
+        # alinhada estritamente sob o recuo do "with st.sidebar:"
+        renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual) 
 
-                plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
-                    
-                # Normalização total imune a erros
-                plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
-                    
-                if "credito" in plano_norm or "moedas" in plano_norm:
-                    tipo_plano = "Plano Crédito de Moedas"
-                elif "vip" in plano_norm or "assinante" in plano_norm:
-                    tipo_plano = "vip"
-                else:
-                    tipo_plano = "Grátis"
-                        
-                saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
-                        
-            except Exception as e:
-                st.error(f"Erro ao mapear cache de saldo: {e}")
-        else:
-            st.warning("⚠️ Usuário não identificado na sessão.")
+        # ======================================================================
 
-        st.session_state["tipo_plano"] = tipo_plano
-        st.session_state["saldo_moedas"] = saldo_moedas
-
-        st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
-          
-
-        
-        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
+        st.markdown("<div style='height: 30px;'></div>", unsafe_allow_html=True) 
+            
+        # Botão Encerrar Sessão (Logout global mantido na base externa do fragmento)
         if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema_final"):
             st.session_state.opcao_menu = "executar_logout_imediato"
             st.rerun()
-
+        
+    
 
 
 # st.title("⚡ Diagnóstico de Conexão: Streamlit ⇄ Supabase")
