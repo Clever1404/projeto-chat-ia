@@ -1,5 +1,5 @@
 openai>=1.0.0
-streamlit
+streamlit.=1.30.0
 psycopg[binary]
 altair
 pandas
@@ -11,5 +11,5 @@ google-genai
 psycopg2-binary
 supabase
 mercadopago
-supabase
+supabase>=2.0.0
 bcrypt
