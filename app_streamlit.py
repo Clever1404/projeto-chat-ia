@@ -977,8 +977,16 @@ def template_disponibilidade():
             st.rerun()
 
 
-def template_gerenciar_conexoes():  
-# ... (todo o resto do bloco with st.sidebar) ...
+def template_gerenciar_conexoes():
+    # ⚡ TRAVA DE SEGURANÇA ANTINULA (LINHA 989 CORRIGIDA)
+    id_sessao = st.session_state.get("usuario_id")
+    
+    # Se o ID não existir ou for nulo (usuário deslogado), bloqueia a tela e joga para o login
+    if id_sessao is None:
+        st.warning("🔒 Acesso restrito. Por favor, faça login para gerenciar suas conexões.")
+        st.session_state.opcao_menu = "login"
+        st.st_stop() if hasattr(st, "st_stop") else st.stop()
+
     st.title("🤝 Gestão de Relacionamentos") 
 
     if st.button("← Voltar para o Chat da Lucy", type="secondary", key="btn_voltar_lucy_gestao"):
@@ -986,7 +994,9 @@ def template_gerenciar_conexoes():
         st.rerun()
                 
     aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
-    meu_id_limpo = int(st.session_state.usuario_id) if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id[0])
+    
+    # Desempacota com segurança garantindo que o dado já é válido e não nulo
+    meu_id_limpo = int(id_sessao if not isinstance(id_sessao, (tuple, list)) else id_usuario_logado)
 
     # Captura e normalização estável do plano do usuário para as travas de negócio
     plano_atual = str(st.session_state.get("tipo_plano", "grátis")).strip().lower()
@@ -2160,16 +2170,14 @@ def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
                 if conn:
                     liberar_conexao(conn)
 
-
 # ==============================================================================
-# 8. ROTEADOR DE FLUXO GLOBAL (CORREÇÃO DE DIALOGS DUPLICADOS)
+# INITIALIZATION DE SEGURANÇA NA LINHA 1
 # ==============================================================================
-
-# 1. Garante os estados iniciais de navegação
 if "opcao_menu" not in st.session_state:
-    st.session_state.opcao_menu = "home"
+    st.session_state["opcao_menu"] = "home"
 
-menu_atual = st.session_state.opcao_menu
+if "usuario_id" not in st.session_state:
+    st.session_state["usuario_id"] = None
 
 # ==============================================================================
 # CHAMADA DENTRO DO SEU WITH ST.SIDEBAR GLOBAL
@@ -2663,7 +2671,15 @@ with miolo_pagina.container():
     elif menu_atual == "💬 Conversar com Lucy":
         renderizar_chat_lucy_isolado()
         st.stop()
-      
+
+
+    elif menu_atual == "🛠️ Painel Admin":
+        template_painel_admin()
+
+    elif st.session_state.opcao_menu == "✉️ Fale Conosco":
+        template_fale_conosco()   
+
+
     elif menu_atual == "📅 Disponibilidade":
         template_disponibilidade()
         st.stop()
@@ -2681,10 +2697,7 @@ with miolo_pagina.container():
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
             st.rerun()
                     
-    elif menu_atual == "🛠️ Painel Admin":
-        template_painel_admin()
-    elif st.session_state.opcao_menu == "✉️ Fale Conosco":
-        template_fale_conosco()          
+       
 
     #    st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
 
