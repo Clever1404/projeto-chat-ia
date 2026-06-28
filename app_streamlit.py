@@ -48,12 +48,67 @@ if "foto_perfil" not in st.session_state:
 menu_atual = st.session_state.opcao_menu
 
 # ==============================================================================
-# 1. GERENCIADOR DE LOGOUT RÁPIDO (TOPO DO SCRIPT - ANTES DA SIDEBAR)
+# 0. DECLARAÇÃO GLOBAL DE SEGURANÇA (TOP DO ARQUIVO)
 # ==============================================================================
-# Se a rota de logout for acionada, ela limpa tudo aqui no topo em microssegundos
+try:
+    from werkzeug.security import check_password_hash, generate_password_hash
+except ImportError:
+    import bcrypt
+    def check_password_hash(hash_banco, senha_digitada):
+        if isinstance(hash_banco, str): hash_banco = hash_banco.encode('utf-8')
+        return bcrypt.checkpw(senha_digitada.encode('utf-8'), hash_banco)
+    def generate_password_hash(senha_digitada):
+        return bcrypt.hashpw(senha_digitada.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+# ==============================================================================
+# 1. FUNÇÃO FRAGMENTADA DA SIDEBAR (PRECISA FICAR AQUI NO TOPO)
+# ==============================================================================
+@st.fragment
+def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
+    possui_convite_pendente = False
+    if id_usuario_logado:
+        conn_b = None
+        try:
+            meu_id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
+            conn_b = obter_conexao_eficiente()
+            with conn_b.cursor() as cursor_b:
+                cursor_b.execute(
+                    "SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", 
+                    (meu_id_limpo sunsets,)
+                )
+                count_res = cursor_b.fetchone()
+                if count_res and count_res[0] > 0: 
+                    possui_convite_pendente = True
+        except Exception: 
+            pass
+        finally:
+            if conn_b: liberar_conexao(conn_b)
+
+    label_gestao = "🤝 ABRIR GESTÃO 🔴" if possui_convite_pendente else "🤝 ABRIR GESTÃO"
+    if possui_convite_pendente:
+        st.markdown("<div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'><span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span></div>", unsafe_allow_html=True)
+
+    if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel_final"):
+        st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
+        st.rerun()
+    if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria_final"): 
+        st.session_state.opcao_menu = "📅 Disponibilidade"
+        st.rerun()
+    if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True, key="btn_sidebar_loja_planos_final"):
+        st.session_state.opcao_menu = "planos"
+        st.rerun()
+            
+    eh_admin = st.session_state.get("eh_admin", False)
+    if eh_admin or str(username_atual).lower() in ['admin', 'cleverson', 'clever1404']:
+        if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm_final"):
+            st.session_state.opcao_menu = "🛠️ Painel Admin"
+            st.rerun()     
+
+# ==============================================================================
+# 2. GERENCIADOR DE LOGOUT RÁPIDO INTERCEPTADOR
+# ==============================================================================
 if st.session_state.get("opcao_menu") == "executar_logout_imediato":
     id_usuario_logado = st.session_state.get("usuario_id")
-    
     if id_usuario_logado:
         conn_logout = None
         try:
@@ -65,10 +120,8 @@ if st.session_state.get("opcao_menu") == "executar_logout_imediato":
         except Exception:
             if conn_logout: conn_logout.rollback()
         finally:
-            if conn_logout: 
-                liberar_conexao(conn_logout)
+            if conn_logout: liberar_conexao(conn_logout)
     
-    # Reseta as chaves essenciais na memória sem destruir o dicionário do Streamlit
     st.session_state.usuario_id = None
     st.session_state.id_usuario = None
     st.session_state.username = None
@@ -77,25 +130,155 @@ if st.session_state.get("opcao_menu") == "executar_logout_imediato":
     st.session_state.form_seed = 42
     st.rerun()
 
-# Captura o menu estável para o restante do arquivo
+# Capture o estado de menu para a Sidebar ler com segurança abaixo
 menu_atual = st.session_state.get("opcao_menu", "home")
 
 # ==============================================================================
-# 2. BARRA LATERAL PROTEGIDA
+# 3. BLOCO DA SIDEBAR GLOBAL (AQUI ELA JÁ ENXERGA A FUNÇÃO ACIMA)
 # ==============================================================================
-if menu_atual not in ["home", "login", "cadastro", "executar_logout_imediato"]:
+if menu_atual not in ["home", "login", "cadastro", "planos", "executar_logout_imediato"]:
     with st.sidebar:
-        # ... (código do seu avatar, perfil e plano cached que organizamos) ...
+        # (Seu código do perfil, avatar e plano_cached)
+        id_usuario_logado = st.session_state.get("usuario_id")
+        username_atual = st.session_state.get("username", "Usuário")
+
+        # ==========================================================================
+        # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO E MAIOR ---
+        # ==========================================================================
+        caminho_foto_perfil = str(st.session_state.get("foto_perfil", "")).strip()
+                
+        # Alinhamento no centro absoluto da barra lateral via colunas
+        col_esq, col_centro, col_dir = st.columns([1, 2, 1])
+        with col_centro:
+            # Otimizado: Verifica apenas links web estáveis válidos de forma nativa e segura
+            if caminho_foto_perfil and caminho_foto_perfil.startswith("http"):
+                st.image(caminho_foto_perfil, width=85)
+            else:
+                st.markdown('<div style="font-size: 65px; text-align:center; margin-top: -10px;">👩</div>', unsafe_allow_html=True)
+
+        # Extração limpa do nome do usuário antes do '@'
+        username_atual = st.session_state.get("username", "Usuário")
+        nome_usuario_puro = str(username_atual).split('@')[0].capitalize()
+
+        st.markdown(f"""
+            <div style="text-align: center; margin-bottom: 20px; margin-top: 5px;">
+                <h3 style="margin: 0; font-size: 17px; font-weight: bold; color: #f0f6fc;">{nome_usuario_puro}</h3>
+                <p style="color: #48bb78; font-weight: bold; font-size: 13px; margin: 4px 0 0 0;">🟢 Online</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # ==========================================================================
+        # --- CONSULTA 1: PLANO E SALDO REAL (CACHED E ACELERADO NO POOL) ---
+        # ==========================================================================
+        tipo_plano = "Grátis"
+        saldo_moedas = 0
+        id_usuario_logado = st.session_state.get("usuario_id")
+
+        if id_usuario_logado is not None:
+            try:
+                registro_banco = carregar_plano_e_moedas_cached(id_usuario_logado)
+                    
+                if isinstance(registro_banco, list) and len(registro_banco) > 0:
+                    dados_reais = registro_banco[0]
+                elif isinstance(registro_banco, dict):
+                    dados_reais = registro_banco
+                else:
+                    dados_reais = {}
+
+                plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
+                    
+                # Normalização total imune a erros
+                plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
+                    
+                if "credito" in plano_norm or "moedas" in plano_norm:
+                    tipo_plano = "Plano Crédito de Moedas"
+                elif "vip" in plano_norm or "assinante" in plano_norm:
+                    tipo_plano = "vip"
+                else:
+                    tipo_plano = "Grátis"
+                        
+                saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
+                        
+            except Exception as e:
+                st.error(f"Erro ao mapear cache de saldo: {e}")
+        else:
+            st.warning("⚠️ Usuário não identificado na sessão.")
+
+        st.session_state["tipo_plano"] = tipo_plano
+        st.session_state["saldo_moedas"] = saldo_moedas
+
+        st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
+                            
+        # ==========================================================================
+        # --- COMPONENTE: ALTERAR FOTO DE PERFIL (CORREÇÃO ANTI-LOOP NO POOL) ---
+        # ==========================================================================
+        st.caption("📷 Enviar nova foto de perfil:")
+            
+        f_nova = st.file_uploader(
+            "Alterar Foto", 
+            type=["png","jpg","jpeg"], 
+            key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
+            label_visibility="collapsed"
+        ) 
+            
+        if f_nova and id_usuario_logado: 
+            id_limpo = id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
+            nome_arquivo_storage = f"user_{id_limpo}.jpg"
+                
+            conn_foto = None
+            try:
+                dados_imagem_bytes = f_nova.getvalue()
+                    
+                # Upload para o storage bucket
+                supabase.storage.from_("perfis").upload(
+                    path=nome_arquivo_storage,
+                    file=dados_imagem_bytes,
+                    file_options={"content-type": "image/jpeg", "upsert": "true"}
+                )
+                    
+                resposta_url = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
+                url_publica_foto = str(resposta_url.public_url).strip() if hasattr(resposta_url, "public_url") else str(resposta_url).strip()
+                    
+                # ⚡ OTIMIZAÇÃO: Gravando no PostgreSQL de forma segura usando o Pool
+                conn_foto = obter_conexao_eficiente()
+                with conn_foto.cursor() as cursor_foto:
+                    cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
+                    conn_foto.commit()
+                    
+                st.session_state.foto_perfil = url_publica_foto
+                
+                # ⚡ OTIMIZAÇÃO CRÍTICA: Limpa apenas a função da foto em vez do app inteiro!
+                carregar_plano_e_moedas_cached.clear(id_usuario_logado)
+                    
+                # Incrementa semente para resetar o uploader
+                if "form_seed" in st.session_state:
+                    st.session_state.form_seed += 1
+                else:
+                    st.session_state.form_seed = 43
+                    
+                st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
+                time.sleep(0.5) # Delay suave
+                st.rerun() 
+                    
+            except Exception as e:
+                if conn_foto: conn_foto.rollback()
+                st.error(f"Erro ao salvar foto: {e}")
+            finally:
+                # ⚡ DEVOLUÇÃO OBRIGATÓRIA AO POOL
+                if conn_foto:
+                    liberar_conexao(conn_foto)
+
+        st.markdown("---") # Divisor visual rápido
+
         
-        # ⚡ EXECUÇÃO DO FRAGMENTO DOS BOTÕES INTERNOS
+        # ⚡ CHAMADA DO FRAGMENTO (O Python agora localiza perfeitamente)
         renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual)
         
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
-        
-        # ⚡ BOTÃO DE LOGOUT OTIMIZADO: Apenas altera a rota para o gatilho do topo interceptar
         if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema_final"):
             st.session_state.opcao_menu = "executar_logout_imediato"
             st.rerun()
+
 
 
 # st.title("⚡ Diagnóstico de Conexão: Streamlit ⇄ Supabase")
@@ -2125,100 +2308,10 @@ def template_fale_conosco():
 
 
 
-# ==============================================================================
-# 0. DECLARAÇÃO GLOBAL DE SEGURANÇA (TOP DO ARQUIVO - FORA DE QUALQUER CONDICIONAL)
-# ==============================================================================
-try:
-    from werkzeug.security import check_password_hash, generate_password_hash
-except ImportError:
-    import bcrypt
-    
-    def check_password_hash(hash_banco, senha_digitada):
-        if isinstance(hash_banco, str):
-            hash_banco = hash_banco.encode('utf-8')
-        return bcrypt.checkpw(senha_digitada.encode('utf-8'), hash_banco)
-
-    def generate_password_hash(senha_digitada):
-        return bcrypt.hashpw(senha_digitada.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
 
-# ==============================================================================
-# SUB-COMPONENTE: NOTIFICAÇÕES E BOTÕES DA SIDEBAR (ISOLADO EM FRAGMENTO)
-# ==============================================================================
-# Ao isolar essa área, o Streamlit pode atualizar os botões e os alertas de convite
-# sem reiniciar o DOM global, impedindo que o modal @st.dialog feche sozinho.
-@st.fragment
-def renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual):
-    possui_convite_pendente = False
-    
-    if id_usuario_logado:
-        conn_b = None
-        try:
-            meu_id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
-            conn_b = obter_conexao_eficiente()
-            with conn_b.cursor() as cursor_b:
-                cursor_b.execute(
-                    "SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", 
-                    (meu_id_limpo,)
-                )
-                count_res = cursor_b.fetchone()
-                if count_res and count_res[0] > 0: 
-                    possui_convite_pendente = True
-        except Exception: 
-            pass
-        finally:
-            if conn_b:
-                liberar_conexao(conn_b)
 
-    # Configura o rótulo do botão baseado na presença de convites
-    if possui_convite_pendente:
-        label_gestao = "🤝 ABRIR GESTÃO 🔴"
-        st.markdown("""
-            <div style='background-color: #21262d; border: 1px solid #ef4444; border-radius: 6px; padding: 6px; text-align: center; margin-bottom: 8px;'>
-                <span style='font-size: 11px; color: #ef4444; font-weight: bold;'>📩 VOCÊ RECEBEU UM NOVO CONVITE!</span>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        label_gestao = "🤝 ABRIR GESTÃO"
-
-    # Botões de Navegação Interna com chaves estáveis
-    if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_rel_final"):
-        st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
-        st.rerun()
-            
-    if st.button("📅 MINHA GRADE HORÁRIA", type="primary", use_container_width=True, key="btn_grade_horaria_final"): 
-        st.session_state.opcao_menu = "📅 Disponibilidade"
-        st.rerun()
-            
-    if st.button("Ir para a Loja 🛒", type="secondary", use_container_width=True):
-        st.session_state.opcao_menu = "planos"
-        st.rerun()
-            
-    eh_admin = st.session_state.get("eh_admin", False)
-    if eh_admin or str(username_atual).lower() in ['admin', 'cleverson', 'clever1404']:
-        if st.button("⚙️ PAINEL ADMINISTRATIVO", type="secondary", use_container_width=True, key="btn_painel_adm_final"):
-            st.session_state.opcao_menu = "🛠️ Painel Admin"
-            st.rerun()     
-
-    if st.button("🗑️ LIMPAR HISTÓRICO DA IA", type="secondary", use_container_width=True, key="btn_limpar_ia_final"):
-        if id_usuario_logado:
-            conn = None
-            try:
-                id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
-                conn = obter_conexao_eficiente()
-                with conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (id_limpo,))
-                    conn.commit()
-                st.toast("Histórico limpo!")
-                time.sleep(0.5)
-                st.rerun()
-            except Exception as e: 
-                if conn: conn.rollback()
-                st.error(f"Erro ao limpar histórico: {e}")
-            finally:
-                if conn:
-                    liberar_conexao(conn)
 
 # ==============================================================================
 # INITIALIZATION DE SEGURANÇA NA LINHA 1
@@ -2228,183 +2321,7 @@ if "opcao_menu" not in st.session_state:
 
 if "usuario_id" not in st.session_state:
     st.session_state["usuario_id"] = None
-
-# ==============================================================================
-# CHAMADA DENTRO DO SEU WITH ST.SIDEBAR GLOBAL
-# ==============================================================================
-if menu_atual not in ["home", "login", "cadastro", "planos"]:
-    with st.sidebar:
-        # 1. Perfil, Avatar e Consulta Cached do Plano (Mantenha aqui)
-        # ==========================================================================
-        # --- PERFIL DO USUÁRIO & AVATAR CENTRALIZADO E MAIOR ---
-        # ==========================================================================
-        caminho_foto_perfil = str(st.session_state.get("foto_perfil", "")).strip()
-                
-        # Alinhamento no centro absoluto da barra lateral via colunas
-        col_esq, col_centro, col_dir = st.columns([1, 2, 1])
-        with col_centro:
-            # Otimizado: Verifica apenas links web estáveis válidos de forma nativa e segura
-            if caminho_foto_perfil and caminho_foto_perfil.startswith("http"):
-                st.image(caminho_foto_perfil, width=85)
-            else:
-                st.markdown('<div style="font-size: 65px; text-align:center; margin-top: -10px;">👩</div>', unsafe_allow_html=True)
-
-        # Extração limpa do nome do usuário antes do '@'
-        username_atual = st.session_state.get("username", "Usuário")
-        nome_usuario_puro = str(username_atual).split('@')[0].capitalize()
-
-        st.markdown(f"""
-            <div style="text-align: center; margin-bottom: 20px; margin-top: 5px;">
-                <h3 style="margin: 0; font-size: 17px; font-weight: bold; color: #f0f6fc;">{nome_usuario_puro}</h3>
-                <p style="color: #48bb78; font-weight: bold; font-size: 13px; margin: 4px 0 0 0;">🟢 Online</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # ==========================================================================
-        # --- CONSULTA 1: PLANO E SALDO REAL (CACHED E ACELERADO NO POOL) ---
-        # ==========================================================================
-        tipo_plano = "Grátis"
-        saldo_moedas = 0
-        id_usuario_logado = st.session_state.get("usuario_id")
-
-        if id_usuario_logado is not None:
-            try:
-                registro_banco = carregar_plano_e_moedas_cached(id_usuario_logado)
-                    
-                if isinstance(registro_banco, list) and len(registro_banco) > 0:
-                    dados_reais = registro_banco[0]
-                elif isinstance(registro_banco, dict):
-                    dados_reais = registro_banco
-                else:
-                    dados_reais = {}
-
-                plano_bruto = str(dados_reais.get("tipo_plano", "Grátis")).strip()
-                    
-                # Normalização total imune a erros
-                plano_norm = unicodedata.normalize('NFKD', plano_bruto).encode('ASCII', 'ignore').decode('utf-8').lower()
-                    
-                if "credito" in plano_norm or "moedas" in plano_norm:
-                    tipo_plano = "Plano Crédito de Moedas"
-                elif "vip" in plano_norm or "assinante" in plano_norm:
-                    tipo_plano = "vip"
-                else:
-                    tipo_plano = "Grátis"
-                        
-                saldo_moedas = int(dados_reais.get("moedas", 0) or 0)
-                        
-            except Exception as e:
-                st.error(f"Erro ao mapear cache de saldo: {e}")
-        else:
-            st.warning("⚠️ Usuário não identificado na sessão.")
-
-        st.session_state["tipo_plano"] = tipo_plano
-        st.session_state["saldo_moedas"] = saldo_moedas
-
-        st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
-                            
-        # ==========================================================================
-        # --- COMPONENTE: ALTERAR FOTO DE PERFIL (CORREÇÃO ANTI-LOOP NO POOL) ---
-        # ==========================================================================
-        st.caption("📷 Enviar nova foto de perfil:")
-            
-        f_nova = st.file_uploader(
-            "Alterar Foto", 
-            type=["png","jpg","jpeg"], 
-            key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
-            label_visibility="collapsed"
-        ) 
-            
-        if f_nova and id_usuario_logado: 
-            id_limpo = id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
-            nome_arquivo_storage = f"user_{id_limpo}.jpg"
-                
-            conn_foto = None
-            try:
-                dados_imagem_bytes = f_nova.getvalue()
-                    
-                # Upload para o storage bucket
-                supabase.storage.from_("perfis").upload(
-                    path=nome_arquivo_storage,
-                    file=dados_imagem_bytes,
-                    file_options={"content-type": "image/jpeg", "upsert": "true"}
-                )
-                    
-                resposta_url = supabase.storage.from_("perfis").get_public_url(nome_arquivo_storage)
-                url_publica_foto = str(resposta_url.public_url).strip() if hasattr(resposta_url, "public_url") else str(resposta_url).strip()
-                    
-                # ⚡ OTIMIZAÇÃO: Gravando no PostgreSQL de forma segura usando o Pool
-                conn_foto = obter_conexao_eficiente()
-                with conn_foto.cursor() as cursor_foto:
-                    cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
-                    conn_foto.commit()
-                    
-                st.session_state.foto_perfil = url_publica_foto
-                
-                # ⚡ OTIMIZAÇÃO CRÍTICA: Limpa apenas a função da foto em vez do app inteiro!
-                carregar_plano_e_moedas_cached.clear(id_usuario_logado)
-                    
-                # Incrementa semente para resetar o uploader
-                if "form_seed" in st.session_state:
-                    st.session_state.form_seed += 1
-                else:
-                    st.session_state.form_seed = 43
-                    
-                st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
-                time.sleep(0.5) # Delay suave
-                st.rerun() 
-                    
-            except Exception as e:
-                if conn_foto: conn_foto.rollback()
-                st.error(f"Erro ao salvar foto: {e}")
-            finally:
-                # ⚡ DEVOLUÇÃO OBRIGATÓRIA AO POOL
-                if conn_foto:
-                    liberar_conexao(conn_foto)
-
-        st.markdown("---") # Divisor visual rápido
-
-        # 2. ⚡ CHAMADA ÚNICA DO FRAGMENTO DOS BOTÕES
-        # ⚡ EXECUÇÃO DO FRAGMENTO: Substitua os botões soltos por esta chamada única
-        renderizar_notificacoes_e_botoes_sidebar(id_usuario_logado, username_atual)
-        
-        st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
-
-
-        #  # 3. Botão Encerrar Sessão (Mantido aqui fora por segurança global)
-        # # Botão Encerrar Sessão (Mantido fora do fragmento para limpar a sessão global do app)
-        #  # ... (código do seu logout que estruturamos com pool) ...
-        # # ==========================================================================
-        # # --- BOTÃO: ENCERRAR SESSÃO (LOGOUT 100% BLINDADO E SEGURO) ---
-        # # ==========================================================================
-        # if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema_final"):
-        #     if id_usuario_logado:
-        #         conn_logout = None
-        #         try:
-        #             id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
-                    
-        #             conn_logout = obter_conexao_eficiente()
-        #             with conn_logout.cursor() as cursor_logout:
-        #                 cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (id_limpo,))
-        #                 conn_logout.commit()
-        #         except Exception as e:
-        #             if conn_logout: 
-        #                 conn_logout.rollback()
-        #             st.sidebar.error(f"Erro no banco ao deslogar: {e}")
-        #         finally:
-        #             if conn_logout:
-        #                 liberar_conexao(conn_logout)  # ⚡ DEVOLUÇÃO OBRIGATÓRIA AO POOL
-            
-        #     # Limpa toda a memória residual do navegador
-        #     for chave in list(st.session_state.keys()):
-        #         del st.session_state[chave]
-                
-            # # Restabelece os estados padrão iniciais para o roteador abrir o Login limpo
-            # st.session_state.usuario_id = None
-            # st.session_state.username = None
-            # st.session_state.opcao_menu = "login"
-            # st.session_state.form_seed = 42
-            
-            # st.rerun()          
+      
         
 # ==============================================================================
 # 3. ROTEADOR DE INTERFACE DO MIOLO (GESTÃO CENTRALIZADA)
@@ -2420,12 +2337,7 @@ with miolo_pagina.container():
         st.stop()  # 👈 ISSO AQUI PRENDE O FORMULÁRIO NA TELA INDEPENDENTE DOS CLIQUES!        
 
 
-# # Se o usuário acabou de logar, limpamos o contêiner de login antes de desenhar o resto
-# if st.session_state.get("usuario_id") and "contener_login_ativo" in st.session_state:
-#     st.session_state.contener_login_ativo.empty()  # ⚡ Destrói fisicamente o HTML do login do navegador
-#     del st.session_state["contener_login_ativo"]   # Remove o rastreador da memória
-
-    
+  
     if menu_atual == "home":
         # Código otimizado da sua Home (aquele com markdown unificado e sem else)
         # --- TELAS PÚBLICAS (Sem Barra Lateral de Usuário) ---
