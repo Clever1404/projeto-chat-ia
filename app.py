@@ -29,10 +29,15 @@ from psycopg2 import pool
 UPLOAD_FOLDER = 'static/uploads/perfis'
 load_dotenv()
 
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
-if not OPENAI_API_KEY or "sua_chave" in OPENAI_API_KEY:
-    st.error("ERRO: Chave API da OpenAI não configurada nos Secrets!")
-    st.stop()
+# Busca primeiro nas variáveis de ambiente do Render, e se não achar, tenta o st.secrets local
+OPENAI_API_KEY = os.environ.get("STREAMLIT_OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+
+# Caso ainda queira manter compatibilidade com seu computador local (secrets.toml):
+if not OPENAI_API_KEY:
+    try:
+        OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+    except Exception:
+        st.error("Chave da API da OpenAI não foi encontrada!")
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
