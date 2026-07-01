@@ -59,7 +59,6 @@ if not SUPABASE_KEY:
     except Exception:
         SUPABASE_KEY = None
 
-key: str = st.secrets.get("SUPABASE_KEY")
 
 
 
