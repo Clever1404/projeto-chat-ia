@@ -42,8 +42,8 @@ if OPENAI_API_KEY:
     client = OpenAI(api_key=OPENAI_API_KEY)
 else:
     st.error("Chave da API da OpenAI não configurada. O chat não vai funcionar.")
-    
-            
+
+
 # Busca primeiro no Render, se não achar, busca no st.secrets local
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 
@@ -63,6 +63,17 @@ if not SUPABASE_KEY:
         SUPABASE_KEY = st.secrets.get("SUPABASE_KEY")
     except Exception:
         SUPABASE_KEY = None
+
+# Busca as credenciais (compatível com local e Render)
+SUPABASE_URL = os.environ.get("SUPABASE_URL") or st.secrets.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or st.secrets.get("SUPABASE_KEY")
+
+# 2. INICIALIZA O OBJETO 'supabase' (Isso resolve o erro de 'name supabase is not defined')
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+else:
+    st.error("Credenciais do Supabase não encontradas! Verifique as configurações.")
+
 
 # Busca primeiro no Render, se não achar, busca no st.secrets local
 TOKEN_MERCADO_PAGO = os.environ.get("TOKEN_MERCADO_PAGO")
