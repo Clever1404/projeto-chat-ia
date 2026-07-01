@@ -86,7 +86,6 @@ if not TOKEN_MERCADO_PAGO:
         TOKEN_MERCADO_PAGO = None
 
 
-
 try:
     sdk = mercadopago.SDK(st.secrets["TOKEN_MERCADO_PAGO"])
 except Exception as e:
@@ -392,80 +391,6 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
             st.rerun() 
     
 
-# st.title("⚡ Diagnóstico de Conexão: Streamlit ⇄ Supabase")
-# # --- INICIALIZAÇÃO DO SUPABASE ---
-# # Tenta conectar usando os secrets do Streamlit Cloud
-# try:
-#     url: str = st.secrets["SUPABASE_URL"]
-#     key: str = st.secrets["SUPABASE_KEY"]
-#     supabase: Client = create_client(url, key)
-# except Exception as e:
-#     st.error(f"❌ Erro ao carregar as credenciais dos Secrets: {e}")
-#     st.markdown("Verifique se as chaves `SUPABASE_URL` e `SUPABASE_KEY` estão configuradas no painel do Streamlit Cloud.")
-
-# # 1. Recupera o ID do usuário da sessão atual
-# id_usuario_teste = st.session_state.get("id_usuario")
-
-# if not id_usuario_teste:
-#     st.warning("⚠️ Nenhum 'id_usuario' encontrado na sessão do Streamlit. Insira um ID válido abaixo para testar:")
-#     id_usuario_teste = st.text_input("ID do Usuário Cadastrado no Banco:", value="3")
-
-# if id_usuario_teste and 'supabase' in locals():
-#     st.info(f"Procurando usuário com ID: `{id_usuario_teste}`")
-    
-#     # --- PASSO 1: TESTE DE LEITURA (SELECT) ---
-#     st.subheader("1. Testando Leitura de Dados")
-#     try:
-#         dados_usuario = supabase.table("usuarios").select("moedas, tipo_plano").eq("id", int(id_usuario_teste)).execute()
-        
-#         if dados_usuario.data and len(dados_usuario.data) > 0:
-#             st.success("✅ Conexão estabelecida! Usuário encontrado com sucesso.")
-#             st.json(dados_usuario.data)
-            
-#             # --- PASSO 2: TESTE DE ESCRITA (UPDATE) ---
-#             st.subheader("2. Testando Escrita de Dados")
-            
-#             if st.button("Simular Atualização (Adicionar 10 moedas)"):
-#                 try:
-#                     # Converte o ID para inteiro para bater com a tipagem do seu banco
-#                     id_numerico = int(id_usuario_teste)
-#                     data_atual_iso = datetime.now().isoformat()
-                    
-#                     # 1. Busca o saldo atual diretamente
-#                     query = supabase.table("usuarios").select("moedas").eq("id", id_numerico).execute()
-                
-#                     if query.data and len(query.data) > 0:
-#                         moedas_atuais = query.data[0].get("moedas") or 0
-#                         novas_moedas = moedas_atuais + 10
-                        
-#                         # 2. Executa a atualização completa com os 3 cenários integrados
-#                         resposta = supabase.table("usuarios").update({
-#                             "tipo_plano": "Plano Crédito de Moedas",
-#                             "moedas": novas_moedas,
-#                             "ultima_recarga": data_atual_iso
-#                         }).eq("id", id_numerico).execute()
-                        
-#                         if resposta.data and len(resposta.data) > 0:
-#                             st.balloons()
-#                             st.success(f"🎉 Sucesso! Moedas atualizadas de {moedas_atuais} para {novas_moedas}.")
-#                             st.json(resposta.data)
-#                         else:
-#                             st.error("❌ O comando foi enviado, mas nenhuma linha foi alterada.")
-#                     else:
-#                         st.error(f"❌ O ID '{id_usuario_teste}' não foi encontrado para atualização.")
-                        
-#                 except Exception as error_update:
-#                     st.error(f"❌ Falha na Escrita (Erro de RLS ou Constraints): {error_update}")
-                    
-#         else:
-#             st.error(f"❌ O Supabase respondeu, mas o ID '{id_usuario_teste}' não foi encontrado na tabela 'usuarios'.")
-#             st.info("💡 Lembre-se: O ID digitado precisa ser um número válido cadastrado na coluna 'id'.")
-            
-#     except Exception as error_select:
-#         st.error(f"❌ Falha Crítica na Leitura: {error_select}")
-
-
-
 # ==============================================================================
 # 1. CONFIGURAÇÕES OBRIGATÓRIAS DE PÁGINA (Sempre no Topo Absoluto)
 # ==============================================================================
@@ -676,7 +601,6 @@ def renderizar_tela_login_definitiva():
     with col_esqueceu:
         if st.button("🔑 Esqueceu a senha?", use_container_width=True, key=f"btn_esq_senha_{u_key}"):
             modal_recuperar_senha()
-
 
 
 
@@ -1742,53 +1666,6 @@ def template_sala_privada():
                 st.rerun(scope="fragment") # Recarrega apenas as mensagens, eliminando o travamento de fundo
       
 
-
-
-# ==============================================================================
-# MODAL DA LOJA DO APP (CORRIGIDO E FECHADO)
-# ==============================================================================
-#@st.dialog("🛒 Loja do App")
-#def mostrar_popup_loja(id_usuario):
-#    opcoes_compra = st.radio("Escolha uma opção:", ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"])
-
-#    if st.button("Gerar Pix de Pagamento"):
-#        valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
-#        id_limpo = id_usuario if isinstance(id_usuario, (list, tuple)) else id_usuario
-#       
-#        payment_data = {
-#            "transaction_amount": valor, 
-#            "description": desc, 
-#            "payment_method_id": "pix",
-#            "payer": {"email": "cliente@email.com"}, 
-#            "external_reference": f"{id_limpo}:{tipo}"
-#        }
-        
-    #     try:
-    #         payment_response = sdk.payment().create(payment_data)
-    #         payment = payment_response["response"]
-            
-    #         if "point_of_interaction" in payment:
-    #             st.session_state.id_pagamento_pendente = payment["id"]
-    #             st.session_state.tipo_pagamento_pendente = tipo
-    #             st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
-    #             st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
-    #             st.success("Pix gerado com sucesso!")
-    #             st.rerun()
-    #     except Exception as e: 
-    #         st.error(f"Erro ao gerar pagamento: {e}")
-
-    # # Renderiza o QR Code caso ele já exista na sessão ativa
-    # if st.session_state.get("qr_code_img"):
-    #     st.markdown("### 📱 Escaneie o QR Code abaixo para pagar:")
-    #     st.image(base64.b64decode(st.session_state.qr_code_img), width=250)
-    #     st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=70)
-        
-    #     if st.button("🔄 Já realizei o pagamento", type="primary"):
-    #         st.toast("Verificando compensação do Pix...")
-    #         st.session_state.abrir_popup_loja = False
-    #         st.rerun()
-
-
 # --- FUNÇÃO PARA VERIFICAR O PAGAMENTO (Mantida limpa e direta) ---
 def verificar_status_pix(id_pagamento):
     """Consulta a API do Mercado Pago e retorna o status atualizado de forma instantânea."""
@@ -1954,7 +1831,7 @@ def template_painel_admin():
             # Query 2: Salas Ativas
             cursor.execute("""
                 SELECT COUNT(id) FROM matches 
-                WHERE status_conexao = 'online' OR ultima_atividade >= NOW() - INTERVAL '5 minutes';
+                WHERE status_conexao = 'online' AND ultima_atividade >= NOW() - INTERVAL '5 minutes';
             """)
             res_salas = cursor.fetchone()
             total_salas_ativas = res_salas[0] if res_salas else 0
@@ -2704,46 +2581,9 @@ with miolo_pagina.container():
             st.warning("Nenhuma sala ativa.")
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
             st.rerun()
-                    
-       
+                      
 
-    #    st.markdown("### 🔍 Inspecionando Caminhos de Imagens")
-
-                # 1. Verifica os dados salvos na Sessão Atual do Navegador
-            #    id_usuario_logado = st.session_state.get("usuario_id")
-            #    foto_sessao = st.session_state.get("foto_perfil")
-
-            #    st.write(f"🔹 **Seu ID de Usuário:** `{id_usuario_logado}`")
-            #    st.write(f"🔹 **Caminho salvo na Session State:** `{foto_sessao}`")
-
-                # 2. Testa a limpeza da barra que o sistema operacional exige
-            #    if foto_sessao:
-            #        caminho_limpo = str(foto_sessao).strip().lstrip('/')
-            #        st.write(f"🥾 **Caminho convertido para o Servidor:** `{caminho_limpo}`")
-            #        st.write(f"📂 **O arquivo existe fisicamente no servidor?** `{'✅ SIM' if os.path.exists(caminho_limpo) else '❌ NÃO'}`")
-
-                # 3. Faz uma varredura real na pasta física para listar TODAS as fotos salvas
-            #    st.markdown("#### 📁 Arquivos encontrados na pasta `static/uploads/perfis/`:")
-            #    try:
-            #        if os.path.exists(UPLOAD_FOLDER):
-            #            arquivos = os.listdir(UPLOAD_FOLDER)
-            #            if arquivos:
-            #                for arq in arquivos:
-            #                    caminho_completo_arquivo = os.path.join(UPLOAD_FOLDER, arq)
-            #                    tamanho_kb = os.path.getsize(caminho_completo_arquivo) / 1024
-            #                    st.code(f"📄 {arq} ({tamanho_kb:.1f} KB) -> Caminho para ler no st.image: '{caminho_completo_arquivo}'")
-            #            else:
-            #                st.info("A pasta existe, mas está vazia. Nenhum usuário fez upload de foto ainda.")
-            #        else:
-            #            st.warning("⚠️ A pasta de uploads ainda não foi criada fisicamente no servidor remoto.")
-            #    except Exception as e:
-            #        st.error(f"Erro ao listar diretório: {e}")
-            
-            
-
-                #avatar_html = ""
-                # Desenha a barra lateral UMA ÚNICA VEZ para o ecossistema privado
-
+    
 
 # ==============================================================================
 # RODAPÉ FIXO DISCRETO (TERMOS E POLÍTICAS)
