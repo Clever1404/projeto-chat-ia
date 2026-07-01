@@ -29,31 +29,39 @@ from psycopg2 import pool
 UPLOAD_FOLDER = 'static/uploads/perfis'
 load_dotenv()
 
-# 1. Tenta buscar primeiro no ambiente do Render
+# Busca primeiro no Render (os.environ), se não achar, busca no st.secrets local
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
-# 2. Se não achou (ou seja, está rodando local no seu PC), busca no st.secrets
 if not OPENAI_API_KEY:
     try:
+        import streamlit as st
         OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
     except Exception:
         OPENAI_API_KEY = None
 
-# Opcional: Alerta caso a chave não seja encontrada em nenhum lugar
-if not OPENAI_API_KEY:
-    st.error("Chave da API da OpenAI não foi encontrada! Verifique as configurações.")
+# Busca primeiro no Render, se não achar, busca no st.secrets local
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
 
-url: str = st.secrets.get("SUPABASE_URL")
-key: str = st.secrets.get("SUPABASE_KEY")
-supabase = create_client(url, key)
-
-if url and key:
+if not SUPABASE_URL:
     try:
-        supabase = create_client(url, key)
-    except Exception as e:
-        st.error(f"Erro ao conectar com o Supabase Client: {e}")
-else:
-    st.warning("⚠️ Atenção: As credenciais do Supabase não estão configuradas nos Secrets.")
+        import streamlit as st
+        SUPABASE_URL = st.secrets.get("SUPABASE_URL")
+    except Exception:
+        SUPABASE_URL = None
+
+# Busca primeiro no Render, se não achar, busca no st.secrets local
+SUPABASE_URL = os.environ.get("SUPABASE_KEY")
+
+if not SUPABASE_KEY:
+    try:
+        import streamlit as st
+        SUPABASE_KEY = st.secrets.get("SUPABASE_KEY")
+    except Exception:
+        SUPABASE_KEY = None
+
+key: str = st.secrets.get("SUPABASE_KEY")
+
+
 
 try:
     sdk = mercadopago.SDK(st.secrets["TOKEN_MERCADO_PAGO"])
