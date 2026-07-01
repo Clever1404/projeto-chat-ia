@@ -59,7 +59,15 @@ if not SUPABASE_KEY:
     except Exception:
         SUPABASE_KEY = None
 
+# Busca primeiro no Render, se não achar, busca no st.secrets local
+TOKEN_MERCADO_PAGO = os.environ.get("TOKEN_MERCADO_PAGO")
 
+if not TOKEN_MERCADO_PAGO:
+    try:
+        import streamlit as st
+        TOKEN_MERCADO_PAGO = st.secrets.get("TOKEN_MERCADO_PAGO")
+    except Exception:
+        TOKEN_MERCADO_PAGO = None
 try:
     sdk = mercadopago.SDK(st.secrets["TOKEN_MERCADO_PAGO"])
 except Exception as e:
