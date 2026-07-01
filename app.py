@@ -50,7 +50,7 @@ if not SUPABASE_URL:
         SUPABASE_URL = None
 
 # Busca primeiro no Render, se não achar, busca no st.secrets local
-SUPABASE_URL = os.environ.get("SUPABASE_KEY")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 if not SUPABASE_KEY:
     try:
