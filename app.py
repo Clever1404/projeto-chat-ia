@@ -29,16 +29,21 @@ from psycopg2 import pool
 UPLOAD_FOLDER = 'static/uploads/perfis'
 load_dotenv()
 
-# Busca primeiro no Render (os.environ), se não achar, busca no st.secrets local
+# 1. Busca a chave da API (garantindo compatibilidade local e nuvem)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-
 if not OPENAI_API_KEY:
     try:
-        import streamlit as st
         OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
     except Exception:
         OPENAI_API_KEY = None
 
+# 2. CRIA O CLIENTE DA OPENAI (Isso resolve o erro name 'client' is not defined)
+if OPENAI_API_KEY:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+else:
+    st.error("Chave da API da OpenAI não configurada. O chat não vai funcionar.")
+    
+            
 # Busca primeiro no Render, se não achar, busca no st.secrets local
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 
@@ -68,6 +73,9 @@ if not TOKEN_MERCADO_PAGO:
         TOKEN_MERCADO_PAGO = st.secrets.get("TOKEN_MERCADO_PAGO")
     except Exception:
         TOKEN_MERCADO_PAGO = None
+
+
+
 try:
     sdk = mercadopago.SDK(st.secrets["TOKEN_MERCADO_PAGO"])
 except Exception as e:
