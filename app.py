@@ -60,8 +60,6 @@ if not SUPABASE_KEY:
         SUPABASE_KEY = None
 
 
-
-
 try:
     sdk = mercadopago.SDK(st.secrets["TOKEN_MERCADO_PAGO"])
 except Exception as e:
