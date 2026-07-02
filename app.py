@@ -561,12 +561,12 @@ def renderizar_tela_login_definitiva():
                         else:
                             st.error("Usuário não encontrado.")
                             
-                    except Exception as e: 
-                        if conn: conn.rollback()
-                        st.error(f"Erro crítico no login: {e}")       
-                    finally:
-                        if conn:
-                            liberar_conexao(conn)
+            except Exception as e: 
+                if conn: conn.rollback()
+                st.error(f"Erro crítico no login: {e}")       
+            finally:
+                if conn:
+                    liberar_conexao(conn)
 
             # Botões auxiliares inferiores
             st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
