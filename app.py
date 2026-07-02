@@ -1575,8 +1575,8 @@ def limpar_historico_sala(match_id):
 
 
 
-@st.fragment(run_every=3.0)  # Auto-refresh de mensagens a cada 3 segundos funciona perfeitamente agora
-def renderizar_mensagens_sala_privada(): # 💡 REMOVIDOS OS ARGUMENTOS DAQUI
+@st.fragment  # Auto-refresh de mensagens a cada 3 segundos funciona perfeitamente agora
+def template_sala_privada(): # 💡 REMOVIDOS OS ARGUMENTOS DAQUI
     # 💡 Buscamos direto do estado da sessão de forma limpa e segura
     match_id = st.session_state.get("match_id_atual")
     meu_id = st.session_state.get("usuario_id")
@@ -2712,7 +2712,7 @@ with miolo_pagina.container():
          
     elif menu_atual == "🤝 Sala Privada":
         if st.session_state.get("match_id_atual"):
-            renderizar_mensagens_sala_privada()
+            template_sala_privada()
         else:
             st.warning("Nenhuma sala ativa.")
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
