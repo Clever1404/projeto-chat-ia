@@ -522,87 +522,68 @@ def renderizar_tela_login_definitiva():
                             (user_in.strip(), user_in.strip())
                         )
                         res = cursor.fetchone()
-                        
+                                      
+                        # --- AGORA FORA DO WITH (As variáveis locais estão seguras na memória) ---
                         if res:
-                            # Próximo passo: validação de hash e injeção nas variáveis de sessão
-                            pass # O restante da sua lógica interna de validação continua aqui
-            except Exception as e:
-                st.error(f"Erro ao processar login: {e}")
-            finally:
-                if conn:
-                    liberar_conexao(conn)
-                    if res:
-                        # Guardamos tudo em variáveis locais seguras antes que o cursor feche no final do 'with'
-                        banco_id = res[0]
-                        banco_username = res[1]
-                        banco_foto = res[2]
-                        banco_admin = res[3]
-                        banco_genero = res[4]
-                        banco_plano = res[5]
-                        banco_moedas = res[6]
-                        banco_password_hash = res[7]
-                
-                # --- AGORA FORA DO WITH (As variáveis locais estão seguras na memória) ---
-                if res:
-                    # Validação usando a função de Hash global
-                    if not check_password_hash(banco_password_hash, str(pass_in)):
-                        st.error("Senha incorreta. Tente novamente.")
-                    else:
-                        # CONFIGURAÇÃO DE SESSÃO UNIFICADA
-                        id_numerico = int(banco_id)
-                        st.session_state.usuario_id = id_numerico
-                        st.session_state.id_usuario = id_numerico 
-                        st.session_state.username = str(banco_username).strip()
-                        st.session_state.foto_perfil = str(banco_foto).strip() if banco_foto else ""
-                        st.session_state.eh_admin = bool(banco_admin)
-                        st.session_state.genero = str(banco_genero).strip() if banco_genero else "M"
-                        
-                        st.session_state.dados_usuario = {
-                            "username": str(banco_username).strip(), 
-                            "foto_perfil": str(banco_foto).strip() if banco_foto else "", 
-                            "genero": str(banco_genero).strip() if banco_genero else "M",
-                            "tipo_plano": str(banco_plano).strip() if banco_plano else "Grátis", 
-                            "moedas": int(banco_moedas) if banco_moedas else 0
-                        }
-                        
-                        # Atualiza status online abrindo um cursor rápido e isolado
-                        with conn.cursor() as cursor_update:
-                            cursor_update.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
-                            conn.commit()
-                        
-                        # ⚡ CORREÇÃO: Limpeza segura removendo referências a containers inexistentes
-                        if "login_view_uuid" in st.session_state:
-                            del st.session_state["login_view_uuid"]
-                        
-                        # Redireciona de forma limpa, forçando redesenho imediato sem telas sobrepostas
-                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                        st.rerun()
-                else:
-                    st.error("Usuário não encontrado.")
-                    
-            except Exception as e: 
-                if conn: conn.rollback()
-                st.error(f"Erro crítico no login: {e}")       
-            finally:
-                if conn:
-                    liberar_conexao(conn)
+                            # Validação usando a função de Hash global
+                            if not check_password_hash(banco_password_hash, str(pass_in)):
+                                st.error("Senha incorreta. Tente novamente.")
+                            else:
+                                # CONFIGURAÇÃO DE SESSÃO UNIFICADA
+                                id_numerico = int(banco_id)
+                                st.session_state.usuario_id = id_numerico
+                                st.session_state.id_usuario = id_numerico 
+                                st.session_state.username = str(banco_username).strip()
+                                st.session_state.foto_perfil = str(banco_foto).strip() if banco_foto else ""
+                                st.session_state.eh_admin = bool(banco_admin)
+                                st.session_state.genero = str(banco_genero).strip() if banco_genero else "M"
+                                
+                                st.session_state.dados_usuario = {
+                                    "username": str(banco_username).strip(), 
+                                    "foto_perfil": str(banco_foto).strip() if banco_foto else "", 
+                                    "genero": str(banco_genero).strip() if banco_genero else "M",
+                                    "tipo_plano": str(banco_plano).strip() if banco_plano else "Grátis", 
+                                    "moedas": int(banco_moedas) if banco_moedas else 0
+                                }
+                                
+                                # Atualiza status online abrindo um cursor rápido e isolado
+                                with conn.cursor() as cursor_update:
+                                    cursor_update.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
+                                    conn.commit()
+                                
+                                # ⚡ CORREÇÃO: Limpeza segura removendo referências a containers inexistentes
+                                if "login_view_uuid" in st.session_state:
+                                    del st.session_state["login_view_uuid"]
+                                
+                                # Redireciona de forma limpa, forçando redesenho imediato sem telas sobrepostas
+                                st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                                st.rerun()
+                        else:
+                            st.error("Usuário não encontrado.")
+                            
+                    except Exception as e: 
+                        if conn: conn.rollback()
+                        st.error(f"Erro crítico no login: {e}")       
+                    finally:
+                        if conn:
+                            liberar_conexao(conn)
 
-    # Botões auxiliares inferiores
-    st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
-    col_voltar, col_esqueceu = st.columns(2)
-    with col_voltar:
-        if st.button("⬅️ Voltar para a Home", use_container_width=True, key=f"btn_vol_home_{u_key}"):
-            if "login_view_uuid" in st.session_state:
-                del st.session_state["login_view_uuid"]
-            st.session_state.opcao_menu = "home"
-            st.rerun()
-    with col_esqueceu:
-        if st.button("🔑 Esqueceu a senha?", use_container_width=True, key=f"btn_esq_senha_{u_key}"):
-            # Garante que a função exista no escopo global ou emite aviso amigável
-            if 'modal_recuperar_senha' in globals():
-                modal_recuperar_senha()
-            else:
-                st.info("Função de recuperação de senha não implementada neste arquivo.")
+            # Botões auxiliares inferiores
+            st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+            col_voltar, col_esqueceu = st.columns(2)
+            with col_voltar:
+                if st.button("⬅️ Voltar para a Home", use_container_width=True, key=f"btn_vol_home_{u_key}"):
+                    if "login_view_uuid" in st.session_state:
+                        del st.session_state["login_view_uuid"]
+                    st.session_state.opcao_menu = "home"
+                    st.rerun()
+            with col_esqueceu:
+                if st.button("🔑 Esqueceu a senha?", use_container_width=True, key=f"btn_esq_senha_{u_key}"):
+                    # Garante que a função exista no escopo global ou emite aviso amigável
+                    if 'modal_recuperar_senha' in globals():
+                        modal_recuperar_senha()
+                    else:
+                        st.info("Função de recuperação de senha não implementada neste arquivo.")
 
 
 def processar_afinidade_e_match(usuario_id, texto_atual):
