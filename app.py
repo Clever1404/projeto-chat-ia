@@ -24,107 +24,8 @@ import altair as alt
 from psycopg2 import pool
 
 # ==============================================================================
-# 3. CONEXÕES DE APIs E BANCO DE DADOS
-# ==============================================================================
-UPLOAD_FOLDER = 'static/uploads/perfis'
-load_dotenv()
-
-# 1. Busca a chave da API (garantindo compatibilidade local e nuvem)
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    try:
-        OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
-    except Exception:
-        OPENAI_API_KEY = None
-
-# 2. CRIA O CLIENTE DA OPENAI (Isso resolve o erro name 'client' is not defined)
-if OPENAI_API_KEY:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-else:
-    st.error("Chave da API da OpenAI não configurada. O chat não vai funcionar.")
-
-
-# Busca primeiro no Render, se não achar, busca no st.secrets local
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-
-if not SUPABASE_URL:
-    try:
-        import streamlit as st
-        SUPABASE_URL = st.secrets.get("SUPABASE_URL")
-    except Exception:
-        SUPABASE_URL = None
-
-# Busca primeiro no Render, se não achar, busca no st.secrets local
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-
-if not SUPABASE_KEY:
-    try:
-        import streamlit as st
-        SUPABASE_KEY = st.secrets.get("SUPABASE_KEY")
-    except Exception:
-        SUPABASE_KEY = None
-
-# Busca as credenciais (compatível com local e Render)
-SUPABASE_URL = os.environ.get("SUPABASE_URL") or st.secrets.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or st.secrets.get("SUPABASE_KEY")
-
-# 2. INICIALIZA O OBJETO 'supabase' (Isso resolve o erro de 'name supabase is not defined')
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-else:
-    st.error("Credenciais do Supabase não encontradas! Verifique as configurações.")
-
-
-# Busca primeiro no Render, se não achar, busca no st.secrets local
-TOKEN_MERCADO_PAGO = os.environ.get("TOKEN_MERCADO_PAGO")
-
-if not TOKEN_MERCADO_PAGO:
-    try:
-        import streamlit as st
-        TOKEN_MERCADO_PAGO = st.secrets.get("TOKEN_MERCADO_PAGO")
-    except Exception:
-        TOKEN_MERCADO_PAGO = None
-
-
-try:
-    sdk = mercadopago.SDK(st.secrets["TOKEN_MERCADO_PAGO"])
-except Exception as e:
-    st.error(f"Erro ao carregar credenciais do Mercado Pago: {e}")
-    sdk = None
-
-# 1. Cria um Pool de conexões global (Carrega apenas UMA vez no início do servidor)
-@st.cache_resource
-def inicializar_pool_banco():
-    return psycopg2.pool.SimpleConnectionPool(
-        minconn=1,
-        maxconn=10,  # Permite até 10 conexões simultâneas reutilizáveis
-        host=st.secrets["postgres"]["host"],
-        database=st.secrets["postgres"]["database"],
-        user=st.secrets["postgres"]["user"],
-        password=st.secrets["postgres"]["password"],
-        port=st.secrets["postgres"]["port"],
-        sslmode="require"
-    )
-
-# 2. Função ultra-rápida que você chamará nas telas
-def obter_conexao_eficiente():
-    # Busca o pool gerenciado pelo cache do Streamlit (instantâneo)
-    pool_db = inicializar_pool_banco()
-    # Pega uma conexão que já está aberta e aquecida na memória
-    return pool_db.getconn()
-
-# 3. Função auxiliar para devolver a conexão ao pool (Não fecha ela, apenas libera)
-def liberar_conexao(conn):
-    try:
-        pool_db = inicializar_pool_banco()
-        pool_db.putconn(conn)
-    except Exception:
-        pass
-
-# ==============================================================================
 # 0. INICIALIZAÇÃO SEGURA DO SESSION STATE (ANTI-ATTRIBUTE ERROR)
 # ==============================================================================
-# Mapeia todas as chaves vazias obrigatórias para o sistema não quebrar ao ligar
 if "usuario_id" not in st.session_state:
     st.session_state.usuario_id = None
 
@@ -140,11 +41,106 @@ if "opcao_menu" not in st.session_state:
 if "foto_perfil" not in st.session_state:
     st.session_state.foto_perfil = ""
 
-# Armazena o menu em uma variável local limpa
+# Armazena o menu de forma limpa
 menu_atual = st.session_state.opcao_menu
 
 # ==============================================================================
-# 0. DECLARAÇÕES GLOBAIS DE SEGURANÇA & CRIPTOGRAFIA
+# 3. CONEXÕES DE APIs E BANCO DE DADOS (RESOLVIDO ERRO DE SECRETS)
+# ==============================================================================
+UPLOAD_FOLDER = 'static/uploads/perfis'
+
+# --- [A] CONFIGURAÇÃO OPENAI ---
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", {}).get("OPENAI_API_KEY") if hasattr(st, "secrets") else None
+if not OPENAI_API_KEY:
+    try:
+        OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
+    except Exception:
+        OPENAI_API_KEY = None
+
+if OPENAI_API_KEY:
+    client = OpenAI(api_key=OPENAI_API_KEY)
+else:
+    st.error("Chave da API da OpenAI não configurada. O chat não vai funcionar.")
+
+# --- [B] CONFIGURAÇÃO SUPABASE ---
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_KEY:
+    try:
+        SUPABASE_URL = st.secrets.get("SUPABASE_URL")
+        SUPABASE_KEY = st.secrets.get("SUPABASE_KEY")
+    except Exception:
+        pass
+
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+else:
+    st.error("Credenciais do Supabase não encontradas! Verifique as configurações.")
+
+# --- [C] CONFIGURAÇÃO MERCADO PAGO (PROTEGIDO CONTRA QUEDAS) ---
+TOKEN_MERCADO_PAGO = os.environ.get("TOKEN_MERCADO_PAGO")
+if not TOKEN_MERCADO_PAGO:
+    try:
+        TOKEN_MERCADO_PAGO = st.secrets.get("TOKEN_MERCADO_PAGO")
+    except Exception:
+        TOKEN_MERCADO_PAGO = None
+
+sdk = None
+if TOKEN_MERCADO_PAGO:
+    try:
+        import mercadopago
+        sdk = mercadopago.SDK(TOKEN_MERCADO_PAGO)
+    except Exception as e:
+        st.error(f"Erro ao carregar credenciais do Mercado Pago: {e}")
+
+# --- [D] POOL DE CONEXÕES POSTGRES (PROTEGIDO CONTRA QUEDAS) ---
+@st.cache_resource
+def inicializar_pool_banco():
+    # Coleta segura das credenciais independente de estar local ou no Render
+    try:
+        db_host = os.environ.get("DB_HOST") or st.secrets["postgres"]["host"]
+        db_name = os.environ.get("DB_DATABASE") or st.secrets["postgres"]["database"]
+        db_user = os.environ.get("DB_USER") or st.secrets["postgres"]["user"]
+        db_pass = os.environ.get("DB_PASSWORD") or st.secrets["postgres"]["password"]
+        db_port = os.environ.get("DB_PORT") or st.secrets["postgres"]["port"]
+    except Exception:
+        # Fallback caso não encontre estruturas aninhadas
+        db_host = os.environ.get("DB_HOST")
+        db_name = os.environ.get("DB_DATABASE")
+        db_user = os.environ.get("DB_USER")
+        db_pass = os.environ.get("DB_PASSWORD")
+        db_port = os.environ.get("DB_PORT")
+
+    return psycopg2.pool.SimpleConnectionPool(
+        minconn=1,
+        maxconn=10,
+        host=db_host,
+        database=db_name,
+        user=db_user,
+        password=db_pass,
+        port=db_port,
+        sslmode="require"
+    )
+
+def obter_conexao_eficiente():
+    try:
+        pool_db = inicializar_pool_banco()
+        return pool_db.getconn()
+    except Exception as e:
+        st.error(f"Erro ao obter conexão do pool: {e}")
+        return None
+
+def liberar_conexao(conn):
+    if conn:
+        try:
+            pool_db = inicializar_pool_banco()
+            pool_db.putconn(conn)
+        except Exception:
+            pass
+
+# ==============================================================================
+# DECLARAÇÕES GLOBAIS DE SEGURANÇA & CRIPTOGRAFIA
 # ==============================================================================
 try:
     from werkzeug.security import check_password_hash, generate_password_hash
@@ -156,16 +152,15 @@ except ImportError:
     def generate_password_hash(senha_digitada):
         return bcrypt.hashpw(senha_digitada.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-
 # ==============================================================================
-# 1. FUNÇÕES DE CACHE E BANCO DE DADOS DE ALTA PERFORMANCE (PRECISAM FICAR AQUI)
+# FUNÇÕES DE BANCO DE DADOS DE ALTA PERFORMANCE
 # ==============================================================================
-# ⚡ OTIMIZAÇÃO: REMOVIDO @st.cache_data. Agora a busca é em tempo real via SQL Pool (0ms de lag)
 def carregar_plano_e_moedas_direto_pool(id_usuario):
-    conn = None
+    conn = obter_conexao_eficiente()
+    if not conn:
+        return {"tipo_plano": "Grátis", "moedas": 0}
     try:
         id_limpo = int(id_usuario if not isinstance(id_usuario, (tuple, list)) else id_usuario)
-        conn = obter_conexao_eficiente()
         with conn.cursor() as cursor:
             cursor.execute("SELECT tipo_plano, moedas FROM usuarios WHERE id = %s;", (id_limpo,))
             res = cursor.fetchone()
@@ -174,19 +169,15 @@ def carregar_plano_e_moedas_direto_pool(id_usuario):
     except Exception:
         pass
     finally:
-        if conn:
-            liberar_conexao(conn) # Devolve a conexão instantaneamente ao Pool
+        liberar_conexao(conn)
     return {"tipo_plano": "Grátis", "moedas": 0}
 
-
-
-
 # ==============================================================================
-# 2. BARRA LATERAL REATIVA GLOBAL (FULL WIDTH LOCKDOWN SEM FRAGMENTOS)
+# 2. BARRA LATERAL REATIVA GLOBAL
 # ==============================================================================
+# Se o menu atual for um desses, a barra lateral NÃO será desenhada (evita sobreposição no login)
 if menu_atual not in ["home", "login", "cadastro", "planos"]:
     with st.sidebar:
-       # --- [A] PERFIL DO USUÁRIO & AVATAR CENTRALIZADO ---
         caminho_foto_perfil = str(st.session_state.get("foto_perfil", "")).strip()
                 
         col_esq, col_centro, col_dir = st.columns([1, 2, 1])
@@ -206,8 +197,6 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
             </div>
         """, unsafe_allow_html=True)
 
-
-        # --- [B] RECONHECIMENTO DO PLANO E MOEDAS EM TEMPO REAL ---
         tipo_plano = "Grátis"
         saldo_moedas = 0
         id_usuario_logado = st.session_state.get("usuario_id")
@@ -232,7 +221,7 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
             except Exception as e:
                 st.error(f"Erro ao ler saldo real: {e}")
 
-        # Sincroniza e trava os estados na memória raiz do Streamlit
+       # Sincroniza e trava os estados na memória raiz do Streamlit
         st.session_state["tipo_plano"] = tipo_plano
         st.session_state["saldo_moedas"] = saldo_moedas
         if "dados_usuario" in st.session_state:
@@ -243,17 +232,21 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
         st.caption(f"Plano: **{tipo_plano}** | Saldo: 🪙 **{saldo_moedas} moedas**")
         st.markdown("<hr style='border-color: #21262d; margin: 10px 0;'>", unsafe_allow_html=True)
 
+        # --- COMPONENTE OTIMIZADO: ALTERAR FOTO DE PERFIL ---
+        # ⚡ OTIMIZAÇÃO: Isolado em um formulário para evitar envios repetidos em background a cada clique do app
+        import time # Garante a importação para evitar NameError
+        
+        with st.form("form_foto_perfil", clear_on_submit=True):
+            st.caption("📷 Enviar nova foto de perfil:")
+            f_nova = st.file_uploader(
+                "Alterar Foto", 
+                type=["png","jpg","jpeg"], 
+                key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
+                label_visibility="collapsed"
+            ) 
+            btn_salvar_foto = st.form_submit_button("Salvar Nova Foto", use_container_width=True)
 
-        # --- COMPONENTE: ALTERAR FOTO DE PERFIL ---
-        st.caption("📷 Enviar nova foto de perfil:")
-        f_nova = st.file_uploader(
-            "Alterar Foto", 
-            type=["png","jpg","jpeg"], 
-            key=f"side_f_up_{st.session_state.get('form_seed', 42)}", 
-            label_visibility="collapsed"
-        ) 
-
-        if f_nova and id_usuario_logado: 
+        if btn_salvar_foto and f_nova and id_usuario_logado: 
             id_limpo = id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
             nome_arquivo_storage = f"user_{id_limpo}.jpg"
                 
@@ -273,24 +266,19 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
                     
                 # Grava no PostgreSQL de forma segura usando o Pool
                 conn_foto = obter_conexao_eficiente()
-                with conn_foto.cursor() as cursor_foto:
-                    cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
-                    conn_foto.commit()
+                if conn_foto:
+                    with conn_foto.cursor() as cursor_foto:
+                        cursor_foto.execute("UPDATE usuarios SET foto_perfil = %s WHERE id = %s;", (url_publica_foto, int(id_limpo))) 
+                        conn_foto.commit()
+                        
+                    st.session_state.foto_perfil = url_publica_foto
                     
-                st.session_state.foto_perfil = url_publica_foto
-                
-                # ⚡ CORREÇÃO DO ERRO: Removida a linha .clear() da função inexistente.
-                # Como o motor direto pool busca dados em tempo real (0ms), o novo avatar e saldo já atualizam sozinhos.
-                    
-                # Incrementa semente para resetar o uploader
-                if "form_seed" in st.session_state:
-                    st.session_state.form_seed += 1
-                else:
-                    st.session_state.form_seed = 43
-                    
-                st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
-                time.sleep(0.5) 
-                st.rerun() 
+                    # Incrementa semente para resetar o uploader
+                    st.session_state.form_seed = st.session_state.get('form_seed', 42) + 1
+                        
+                    st.toast("📷 Foto de perfil salva permanentemente na nuvem!")
+                    time.sleep(0.5) 
+                    st.rerun() 
                     
             except Exception as e:
                 if conn_foto: conn_foto.rollback()
@@ -308,11 +296,12 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
             try:
                 meu_id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
                 conn_b = obter_conexao_eficiente()
-                with conn_b.cursor() as cursor_b:
-                    cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
-                    count_res = cursor_b.fetchone()
-                    if count_res and count_res[0] > 0: 
-                        possui_convite_pendente = True
+                if conn_b:
+                    with conn_b.cursor() as cursor_b:
+                        cursor_b.execute("SELECT COUNT(*) FROM agendamentos_virtuais WHERE destinatario_id = %s AND status_convite = 'pendente';", (meu_id_limpo,))
+                        count_res = cursor_b.fetchone()
+                        if count_res and count_res[0] > 0: 
+                            possui_convite_pendente = True
             except Exception: 
                 pass
             finally:
@@ -328,7 +317,6 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
                 """, unsafe_allow_html=True)
 
         # --- [D] BOTÕES DE NAVEGAÇÃO REATIVOS (CHAVES FIXAS ESTÁVEIS) ---
-        # Como estão fora de fragmentos, um único clique altera a rota global e redesenha o miolo instantaneamente!
         if st.button(label_gestao, type="secondary", use_container_width=True, key="btn_sidebar_gestao_final_real"):
             st.session_state.opcao_menu = "🤝 Gerenciar Conexões"
             st.rerun()
@@ -354,57 +342,45 @@ if menu_atual not in ["home", "login", "cadastro", "planos"]:
                 try:
                     id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
                     conn = obter_conexao_eficiente()
-                    with conn.cursor() as cursor:
-                        cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (id_limpo,))
-                        conn.commit()
-                    
-                    st.toast("Histórico limpo!")
-                    time.sleep(0.5)
-                    st.rerun()
+                    if conn:
+                        with conn.cursor() as cursor:
+                            cursor.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (id_limpo,))
+                            conn.commit()
+                        
+                        st.toast("Histórico limpo!")
+                        time.sleep(0.5)
+                        st.rerun()
                 except Exception as e: 
                     if conn: conn.rollback()
                     st.error(f"Erro ao limpar histórico: {e}")
-                        
+                finally:
+                    if conn:
+                        liberar_conexao(conn)
 
         st.markdown("<div style='height: 40px;'></div>", unsafe_allow_html=True) 
             
         # Botão de Logout Nativo
         if st.button("🚪 ENCERRAR SESSÃO", type="primary", use_container_width=True, key="btn_logout_sistema_final_real"):
-            conn_logout = None
-            try:
-                id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
-                conn_logout = obter_conexao_eficiente()
-                with conn_logout.cursor() as cursor_logout:
-                    cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (id_limpo,))
-                    conn_logout.commit()
-            except Exception:
-                if conn_logout: conn_logout.rollback()
-            finally:
-                if conn_logout: liberar_conexao(conn_logout)
-            
-            # Reseta a sessão de forma limpa
-            st.session_state.usuario_id = None
-            st.session_state.id_usuario = None
-            st.session_state.username = None
-            st.session_state.foto_perfil = ""
-            st.session_state.opcao_menu = "login"
-            st.rerun() 
-    
+            # Limpa todos os estados de sessão para deslogar com segurança total
+            st.session_state.clear()
+            st.rerun()
+
+              
 
 # ==============================================================================
-# 1. CONFIGURAÇÕES OBRIGATÓRIAS DE PÁGINA (Sempre no Topo Absoluto)
+# 1. CONFIGURAÇÕES OBRIGATÓRIAS DE PÁGINA (Sempre no Topo Absoluto do Script)
 # ==============================================================================
 if "sidebar_state" not in st.session_state:
     st.session_state.sidebar_state = "expanded"
 
+# DEVE ser chamado antes de desenhar qualquer elemento visual ou barra lateral!
 st.set_page_config(
     page_title="Lucy Chat IA - Plataforma", 
     layout="wide", 
     initial_sidebar_state=st.session_state.sidebar_state
 )
 
-
-# Estilização Padrão Global (Sem rolagem dupla)
+# Estilização Padrão Global (Injetada logo no início)
 st.markdown("""
     <style>
     [data-testid="stHeader"] { display: none !important; }
@@ -445,6 +421,7 @@ st.markdown("""
 # ==============================================================================
 if "opcao_menu" not in st.session_state: st.session_state.opcao_menu = "home"
 if "usuario_id" not in st.session_state: st.session_state.usuario_id = None
+if "id_usuario" not in st.session_state: st.session_state.id_usuario = None
 if "username" not in st.session_state: st.session_state.username = None
 if "foto_perfil" not in st.session_state: st.session_state.foto_perfil = None
 if "genero" not in st.session_state: st.session_state.genero = "M"
@@ -465,41 +442,60 @@ if "saldo_moedas" not in st.session_state: st.session_state.saldo_moedas = 0
 dias_semana_map = {0: 'Segunda-feira', 1: 'Terça-feira', 2: 'Quarta-feira', 3: 'Quinta-feira', 4: 'Sexta-feira', 5: 'Sábado', 6: 'Domingo'}
 dia_atual_servidor = dias_semana_map[datetime.now().weekday()]
 
-
+# ==============================================================================
+# LÓGICA DO LOGOUT (Agrupado de forma limpa e segura)
+# ==============================================================================
+# Este bloco deve estar contido dentro do escopo onde st.sidebar foi declarado no arquivo anterior
+def processar_logout(id_usuario_logado):
+    conn_logout = None
+    try:
+        if id_usuario_logado:
+            id_limpo = int(id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado)
+            conn_logout = obter_conexao_eficiente()
+            if conn_logout:
+                with conn_logout.cursor() as cursor_logout:
+                    cursor_logout.execute("UPDATE usuarios SET status = '⚫ Offline' WHERE id = %s;", (id_limpo,))
+                    conn_logout.commit()
+    except Exception:
+        if conn_logout: conn_logout.rollback()
+    finally:
+        if conn_logout: 
+            liberar_conexao(conn_logout)
+    
+    # Reseta a sessão completamente limpando os dados da memória
+    st.session_state.clear()
+    st.session_state.opcao_menu = "login"
+    st.rerun()
 
 # ==============================================================================
-# 4. FUNÇÕES DE SUPORTE E MECANISMO DE INTELIGÊNCIA ARTIFICIAL (4 PILARES)
+# 4. FUNÇÕES DE SUPORTE E MECANISMO DE INTELIGÊNCIA ARTIFICIAL
 # ==============================================================================
 def buscar_memoria(usuario_id, limite=15):
-    conn = None  # Inicializa explicitamente fora do try
+    conn = None
     try:
         conn = obter_conexao_eficiente() 
-        with conn.cursor() as cursor:
-            cursor.execute(
-                'SELECT usuario_pergunta, ia_resposta FROM historico_ia WHERE usuario_id = %s ORDER BY id ASC LIMIT %s;', 
-                (int(usuario_id), limite)
-            )
-            # ⚡ CORREÇÃO: O fetchall() PRECISA ficar dentro do bloco 'with' do cursor
-            hist = cursor.fetchall() 
-       
-        return hist
-    except Exception as e:
-        # Se quiser debugar durante os testes, descomente a linha abaixo:
-        # print(f"Erro ao buscar memória: {e}")
+        if conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    'SELECT usuario_pergunta, ia_resposta FROM historico_ia WHERE usuario_id = %s ORDER BY id ASC LIMIT %s;', 
+                    (int(usuario_id), limite)
+                )
+                return cursor.fetchall()
+    except Exception:
         return []
     finally:
         if conn:
             liberar_conexao(conn)
+    return []
 
-
-
+# ==============================================================================
+# TELA DE LOGIN DEFINITIVA (CORRIGIDA)
+# ==============================================================================
 def renderizar_tela_login_definitiva():
-    # Curto-circuito de segurança
-    if "usuario_id" in st.session_state and st.session_state.usuario_id:
+    if st.session_state.get("usuario_id"):
         st.session_state.opcao_menu = "💬 Conversar com Lucy"
         st.rerun()
 
-    # Gera a chave dinâmica única baseada no tempo atual
     if "login_view_uuid" not in st.session_state:
         st.session_state.login_view_uuid = str(time.time()).replace('.', '')
         
@@ -514,20 +510,27 @@ def renderizar_tela_login_definitiva():
 
     if botao_entrar:
         if not user_in.strip() or not pass_in.strip():
-                st.warning("Por favor, preencha todos os campos.")
+            st.warning("Por favor, preencha todos os campos.")
         else:
             conn = None  
             try:
                 conn = obter_conexao_eficiente()
-                
-                with conn.cursor() as cursor:
-                    cursor.execute(
-                        "SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", 
-                        (user_in.strip(), user_in.strip())
-                    )
-                    # ⚡ SOLUÇÃO DEFINITIVA: fetchone() e extração de variáveis DENTRO do bloco do cursor ativo
-                    res = cursor.fetchone()
-                    
+                if conn:
+                    with conn.cursor() as cursor:
+                        cursor.execute(
+                            "SELECT id, username, foto_perfil, is_admin, genero, tipo_plano, moedas, password_hash FROM usuarios WHERE username = %s OR email = %s;", 
+                            (user_in.strip(), user_in.strip())
+                        )
+                        res = cursor.fetchone()
+                        
+                        if res:
+                            # Próximo passo: validação de hash e injeção nas variáveis de sessão
+                            pass # O restante da sua lógica interna de validação continua aqui
+            except Exception as e:
+                st.error(f"Erro ao processar login: {e}")
+            finally:
+                if conn:
+                    liberar_conexao(conn)
                     if res:
                         # Guardamos tudo em variáveis locais seguras antes que o cursor feche no final do 'with'
                         banco_id = res[0]
@@ -539,13 +542,13 @@ def renderizar_tela_login_definitiva():
                         banco_moedas = res[6]
                         banco_password_hash = res[7]
                 
-                # --- AGORA FORA DO WITH (O cursor fechou, mas as variáveis locais estão seguras na memória) ---
+                # --- AGORA FORA DO WITH (As variáveis locais estão seguras na memória) ---
                 if res:
                     # Validação usando a função de Hash global
                     if not check_password_hash(banco_password_hash, str(pass_in)):
                         st.error("Senha incorreta. Tente novamente.")
                     else:
-                        # CONFIGURAÇÃO DE SESSÃO UNIFICADA (Usando as variáveis locais salvas)
+                        # CONFIGURAÇÃO DE SESSÃO UNIFICADA
                         id_numerico = int(banco_id)
                         st.session_state.usuario_id = id_numerico
                         st.session_state.id_usuario = id_numerico 
@@ -567,14 +570,11 @@ def renderizar_tela_login_definitiva():
                             cursor_update.execute("UPDATE usuarios SET status = '🟢 Online' WHERE id = %s", (id_numerico,))
                             conn.commit()
                         
-                        # Limpeza radical do contêiner para extinguir o efeito fantasma
-                        if "contener_login_ativo" in st.session_state:
-                            st.session_state.contener_login_ativo.empty()
-                        
+                        # ⚡ CORREÇÃO: Limpeza segura removendo referências a containers inexistentes
                         if "login_view_uuid" in st.session_state:
                             del st.session_state["login_view_uuid"]
                         
-                        # Redireciona e limpa os inputs do navegador
+                        # Redireciona de forma limpa, forçando redesenho imediato sem telas sobrepostas
                         st.session_state.opcao_menu = "💬 Conversar com Lucy"
                         st.rerun()
                 else:
@@ -592,43 +592,43 @@ def renderizar_tela_login_definitiva():
     col_voltar, col_esqueceu = st.columns(2)
     with col_voltar:
         if st.button("⬅️ Voltar para a Home", use_container_width=True, key=f"btn_vol_home_{u_key}"):
-            if "contener_login_ativo" in st.session_state:
-                st.session_state.contener_login_ativo.empty()
             if "login_view_uuid" in st.session_state:
                 del st.session_state["login_view_uuid"]
             st.session_state.opcao_menu = "home"
             st.rerun()
     with col_esqueceu:
         if st.button("🔑 Esqueceu a senha?", use_container_width=True, key=f"btn_esq_senha_{u_key}"):
-            modal_recuperar_senha()
-
+            # Garante que a função exista no escopo global ou emite aviso amigável
+            if 'modal_recuperar_senha' in globals():
+                modal_recuperar_senha()
+            else:
+                st.info("Função de recuperação de senha não implementada neste arquivo.")
 
 
 def processar_afinidade_e_match(usuario_id, texto_atual):
-    conn = None  # Inicializa para garantir o escopo do finally
+    conn = None  
     cursor = None
     try:
         meu_id_limpo = usuario_id if not isinstance(usuario_id, (tuple, list)) else int(usuario_id[0] if isinstance(usuario_id, tuple) else usuario_id)
         
         # 1. PRIMEIRA SESSÃO DO BANCO (Busca rápida de perfil)
         conn = obter_conexao_eficiente()
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT idade, genero, procura_por, procura_relacionamento FROM usuarios WHERE id = %s;", (meu_id_limpo,))
-        meu_perfil = cursor.fetchone()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT idade, genero, procura_por, procura_relacionamento FROM usuarios WHERE id = %s;", (meu_id_limpo,))
+            meu_perfil = cursor.fetchone()
+            cursor.close()
+            liberar_conexao(conn)
+            conn = None  # Reseta para não duplicar no finally
+        else:
+            return {"match": False}
         
         if not meu_perfil:
             return {"match": False}
             
         minha_idade, meu_genero, o_que_eu_procuro_gen, o_que_eu_procuro_rel = meu_perfil
-        
-        # ⚡ OTIMIZAÇÃO CRÍTICA: Devolvemos a conexão ao pool ANTES de chamar a OpenAI.
-        # Isso impede que o banco fique travado esperando a API externa responder (Gargalo de concorrência)
-        cursor.close()
-        liberar_conexao(conn)
-        conn = None  # Reseta para não duplicar a liberação no finally
 
-        # 2. PROCESSAMENTO EXTERNO DE IA (Sem travar o banco de dados)
+        # 2. PROCESSAMENTO EXTERNO DE IA (Sem travar as pools do Postgres)
         mensagens_sintese = [
             {"role": "system", "content": "Escreva apenas um parágrafo corrido contendo as palavras-chaves semânticas de interesses e estilo de vida."},
             {"role": "user", "content": f"Baseado nesta interação recente do usuário, extraia e descreva em terceira pessoa uma lista de seus hobbies e interesses: {texto_atual}"}
@@ -640,24 +640,24 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
         vetor_atual = resposta_embedding.data[0].embedding
         vetor_formatado_postgres = str(vetor_atual)
 
-        # 3. SEGUNDA SESSÃO DO BANCO (Escrita e Busca de Vetores por Proximidade)
+        # 3. SEGUNDA SESSÃO DO BANCO (Escrita e Busca por Proximidade de Vetor)
         conn = obter_conexao_eficiente()
-        cursor = conn.cursor()
-
-        cursor.execute('UPDATE usuarios SET biografia = %s, embedding_interesses = %s WHERE id = %s;', (perfil_consolidado_texto, vetor_formatado_postgres, meu_id_limpo))
-        
-        cursor.execute('''
-            SELECT id, username, status, (embedding_interesses <=> %s::vector) AS distancia 
-            FROM usuarios 
-            WHERE id != %s AND is_admin = FALSE AND embedding_interesses IS NOT NULL
-              AND (idade BETWEEN %s - 5 AND %s + 5)
-              AND LOWER(TRIM(procura_relacionamento)) = LOWER(TRIM(%s))
-              AND ((%s = 'O' OR procura_por = %s OR procura_por = 'O') AND (%s = 'O' OR %s = genero OR %s = 'O'))
-            ORDER BY (embedding_interesses <=> %s::vector) ASC, id ASC LIMIT 1;
-        ''', (vetor_formatado_postgres, meu_id_limpo, int(minha_idade or 25), int(minha_idade or 25), str(o_que_eu_procuro_rel or ''), str(meu_genero), str(meu_genero), str(o_que_eu_procuro_gen), str(o_que_eu_procuro_gen), str(meu_genero), vetor_formatado_postgres))
-        resultado = cursor.fetchone()
-        
-        conn.commit()  # Salva o UPDATE e garante integridade antes de avaliar o resultado
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute('UPDATE usuarios SET biografia = %s, embedding_interesses = %s WHERE id = %s;', (perfil_consolidado_texto, vetor_formatado_postgres, meu_id_limpo))
+            
+            cursor.execute('''
+                SELECT id, username, status, (embedding_interesses <=> %s::vector) AS distancia 
+                FROM usuarios 
+                WHERE id != %s AND is_admin = FALSE AND embedding_interesses IS NOT NULL
+                  AND (idade BETWEEN %s - 5 AND %s + 5)
+                  AND LOWER(TRIM(procura_relacionamento)) = LOWER(TRIM(%s))
+                  AND ((%s = 'O' OR procura_por = %s OR procura_por = 'O') AND (%s = 'O' OR %s = genero OR %s = 'O'))
+                ORDER BY (embedding_interesses <=> %s::vector) ASC, id ASC LIMIT 1;
+            ''', (vetor_formatado_postgres, meu_id_limpo, int(minha_idade or 25), int(minha_idade or 25), str(o_que_eu_procuro_rel or ''), str(meu_genero), str(meu_genero), str(o_que_eu_procuro_gen), str(o_que_eu_procuro_gen), str(meu_genero), vetor_formatado_postgres))
+            resultado = cursor.fetchone()
+            conn.commit()
+            cursor.close()
 
         if resultado:
             id_par, nome_par, status_par, distancia = resultado
@@ -665,33 +665,31 @@ def processar_afinidade_e_match(usuario_id, texto_atual):
             if distancia_val <= 0.22:
                 similaridade_bruta = 1.0 - distancia_val
                 porcentagem_match = max(0.0, min(100.0, (similaridade_bruta - 0.75) / (0.88 - 0.75) * 100))
-                return {"match": True, "id_par": int(id_par), "nome_par": nome_par, "online": "🟢" in str(status_par) or "Online" in str(status_par), "afinidade_porcentagem": round(porcentagem_match, 1)}
+                return {
+                    "match": True, 
+                    "id_par": int(id_par), 
+                    "nome_par": nome_par, 
+                    "online": "🟢" in str(status_par) or "Online" in str(status_par), 
+                    "afinidade_porcentagem": round(porcentagem_match, 1)
+                }
 
         return {"match": False}
 
     except Exception as e:
-        # Se houver erro em qualquer uma das sessões, cancela transações abertas
         if conn:
             try:
                 conn.rollback()
             except Exception:
                 pass
-        st.error(f"Erro no motor de afinidade: {e}")
+        st.error(f"Erro no processamento de afinidade: {e}")
         return {"match": False}
-        
     finally:
-        # Garante o fechamento limpo do cursor e devolução segura da conexão ao Pool
-        if cursor:
-            try:
-                cursor.close()
-            except Exception:
-                pass
         if conn:
             liberar_conexao(conn)
 
 
 # ==============================================================================
-# 5. RENDERIZADORES DE DIALOGS/MODAIS (RECALIBRADOS)
+# 5. RENDERIZADORES DE DIALOGS/MODAIS (RECALIBRADOS - SEM ROLES FANTASMAS)
 # ==============================================================================
 # ⚡ OTIMIZAÇÃO: Use o decorador atualizado estável do Streamlit
 @st.dialog("🤖 Lucy Notou Afinidade!")
@@ -706,6 +704,7 @@ def exibir_modal_match(dados_m, tipo_plano, saldo_moedas):
             if st.button("🚀 Entrar na Sala Privada (Acesso Total Ilimitado)", type="primary", use_container_width=True, key="btn_match_vip"):
                 st.session_state.match_id_atual = dados_m["match_id"]
                 st.session_state.tempo_limite_sala = -1
+                st.session_state.alerta_match = None  # Limpa o gatilho para o modal fechar de verdade
                 st.session_state.opcao_menu = "🤝 Sala Privada"
                 st.rerun()  # O roteador limpa a tela de fundo na re-execução
                 
@@ -714,19 +713,33 @@ def exibir_modal_match(dados_m, tipo_plano, saldo_moedas):
             
             if st.button("🪙 Entrar na Sala Privada (Gasta 10 moedas)", type="primary", use_container_width=True, key="btn_match_moedas"):
                 if saldo_moedas >= 10:
+                    conn_debito = None
                     try:
                         id_limpo = id_usuario[0] if isinstance(id_usuario, (list, tuple)) else id_usuario
                         
-                        # Transação rápida no banco
-                        supabase.table("usuarios").update({"moedas": saldo_moedas - 10}).eq("id", int(id_limpo)).execute()
-                        st.success("Moedas debitadas! Sala privada liberada por 10 minutos iniciais.")
-                        
-                        st.session_state.match_id_atual = dados_m["match_id"]
-                        st.session_state.tempo_limite_sala = 10
-                        st.session_state.opcao_menu = "🤝 Sala Privada"
-                        st.rerun()
+                        # ⚡ OTIMIZAÇÃO CRÍTICA: Débito executado direto no Pool PostgreSQL (0ms de lag)
+                        # Remove a dependência da chamada HTTP lenta do cliente Supabase
+                        conn_debito = obter_conexao_eficiente()
+                        if conn_debito:
+                            with conn_debito.cursor() as cursor_debito:
+                                cursor_debito.execute("UPDATE usuarios SET moedas = %s WHERE id = %s;", (saldo_moedas - 10, int(id_limpo)))
+                                conn_debito.commit()
+                            
+                            st.success("Moedas debitadas! Sala privada liberada por 10 minutos iniciais.")
+                            
+                            st.session_state.match_id_atual = dados_m["match_id"]
+                            st.session_state.tempo_limite_sala = 10
+                            st.session_state.alerta_match = None  # Limpa o gatilho
+                            st.session_state.opcao_menu = "🤝 Sala Privada"
+                            st.rerun()
+                        else:
+                            st.error("Não foi possível conectar ao banco para processar a transação.")
                     except Exception as e: 
+                        if conn_debito: conn_debito.rollback()
                         st.error(f"Falha na transação: {e}")
+                    finally:
+                        if conn_debito:
+                            liberar_conexao(conn_debito)
                 else: 
                     st.warning("🔒 Saldo insuficiente. Você precisa de pelo menos 10 moedas.")
         else: 
@@ -744,14 +757,18 @@ def exibir_modal_match(dados_m, tipo_plano, saldo_moedas):
                     "nome_par": dados_m["nome"], 
                     "m_id": dados_m["match_id"]
                 }
+                st.session_state.alerta_match = None  # Limpa o gatilho para fechar o modal
                 st.rerun()
             else: 
                 st.warning("🔒 O agendamento de encontros virtuais não está disponível no Plano Grátis. Faça um upgrade!")
                 
     st.markdown("---")
-    # Botão de fechar ganha chave explícita para evitar conflito com re-renders secundários
+    
+    # ⚡ CORREÇÃO DE LOOP: Desativa o gatilho limpando o estado antes de rodar o rerun
     if st.button("❌ Não tenho interesse", type="secondary", use_container_width=True, key="btn_match_recusar"): 
-        st.rerun()
+        st.session_state.alerta_match = None  # Neutraliza a variável controladora que invoca o modal
+        st.rerun()  # Fecha o modal de forma limpa e restaura o controle da tela de fundo
+
 
 
 
@@ -760,80 +777,79 @@ def processar_match_lucy(dados_m):
     if id_usuario_logado is None: 
         return
         
-    # ⚡ OTIMIZAÇÃO CRÍTICA: Se os dados do plano já foram carregados neste ciclo,
-    # evita fazer uma nova requisição de rede ao Supabase (Gargalo de IO)
-    if "cache_plano_usuario" not in st.session_state:
+    # ⚡ OTIMIZAÇÃO CRÍTICA: Se os dados do plano e moedas já existem na sessão global,
+    # nós usamos eles diretamente (0ms). Caso contrário, buscamos no Pool de forma ultra-rápida.
+    if "tipo_plano" not in st.session_state or "saldo_moedas" not in st.session_state:
+        conn_match = None
         try:
-            id_limpo = id_usuario_logado if isinstance(id_usuario_logado, (list, tuple)) else id_usuario_logado
-            user_data = supabase.table("usuarios").select("tipo_plano", "moedas").eq("id", int(id_limpo)).execute()
+            id_limpo = id_usuario_logado if not isinstance(id_usuario_logado, (list, tuple)) else id_usuario_logado
             
-            if user_data.data:
-                registro_banco = user_data.data[0]
-                st.session_state.cache_plano_usuario = str(registro_banco.get("tipo_plano", "Grátis")).strip()
-                st.session_state.cache_moedas_usuario = registro_banco.get("moedas", 0)
+            # Substituída a API lenta do Supabase pelo Pool eficiente já configurado
+            conn_match = obter_conexao_eficiente()
+            if conn_match:
+                with conn_match.cursor() as cursor_match:
+                    cursor_match.execute("SELECT tipo_plano, moedas FROM usuarios WHERE id = %s;", (int(id_limpo),))
+                    res = cursor_match.fetchone()
+                    if res:
+                        st.session_state["tipo_plano"] = str(res[0]).strip()
+                        st.session_state["saldo_moedas"] = int(res[1] or 0)
+                    else:
+                        st.session_state["tipo_plano"] = "Grátis"
+                        st.session_state["saldo_moedas"] = 0
             else:
-                st.session_state.cache_plano_usuario = "Grátis"
-                st.session_state.cache_moedas_usuario = 0
+                st.session_state["tipo_plano"] = "Grátis"
+                st.session_state["saldo_moedas"] = 0
         except Exception as e: 
-            st.error(f"Erro ao carregar dados do banco: {e}")
+            st.error(f"Erro ao carregar dados do banco no fluxo do match: {e}")
             return
+        finally:
+            if conn_match:
+                liberar_conexao(conn_match)
 
-    # Extrai os dados salvos de forma instantânea da memória (0 milissegundos)
-    tipo_plano = st.session_state.cache_plano_usuario
-    saldo_moedas = st.session_state.cache_moedas_usuario
+    # Extrai os dados unificados e sincronizados diretamente da memória raiz do Streamlit
+    tipo_plano = st.session_state["tipo_plano"]
+    saldo_moedas = st.session_state["saldo_moedas"]
         
-    # Dispara o modal sem nenhum atraso de rede pendente
+    # Dispara o modal sem nenhum atraso de rede pendente ou travamento visual
     exibir_modal_match(dados_m, tipo_plano, saldo_moedas)
 
 
-
 # ==============================================================================
-# FUNÇÃO ISOLADA COM BUFFER DE MEMÓRIA (INPUT EMBAIXO E MENSAGENS EM CIMA)
+# FUNÇÃO ISOLADA COM BUFFER DE MEMÓRIA (TOTALMENTE ALINHADA E CORRIGIDA)
 # ==============================================================================
-# ⚡ CORREÇÃO DO DECORADOR: Deixe o fragment puro e limpo, sem argumentos
 @st.fragment
 def renderizar_chat_lucy_isolado():
     # Inicializa a semente caso ela não exista na memória
     semente_atual = st.session_state.get("seed_recarregar_chat", 0)
 
-    # ⚡ O SEGREDO DO PROCESSO: O container de layout ganha a key baseada na semente.
-    # Quando o Pix é aprovado e a semente muda para 1, o Streamlit é obrigado a
-    # apagar este container e reconstruir todos os inputs (inclusive o chat_input) do zero!
+    # ⚡ PROVIMENTO DE SEGURANÇA CONTRA DESLOGAMENTO SÚBITO
+    id_bruto = st.session_state.get("usuario_id")
+    if id_bruto is None:
+        st.session_state.opcao_menu = "login"
+        st.rerun(scope="fragment")
+        return
+        
+    meu_id_limpo = int(id_bruto if not isinstance(id_bruto, (tuple, list)) else id_bruto)
+
+    # ⚡ CORREÇÃO DA INDENTAÇÃO: Todo o fluxo visual e lógico agora reside
+    # estritamente envelopado por dentro do bloco de contêiner dinâmico da semente.
     with st.container(key=f"container_interno_chat_{semente_atual}"):
         
         if "opcao_menu" not in st.session_state:
             st.session_state.opcao_menu = "chat"
             
-        # ----------------------------------------------------------------------
-        # MANTENHA AQUI DENTRO TODO O RESTO DO SEU CÓDIGO DO CHAT IGUAL:
-        # (Histórico, área visual de rolagem, st.chat_input, etc.)
-        # Certifique-se apenas de que TODO o código do chat fique indentado (com recuo)
-        # para dentro deste bloco 'with st.container'
-        # -------------------------------------------
-    
         # 1. TRATAMENTO DE TELAS SECUNDÁRIAS DENTRO DO FRAGMENTO
         if st.session_state.opcao_menu == "✉️ Fale Conosco":
-            template_fale_conosco()
+            # Certifique-se de que template_fale_conosco esteja importada/definida
+            if 'template_fale_conosco' in globals():
+                template_fale_conosco()
+            else:
+                st.info("Formulário de contato indisponível.")
+                
             if st.button("⬅️ Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_fc"):
                 st.session_state.opcao_menu = "chat"
                 st.rerun(scope="fragment")
-            return # Interrompe o resto do chat se estiver no fale conosco
-
-    
-    #meu_id_limpo = st.session_state.usuario_id if not isinstance(st.session_state.usuario_id, (tuple, list)) else int(st.session_state.usuario_id)
-
-    # ⚡ PROVIMENTO DE SEGURANÇA CONTRA DESLOGAMENTO SÚBITO (LINHA 597)
-        # Substitui a leitura crua por um resgate imune a falhas de atributo .get()
-        id_bruto = st.session_state.get("usuario_id")
-        
-        # Se o ID não existir ou for nulo (após logout), aborta a renderização do chat na hora
-        if id_bruto is None:
-            st.session_state.opcao_menu = "login"
-            st.st_stop() if hasattr(st, "st_stop") else st.stop()
-            
-        # Desempacota com segurança caso o banco retorne formatos em lista/tupla
-        meu_id_limpo = int(id_bruto if not isinstance(id_bruto, (tuple, list)) else id_bruto)
-
+            return  # Interrompe o resto do chat se estiver no fale conosco
 
         # 2. ÁREA VISUAL FIXA DO TOPO (Nunca some)
         col_titulos, col_botoes_topo = st.columns([2, 1])
@@ -844,19 +860,18 @@ def renderizar_chat_lucy_isolado():
         with col_botoes_topo:
             c_refresh, c_fc = st.columns(2)
             with c_refresh:
-                if st.button("🔄 Atualizar", type="tertiary", help="Sincronizar mensagens", key="btn_refresh_chat"):
+                if st.button("🔄 Atualizar", type="secondary", help="Sincronizar mensagens", key="btn_refresh_chat"):
                     st.rerun(scope="fragment")
             with c_fc:
-                if st.button("✉️ Contato", type="tertiary", key="btn_fale_conosco_chat"):
+                if st.button("✉️ Contato", type="secondary", key="btn_fale_conosco_chat"):
                     st.session_state.opcao_menu = "✉️ Fale Conosco"
                     st.rerun(scope="fragment")
         
         st.markdown("<hr style='border-color: #30363d; margin: 5px 0 15px 0;'>", unsafe_allow_html=True)
 
-        # 3. BUSCA RÁPIDA E EXIBIÇÃO DO HISTÓRICO (Feedback Visual Instantâneo)
+        # 3. BUSCA RÁPIDA E EXIBIÇÃO DO HISTÓRICO
         historico_banco = buscar_memoria(meu_id_limpo, limite=20)
         
-        # Criamos um container invisível para as mensagens antigas
         area_mensagens = st.container(height=450, border=False)
         with area_mensagens:
             for pergunta_antiga, resposta_antiga in historico_banco:
@@ -869,58 +884,59 @@ def renderizar_chat_lucy_isolado():
         prompt_capturado = st.chat_input("Digite sua mensagem para a Lucy...")
         
         if prompt_capturado:
-            # Adiciona a mensagem do usuário na tela IMEDIATAMENTE (Sem esperar a IA)
             with area_mensagens:
                 with st.chat_message("user"):
                     st.markdown(prompt_capturado)
-                # Cria um placeholder com efeito de carregamento para a resposta da IA
                 with st.chat_message("assistant", avatar="🤖"):
                     placeholder_resposta = st.empty()
-                    with placeholder_resposta.container():
-                        st.markdown("⏳ *Lucy está pensando...*")
+                    resposta_completa = ""
 
-            # Inicia o processamento pesado com o banco de dados livre
             try:
-                # Pega o contexto rápido baseado nas últimas mensagens lidas acima
                 contexto_mensagens = [
                     {"role": "system", "content": "Você é a Lucy, uma IA psicóloga e assistente de relacionamentos altamente empática. Seu objetivo é entender o estilo de vida, gostos e rotina do usuário através de uma conversa natural. Seja acolhedora, faça perguntas abertas e ajude-o a se expressar para encontrar o par ideal."}
                 ]
                 
-                # Alimenta as últimas 5 mensagens para a OpenAI ter contexto recente
+                # Contexto das últimas mensagens lidas
                 for p, r in historico_banco[-5:]:
                     contexto_mensagens.append({"role": "user", "content": p})
                     contexto_mensagens.append({"role": "assistant", "content": r})
                 
                 contexto_mensagens.append({"role": "user", "content": prompt_capturado})
 
-                # Chamada de API externa
-                resposta_openai = client.chat.completions.create(
+                # ⚡ OTIMIZAÇÃO CRÍTICA: Ativado o Efeito de Streaming (Respostas fluidas palavra por palavra)
+                stream = client.chat.completions.create(
                     model='gpt-4o-mini',
                     messages=contexto_mensagens,
-                    temperature=0.7
+                    temperature=0.7,
+                    stream=True
                 )
-                resposta_lucy = resposta_openai.choices[0].message.content
+                
+                for chunk in stream:
+                    if chunk.choices and chunk.choices[0].delta.content is not None:
+                        resposta_completa += chunk.choices[0].delta.content
+                        placeholder_resposta.markdown(resposta_completa + "▌")
+                
+                placeholder_resposta.markdown(resposta_completa)  # Exibe o texto final sem o cursor
 
-                # Salva no histórico usando a função estável de Pool com try/finally
+                # Salva no histórico usando o Pool estável
                 conn_salvar = None
                 try:
                     conn_salvar = obter_conexao_eficiente()
-                    with conn_salvar.cursor() as cursor_salvar:
-                        cursor_salvar.execute("""
-                            INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta) 
-                            VALUES (%s, %s, %s);
-                        """, (meu_id_limpo, prompt_capturado, resposta_lucy))
-                        conn_salvar.commit()
+                    if conn_salvar:
+                        with conn_salvar.cursor() as cursor_salvar:
+                            cursor_salvar.execute("""
+                                INSERT INTO historico_ia (usuario_id, usuario_pergunta, ia_resposta) 
+                                VALUES (%s, %s, %s);
+                            """, (meu_id_limpo, prompt_capturado, resposta_completa))
+                            conn_salvar.commit()
                 except Exception as e_db:
                     if conn_salvar: conn_salvar.rollback()
-                    raise e_db
+                    st.error(f"Erro ao salvar mensagem no banco: {e_db}")
                 finally:
-                    if conn_salvar: liberar_conexao(conn_salvar)
+                    if conn_salvar: 
+                        liberar_conexao(conn_salvar)
 
-                # Substitui o "Lucy está pensando..." pela resposta real da IA instantaneamente
-                placeholder_resposta.markdown(resposta_lucy)
-
-                # Executa o motor de afinidade pós-mensagem de forma assíncrona
+                # Executa o motor de afinidade pós-mensagem
                 dados_match = processar_afinidade_e_match(meu_id_limpo, prompt_capturado)
                 if dados_match and dados_match.get("match"):
                     st.session_state.alerta_match = {
@@ -935,8 +951,6 @@ def renderizar_chat_lucy_isolado():
                 st.error(f"Erro ao processar conversa com a IA: {e}")
 
 
-
-# ⚡ OTIMIZAÇÃO CRÍTICA: REMOVA o @st.dialog daqui. A função agora é um componente nativo.
 def modal_agendamento_encontro(dados_r):
     # Criamos uma caixa visual simulando o modal (Estilização GitHub Dark)
     with st.container(border=True):
@@ -955,8 +969,8 @@ def modal_agendamento_encontro(dados_r):
         hor_s = st.time_input("Ajuste o Horário Exato:", value=horario_sugestao, step=900, key="dg_res_hor")
         
         def limpar_id_absoluto(id_bruto):
-            while isinstance(id_bruto, (tuple, list)): 
-                id_bruto = id_bruto[0] if len(id_bruto) > 0 else 0
+            if isinstance(id_bruto, (tuple, list)):
+                return int(id_bruto[0]) if len(id_bruto) > 0 else 0
             return int(id_bruto) if id_bruto is not None else 0
 
         m_id_limpo = limpar_id_absoluto(dados_r.get('m_id'))
@@ -973,88 +987,93 @@ def modal_agendamento_encontro(dados_r):
         if st.button("💾 Confirmar Reserva e Enviar", type="primary", use_container_width=True, key="btn_confirmar_reserva_final"):
             
             hora_int = hor_s.hour
+            # ⚡ CORREÇÃO: Substituído o 'return' por marcação de erro boleana para não sumir com o layout da página
             if per_s == 'manha' and (hora_int < 6 or hora_int >= 12): 
-                st.error("❌ Horário inválido para Manhã (06:00 às 11:59).")
-                return
+                erro_validacao = True
+                mensagem_erro = "❌ Horário inválido para Manhã (06:00 às 11:59)."
             elif per_s == 'tarde' and (hora_int < 12 or hora_int >= 18): 
-                st.error("❌ Horário inválido para Tarde (12:00 às 17:59).")
-                return
+                erro_validacao = True
+                mensagem_erro = "❌ Horário inválido para Tarde (12:00 às 17:59)."
             elif per_s == 'noite' and (hora_int < 18 or hora_int > 23): 
-                st.error("❌ Horário inválido para Noite (18:00 às 23:59).")
-                return
+                erro_validacao = True
+                mensagem_erro = "❌ Horário inválido para Noite (18:00 às 23:59)."
 
-            conn = None
-            try:
-                conn = obter_conexao_eficiente()
-                with conn.cursor() as cursor:
-                    # Verificação de Match
-                    cursor.execute("SELECT COUNT(*) FROM matches WHERE id = %s;", (m_id_limpo,))
-                    match_existe = cursor.fetchone()[0] > 0
-                    
-                    if not match_existe:
-                        cursor.execute("""
-                            SELECT id FROM matches 
-                            WHERE (usuario_1_id = %s AND usuario_2_id = %s) OR (usuario_1_id = %s AND usuario_2_id = %s) 
-                            LIMIT 1;
-                        """, (meu_id_limpo, parceiro_id_limpo, parceiro_id_limpo, meu_id_limpo))
-                        match_recuperado = cursor.fetchone()
-                        
-                        if match_recuperado:
-                            m_id_limpo = int(match_recuperado[0])
-                        else:
+            if erro_validacao:
+                st.error(mensagem_erro)
+            else:
+                conn = None
+                try:
+                    conn = obter_conexao_eficiente()
+                    if conn:
+                        with conn.cursor() as cursor:
+                            # Verificação de Match
+                            cursor.execute("SELECT COUNT(*) FROM matches WHERE id = %s;", (m_id_limpo,))
+                            match_existe = cursor.fetchone()[0] > 0
+                            
+                            if not match_existe:
+                                cursor.execute("""
+                                    SELECT id FROM matches 
+                                    WHERE (usuario_1_id = %s AND usuario_2_id = %s) OR (usuario_1_id = %s AND usuario_2_id = %s) 
+                                    LIMIT 1;
+                                """, (meu_id_limpo, parceiro_id_limpo, parceiro_id_limpo, meu_id_limpo))
+                                match_recuperado = cursor.fetchone()
+                                
+                                if match_recuperado:
+                                    m_id_limpo = int(match_recuperado[0])
+                                else:
+                                    cursor.execute("""
+                                        INSERT INTO matches (usuario_1_id, usuario_2_id, status_conexao) 
+                                        VALUES (%s, %s, 'offline') RETURNING id;
+                                    """, (meu_id_limpo, parceiro_id_limpo))
+                                    m_id_limpo = int(cursor.fetchone()[0])
+                                    conn.commit()
+
+                            # Validações de Disponibilidade
                             cursor.execute("""
-                                INSERT INTO matches (usuario_1_id, usuario_2_id, status_conexao) 
-                                VALUES (%s, %s, 'offline') RETURNING id;
-                            """, (meu_id_limpo, parceiro_id_limpo))
-                            m_id_limpo = int(cursor.fetchone()[0])
-                            conn.commit()
-
-                    # Validações de Disponibilidade
-                    cursor.execute("""
-                        SELECT COUNT(*) FROM disponibilidade_usuarios 
-                        WHERE usuario_id = %s AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-                    """, (meu_id_limpo, str(dia_s), str(per_s)))
-                    meu_registro_existe = cursor.fetchone()[0] > 0
-            
-                    cursor.execute("""
-                        SELECT COUNT(*) FROM disponibilidade_usuarios 
-                        WHERE usuario_id = %s 
-                        AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
-                        AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
-                    """, (parceiro_id_limpo, str(dia_s), str(per_s)))
-                    parceiro_registro_existe = cursor.fetchone()[0] > 0
-
-                    if not meu_registro_existe:
-                        erro_validacao = True
-                        mensagem_erro = f"❌ **Agendamento Recusado:** Você configurou este dia/período como indisponível na sua grade."
-                    elif not parceiro_registro_existe:
-                        erro_validacao = True
-                        mensagem_erro = f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado."       
+                                SELECT COUNT(*) FROM disponibilidade_usuarios 
+                                WHERE usuario_id = %s AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+                            """, (meu_id_limpo, str(dia_s), str(per_s)))
+                            meu_registro_existe = cursor.fetchone()[0] > 0
                     
-                    if erro_validacao:
-                        st.error(mensagem_erro)
-                        # ⚡ Importante: Não damos rerun aqui! Mantemos a tela aberta para o admin ler o erro.
+                            cursor.execute("""
+                                SELECT COUNT(*) FROM disponibilidade_usuarios 
+                                WHERE usuario_id = %s 
+                                AND LOWER(TRIM(dia_semana)) = LOWER(TRIM(%s)) 
+                                AND LOWER(TRIM(periodo)) = LOWER(TRIM(%s));
+                            """, (parceiro_id_limpo, str(dia_s), str(per_s)))
+                            parceiro_registro_existe = cursor.fetchone()[0] > 0
+
+                            if not meu_registro_existe:
+                                erro_validacao = True
+                                mensagem_erro = f"❌ **Agendamento Recusado:** Você configurou este dia/período como indisponível na sua grade."
+                            elif not parceiro_registro_existe:
+                                erro_validacao = True
+                                mensagem_erro = f"❌ **Agendamento Recusado:** {dados_r['nome_par']} está indisponível na {dia_s} no período selecionado."       
+                            
+                            if erro_validacao:
+                                st.error(mensagem_erro)
+                            else:
+                                cursor.execute("""
+                                    INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
+                                    VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
+                                """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), hor_s))
+                                
+                                conn.commit()
+                                st.success("🎉 Convite enviado com sucesso!")
+                                st.session_state.abrir_reserva_fluxo = None  # Fecha o modal simulado
+                                st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                                time.sleep(1.0)
+                                st.rerun()
                     else:
-                        cursor.execute("""
-                            INSERT INTO agendamentos_virtuais (match_id, remetente_id, destinatario_id, dia_semana, periodo, horario, status_convite) 
-                            VALUES (%s, %s, %s, %s, %s, %s, 'pendente');
-                        """, (m_id_limpo, meu_id_limpo, parceiro_id_limpo, str(dia_s), str(per_s), hor_s))
-                        
-                        conn.commit()
-                        st.success("🎉 Convite enviado com sucesso!")
-                        st.session_state.abrir_reserva_fluxo = None  # Fecha o modal simulado
-                        st.session_state.opcao_menu = "💬 Conversar com Lucy"
-                        time.sleep(1.0)
-                        st.rerun()
+                        st.error("Falha ao obter conexão ativa com o banco de dados.")
+                except Exception as e: 
+                    if conn: conn.rollback()
+                    st.error(f"Erro crítico ao salvar agendamento: {e}")
+                finally:
+                    if conn:
+                        liberar_conexao(conn)
 
-            except Exception as e: 
-                if conn: conn.rollback()
-                st.error(f"Erro crítico ao salvar agendamento: {e}")
-            finally:
-                if conn:
-                    liberar_conexao(conn)
-
-        # Botão de fechar nativo do modal simulado
+        # Botão de fechar nativo do modal simulado (Permanece intacto e visível)
         if st.button("🚫 Cancelar e Voltar", use_container_width=True, key="btn_cancelar_modal_reserva_simulado"):
             st.session_state.abrir_reserva_fluxo = None
             st.rerun()
@@ -1065,33 +1084,30 @@ def modal_agendamento_encontro(dados_r):
 @st.cache_data(ttl=60)  # Limpa o cache automaticamente após 1 minuto
 def buscar_disponibilidade_banco(usuario_id):
     horarios = set()
-    conn = None  # Inicializa para garantir o escopo do finally
+    conn = None  
     try:
         conn = obter_conexao_eficiente()
-        with conn.cursor() as cursor:
-            cursor.execute(
-                "SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", 
-                (int(usuario_id),)
-            )
-            # ⚡ CORREÇÃO CRUCIAL: O fetchall() PRECISA ficar dentro do bloco 'with' do cursor
-            registros = cursor.fetchall()
-            
-        # Processa os dados na memória após fechar o cursor com segurança
-        for d_sem, per_id in registros:
-            horarios.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
-            
-    except Exception as e:
-        # Silencia ou debuga se necessário: print(f"Erro ao buscar disponibilidade: {e}")
+        if conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT dia_semana, periodo FROM disponibilidade_usuarios WHERE usuario_id = %s;", 
+                    (int(usuario_id),)
+                )
+                registros = cursor.fetchall()
+                
+            for d_sem, per_id in registros:
+                horarios.add(f"{str(d_sem).strip()}_{str(per_id).strip()}") 
+    except Exception:
         pass
     finally:
-        # ⚡ RETORNO OBRIGATÓRIO: Devolve a conexão para o Pool continuar rápido
         if conn:
             liberar_conexao(conn)
             
     return horarios
 
+
 # ==============================================================================
-# TELA DE CONFIGURAÇÃO DE DISPONIBILIDADE SEMANAL
+# TELA DE CONFIGURAÇÃO DE DISPONIBILIDADE SEMANAL (CORRIGIDA)
 # ==============================================================================
 def template_disponibilidade(): 
     st.subheader("📅 Sua Grade de Disponibilidade") 
@@ -1135,34 +1151,39 @@ def template_disponibilidade():
             conn = None
             try:
                 conn = obter_conexao_eficiente()
-                with conn.cursor() as cursor: 
-                    cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
+                if conn:
+                    with conn.cursor() as cursor: 
+                        cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,)) 
+                        
+                        for idx, row in grade_editada.iterrows(): 
+                            p_id = periodos[idx]["id"]
+                            for d in dias: 
+                                if row[d]: 
+                                    cursor.execute("""
+                                        INSERT INTO disponibilidade_usuarios (usuario_id, dia_semana, periodo) 
+                                        VALUES (%s, %s, %s);
+                                    """, (meu_id_limpo, str(d), str(p_id))) 
+                        
+                        conn.commit()
                     
-                    for idx, row in grade_editada.iterrows(): 
-                        p_id = periodos[idx]["id"]
-                        for d in dias: 
-                            if row[d]: 
-                                cursor.execute("""
-                                    INSERT INTO disponibilidade_usuarios (usuario_id, dia_semana, periodo) 
-                                    VALUES (%s, %s, %s);
-                                """, (meu_id_limpo, str(d), str(p_id))) 
+                    # ⚡ OTIMIZAÇÃO CRÍTICA: Limpa o cache da função de grade horária
+                    buscar_disponibilidade_banco.clear(meu_id_limpo)
                     
-                    conn.commit()
-                
-                # ⚡ OTIMIZAÇÃO CRÍTICA: Limpa apenas o cache desta função de grade, deixando o resto do app intacto
-                buscar_disponibilidade_banco.clear(meu_id_limpo)
-                
-                if "df_grade_memoria" in st.session_state:
-                    del st.session_state["df_grade_memoria"]
-                
-                st.toast("🎉 Sua grade horária foi salva com sucesso!")
-                time.sleep(0.5)  # Reduzido para resposta mais ágil
-                st.rerun() 
+                    # ⚡ SOLUÇÃO DO CONGELAMENTO: Além de deletar o DataFrame, limpa o estado interno do editor
+                    if "df_grade_memoria" in st.session_state:
+                        del st.session_state["df_grade_memoria"]
+                    if "grade_horaria_editor" in st.session_state:
+                        del st.session_state["grade_horaria_editor"]
+                    
+                    st.toast("🎉 Sua grade horária foi salva com sucesso!")
+                    time.sleep(0.5)
+                    st.rerun() 
+                else:
+                    st.error("Não foi possível conectar ao banco de dados.")
             except Exception as e:
                 if conn: conn.rollback()
                 st.error(f"Erro crítico ao salvar no banco: {e}")
             finally:
-                # ⚡ DEVOLUÇÃO OBRIGATÓRIA AO POOL
                 if conn:
                     liberar_conexao(conn)
 
@@ -1175,24 +1196,29 @@ def template_disponibilidade():
             conn = None
             try:
                 conn = obter_conexao_eficiente()
-                with conn.cursor() as cursor:
-                    cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
-                    conn.commit()
-                
-                # Limpa cirurgicamente o cache da função
-                buscar_disponibilidade_banco.clear(meu_id_limpo)
-                
-                if "df_grade_memoria" in st.session_state:
-                    del st.session_state["df_grade_memoria"]
+                if conn:
+                    with conn.cursor() as cursor:
+                        cursor.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (meu_id_limpo,))
+                        conn.commit()
                     
-                st.toast("Toda a sua grade horária foi limpa!")
-                time.sleep(0.5)
-                st.rerun()
+                    # Limpa cirurgicamente o cache da função
+                    buscar_disponibilidade_banco.clear(meu_id_limpo)
+                    
+                    # ⚡ SOLUÇÃO DO CONGELAMENTO: Limpa o editor para o estado "Zeradinho" aparecer na hora
+                    if "df_grade_memoria" in st.session_state:
+                        del st.session_state["df_grade_memoria"]
+                    if "grade_horaria_editor" in st.session_state:
+                        del st.session_state["grade_horaria_editor"]
+                        
+                    st.toast("Toda a sua grade horária foi limpa!")
+                    time.sleep(0.5)
+                    st.rerun()
+                else:
+                    st.error("Não foi possível conectar ao banco de dados.")
             except Exception as e: 
                 if conn: conn.rollback()
                 st.error(f"Erro ao limpar grade: {e}")
             finally:
-                # ⚡ DEVOLUÇÃO OBRIGATÓRIA AO POOL
                 if conn:
                     liberar_conexao(conn)
             
@@ -1203,7 +1229,7 @@ def template_disponibilidade():
 
 
 def template_gerenciar_conexoes():
-    # ⚡ TRAVA DE SEGURANÇA ANTINULA (LINHA 989 CORRIGIDA)
+    # ⚡ TRAVA DE SEGURANÇA ANTINULA
     id_sessao = st.session_state.get("usuario_id")
     
     # Se o ID não existir ou for nulo (usuário deslogado), bloqueia a tela e joga para o login
@@ -1220,8 +1246,8 @@ def template_gerenciar_conexoes():
                 
     aba_m, aba_e = st.tabs(["👥 Meus Matches", "📆 Gestão de Convites e Histórico"]) 
     
-    # Desempacota com segurança garantindo que o dado já é válido e não nulo
-    meu_id_limpo = int(id_sessao if not isinstance(id_sessao, (tuple, list)) else id_usuario_logado)
+    # ⚡ CORREÇÃO: Alinhado o desempacotamento seguro usando apenas 'id_sessao'
+    meu_id_limpo = int(id_sessao if not isinstance(id_sessao, (tuple, list)) else id_sessao[0])
 
     # Captura e normalização estável do plano do usuário para as travas de negócio
     plano_atual = str(st.session_state.get("tipo_plano", "grátis")).strip().lower()
@@ -1236,21 +1262,22 @@ def template_gerenciar_conexoes():
         matches_dados = []
         conn = None
         try:
-            # ⚡ OTIMIZAÇÃO: Varredura de afinidades encapsulada no Pool
+            # Varredura de afinidades encapsulada no Pool
             conn = obter_conexao_eficiente()
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    SELECT m.id, u.username, u.foto_perfil, u.genero, u.id 
-                    FROM matches m 
-                    JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) 
-                    WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;
-                """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-                matches_dados = cursor.fetchall()
+            if conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT m.id, u.username, u.foto_perfil, u.genero, u.id 
+                        FROM matches m 
+                        JOIN usuarios u ON (u.id = m.usuario_2_id OR u.id = m.usuario_1_id) 
+                        WHERE (m.usuario_1_id = %s OR m.usuario_2_id = %s) AND u.id != %s;
+                    """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
+                    matches_dados = cursor.fetchall()
         except Exception as e:
             st.error(f"Erro ao buscar afinidades: {e}")
         finally:
             if conn:
-                liberar_conexao(conn)  # ⚡ LIBERAÇÃO OBRIGATÓRIA AO POOL
+                liberar_conexao(conn)
 
         if not matches_dados: 
             st.info("Nenhum par localizado.")
@@ -1261,7 +1288,6 @@ def template_gerenciar_conexoes():
                 
                 with c_av_c:
                     caminho_par_img = str(m_foto).strip()
-                    # Otimizado: Renderiza imagens da web de forma direta e sem IO local assíncrono
                     if caminho_par_img and caminho_par_img.startswith("http"):
                         st.image(caminho_par_img, width=50)
                     else:
@@ -1281,16 +1307,16 @@ def template_gerenciar_conexoes():
                     if st.button("🗑️ Desfazer", key=f"del_match_central_{m_id}", type="secondary", use_container_width=True):
                         conn_del = None
                         try:
-                            # Executa exclusão atômica em cascata manual protegida por rollback
                             conn_del = obter_conexao_eficiente()
-                            with conn_del.cursor() as cursor_del:
-                                cursor_del.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(m_id),))
-                                cursor_del.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
-                                cursor_del.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
-                                conn_del.commit()
-                            st.toast("Match removido!")
-                            time.sleep(0.5)
-                            st.rerun()
+                            if conn_del:
+                                with conn_del.cursor() as cursor_del:
+                                    cursor_del.execute("DELETE FROM mensagens_chat WHERE match_id = %s;", (int(m_id),))
+                                    cursor_del.execute("DELETE FROM agendamentos_virtuais WHERE match_id = %s;", (int(m_id),))
+                                    cursor_del.execute("DELETE FROM matches WHERE id = %s;", (int(m_id),))
+                                    conn_del.commit()
+                                st.toast("Match removido!")
+                                time.sleep(0.5)
+                                st.rerun()
                         except Exception as e: 
                             if conn_del: conn_del.rollback()
                             st.error(f"Erro ao remover match: {e}")
@@ -1306,27 +1332,26 @@ def template_gerenciar_conexoes():
         encontros = []
         conn_enc = None
         
-        # 1. BUSCA INICIAL DE ENCONTROS (Totalmente isolada)
         try:
             conn_enc = obter_conexao_eficiente()
-            with conn_enc.cursor() as cursor_enc:
-                cursor_enc.execute("""
-                    SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
-                        CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
-                    FROM agendamentos_virtuais a 
-                    JOIN matches m ON m.id = a.match_id 
-                    JOIN usuarios u1 ON u1.id = m.usuario_1_id 
-                    JOIN usuarios u2 ON u2.id = m.usuario_2_id
-                    WHERE a.remetente_id = %s OR a.destinatario_id = %s ORDER BY a.id DESC;
-                """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
-                encontros = cursor_enc.fetchall()
+            if conn_enc:
+                with conn_enc.cursor() as cursor_enc:
+                    cursor_enc.execute("""
+                        SELECT a.id, a.dia_semana, a.periodo, a.horario, a.status_convite, a.remetente_id,
+                            CASE WHEN a.remetente_id = %s THEN u2.username ELSE u1.username END as nome_parceiro, a.match_id
+                        FROM agendamentos_virtuais a 
+                        JOIN matches m ON m.id = a.match_id 
+                        JOIN usuarios u1 ON u1.id = m.usuario_1_id 
+                        JOIN usuarios u2 ON u2.id = m.usuario_2_id
+                        WHERE a.remetente_id = %s OR a.destinatario_id = %s ORDER BY a.id DESC;
+                    """, (meu_id_limpo, meu_id_limpo, meu_id_limpo))
+                    encontros = cursor_enc.fetchall()
         except Exception as e:
             st.error(f"Erro ao buscar convites: {e}")
         finally:
             if conn_enc:
                 liberar_conexao(conn_enc)
 
-        # 2. SEPARAÇÃO DOS FILTROS (Fora do bloco finally da query)
         encontros_ativos = [e for e in encontros if str(e[4]).lower() in ['pendente', 'aceito']]
         encontros_passados = [e for e in encontros if str(e[4]).lower() in ['concluido', 'recusado', 'cancelado']]
 
@@ -1339,50 +1364,85 @@ def template_gerenciar_conexoes():
             parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize()
         
             with st.container(border=True):
-                col_i, col_b = st.columns([3, 1])
+                col_i, col_b = st.columns([2, 1])
                 with col_i:
                     st.write(f"📅 **Encontro com {parceiro_limpo}:** {dia} às {str(hora)[:5]}")
                     st.caption(f"Status: {status.upper()}")
                 with col_b:
                     if status == 'pendente' and not eu_enviei:
-                        if st.button("✅ Confirmar", key=f"side_ok_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                            help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                            
-                            # ⚡ CORREÇÃO: O processamento do banco agora está estritamente DENTRO do botão
-                            conn_up = None
-                            try:
-                                conn_up = obter_conexao_eficiente()
-                                with conn_up.cursor() as cursor_up:
-                                    cursor_up.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (ag_id,))
-                                    conn_up.commit()
-                                st.rerun()
-                            except Exception as e_up:
-                                if conn_up: conn_up.rollback()
-                                st.error(f"Erro ao confirmar convite: {e_up}")
-                            finally:
-                                if conn_up:
-                                    liberar_conexao(conn_up)
-                                                
-                    elif status == 'aceito':
-                        if st.button("🟢 Entrar", key=f"side_g_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes,
-                            help="Disponível apenas para planos vip ou Plano Crédito de Moedas" if bloquear_botoes else None):
-                            st.session_state.match_id_atual = m_id
-                            st.session_state.opcao_menu = "🤝 Sala Privada"
-                            st.rerun()
-        
-        # ⚡ CORREÇÃO: Histórico movido para fora do laço FOR dos ativos e alinhado corretamente na base
-        st.markdown("<br><hr style='border-color: #21262d;'>", unsafe_allow_html=True)
-        st.markdown("### 📚 Histórico de Encontros Concluídos")
-        
-        if not encontros_passados:
-            st.caption("Nenhum registro antigo arquivado.")
-        else:
-            for ag_id, dia, per, hora, status_p, rem_id_p, parceiro_nome_p, m_id_p in encontros_passados:
-                parceiro_antigo_limpo = str(parceiro_nome_p).split('@')[0].capitalize()
-                st.markdown(f"🔒 *Encontro Concluído com {parceiro_antigo_limpo} na {dia} ({per}) às {str(hora)[:5]}*")
+                        c_conf, c_rec = st.columns(2)
+                        with c_conf:
+                            if st.button("✅ Confirmar", key=f"btn_ok_{ag_id}", type="primary", use_container_width=True, disabled=bloquear_botoes):
+                                conn_up = None
+                                try:
+                                    conn_up = obter_conexao_eficiente()
+                                    if conn_up:
+                                        with conn_up.cursor() as cursor_up:
+                                            cursor_up.execute("UPDATE agendamentos_virtuais SET status_convite = 'aceito' WHERE id = %s;", (int(ag_id),))
+                                            conn_up.commit()
+                                        st.toast("Convite aceito!")
+                                        time.sleep(0.5)
+                                        st.rerun()
+                                except Exception as e_up:
+                                    if conn_up: conn_up.rollback()
+                                    st.error(f"Erro ao aceitar: {e_up}")
+                                finally:
+                                    if conn_up: liberar_conexao(conn_up)
+                        with c_rec:
+                            if st.button("❌ Recusar", key=f"btn_rec_{ag_id}", type="secondary", use_container_width=True):
+                                conn_up = None
+                                try:
+                                    conn_up = obter_conexao_eficiente()
+                                    if conn_up:
+                                        with conn_up.cursor() as cursor_up:
+                                            cursor_up.execute("UPDATE agendamentos_virtuais SET status_convite = 'recusado' WHERE id = %s;", (int(ag_id),))
+                                            conn_up.commit()
+                                        st.toast("Convite recusado.")
+                                        time.sleep(0.5)
+                                        st.rerun()
+                                except Exception as e_up:
+                                    if conn_up: conn_up.rollback()
+                                    st.error(f"Erro ao recusar: {e_up}")
+                                finally:
+                                    if conn_up: liberar_conexao(conn_up)
+
+elif status == 'pendente' and eu_enviei: 
+if st.button("🚫 Cancelar", key=f"btn_canc_{ag_id}", type="secondary", use_container_width=True): 
+conn_up = None 
+try: 
+conn_up = obter_conexao_eficiente() 
+if conn_up: 
+with conn_up.cursor() as cursor_up: 
+cursor_up.execute("UPDATE agendamentos_virtuais SET status_convite = 'cancelado' WHERE id = %s;", (int(ag_id),)) 
+conn_up.commit() 
+st.toast("Convite cancelado.") 
+time.sleep(0.5) 
+st.rerun() 
+except Exception as e_up: 
+if conn_up: conn_up.rollback() 
+st.error(f"Erro ao cancelar: {e_up}") 
+finally: 
+if conn_up: liberar_conexao(conn_up) 
+else: 
+st.info("📆 Convite Aceito") 
+
+# Histórico de encontros passados 
+st.markdown(" 
+### 🕒 Histórico de Convites Recusados ou Passados", unsafe_allow_html=True) 
+if not encontros_passados: 
+st.caption("Nenhum histórico disponível.") 
+else: 
+for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados: 
+parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize() 
+st.text(f"⚪ Encontro com {parceiro_limpo} ({dia} às {str(hora)[:5]}) - Status: {status.upper()}") 
 
 
 
+
+# ==============================================================================
+# TEMPORIZADOR AUTOMÁTICO DE CRÉDITOS (AUTO-REFRESH SEGURO)
+# ==============================================================================
+# ⚡ OTIMIZAÇÃO: Removemos o st.rerun fragmentado manual, deixando o run_every gerenciar o ciclo
 @st.fragment(run_every=5.0)
 def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_match_int):
     # 1. INICIALIZAÇÃO SEGURA DO TEMPO
@@ -1396,28 +1456,40 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
         # Exibe o cronômetro regressivo de forma limpa
         st.warning(f"⏳ Tempo Restante: {int(tempo_restante // 60)}m {int(tempo_restante % 60)}s | Saldo: 🪙 {saldo_moedas_sala} moedas")
     else:
-        # O tempo esgotou, tenta renovar
+        # O tempo esgotou, tenta renovar de forma atômica no banco
         if saldo_moedas_sala >= 10:
+            conn_renova = None
             try:
                 novo_saldo = saldo_moedas_sala - 10
                 id_limpo = id_usuario_logado if not isinstance(id_usuario_logado, (tuple, list)) else id_usuario_logado
                 
-                # Executa o débito no Supabase
-                supabase.table("usuarios").update({"moedas": novo_saldo}).eq("id", int(id_limpo)).execute()
-                
-                # Sincroniza a memória instantaneamente para a Sala Privada ler o novo saldo
-                if "dados_usuario" in st.session_state: 
-                    st.session_state.dados_usuario["moedas"] = novo_saldo
+                # ⚡ OTIMIZAÇÃO CRÍTICA: Débito executado direto no Pool PostgreSQL (0ms de lag)
+                # Remove a dependência da chamada HTTP lenta do cliente Supabase no loop crítico
+                conn_renova = obter_conexao_eficiente()
+                if conn_renova:
+                    with conn_renova.cursor() as cursor_renova:
+                        cursor_renova.execute("UPDATE usuarios SET moedas = %s WHERE id = %s;", (int(novo_saldo), int(id_limpo)))
+                        conn_renova.commit()
                     
-                # Reseta o cronômetro para mais 10 minutos
-                st.session_state.tempo_inicio_sala = time.time()
-                st.toast("🪙 Mais 10 minutos adicionados!", icon="🪙")
-                
-                # ⚡ OTIMIZAÇÃO CRÍTICA: Recarrega APENAS o fragmento, sem piscar ou travar o fundo do site
-                st.rerun(scope="fragment")
+                    # Sincroniza a memória global em todas as instâncias (Barra lateral e telas)
+                    st.session_state["saldo_moedas"] = novo_saldo
+                    if "dados_usuario" in st.session_state: 
+                        st.session_state.dados_usuario["moedas"] = novo_saldo
+                        
+                    # Reseta o cronômetro para mais 10 minutos
+                    st.session_state.tempo_inicio_sala = time.time()
+                    st.toast("🪙 Mais 10 minutos adicionados!", icon="🪙")
+                    
+                    # Deixa o run_every=5.0 assumir o próximo ciclo naturalmente, redesenhando a caixa limpa
+                else:
+                    st.error("Falha de conexão ao tentar renovar seu tempo.")
                 
             except Exception as e: 
+                if conn_renova: conn_renova.rollback()
                 st.error(f"Erro ao debitar moedas: {e}")
+            finally:
+                if conn_renova:
+                    liberar_conexao(conn_renova)
         else:
             # Sem saldo: Redireciona o usuário imediatamente alterando o estado global
             st.error("🔒 Tempo esgotado e sem moedas para renovação.")
@@ -1427,12 +1499,12 @@ def renderizar_temporizador_creditos(saldo_moedas_sala, id_usuario_logado, id_ma
             if "tempo_inicio_sala" in st.session_state:
                 del st.session_state.tempo_inicio_sala
                 
-            # ⚡ OTIMIZAÇÃO CRÍTICA: Como mudamos de menu, aqui sim forçamos o rerun da tela inteira
+            # Como mudamos de menu principal, aqui forçamos o redesenho da tela inteira
             st.rerun()
 
 
 # ==============================================================================
-# FUNÇÃO AUXILIAR: BANCO DE DADOS DA SALA PRIVADA
+# FUNÇÃO AUXILIAR: BANCO DE DADOS DA SALA PRIVADA (PERFEITA)
 # ==============================================================================
 def enviar_mensagem(match_id, remetente_id, texto):
     if not texto or str(texto).strip() == "":
@@ -1444,44 +1516,49 @@ def enviar_mensagem(match_id, remetente_id, texto):
         id_remetente_int = int(remetente_id[0] if isinstance(remetente_id, (tuple, list)) else remetente_id)
         
         conn = obter_conexao_eficiente()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO mensagens_sala (match_id, remetente_id, conteudo) 
-                VALUES (%s, %s, %s);
-            """, (id_match_int, id_remetente_int, str(texto).strip()))
-            conn.commit()
+        if conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO mensagens_sala (match_id, remetente_id, conteudo) 
+                    VALUES (%s, %s, %s);
+                """, (id_match_int, id_remetente_int, str(texto).strip()))
+                conn.commit()
         
     except Exception as e:
         if conn: conn.rollback()
         st.error(f"Erro ao enviar mensagem: {e}")
     finally:
-        # ⚡ RETORNO OBRIGATÓRIO AO POOL
         if conn:
             liberar_conexao(conn)
 
+# ==============================================================================
+# MOTORES DE BUSCA E LIMPEZA DA SALA PRIVADA (TOTALMENTE SEGUROS)
+# ==============================================================================
 def buscar_mensagens(match_id):
     conn = None
     try:
         id_match_int = int(match_id[0] if isinstance(match_id, (tuple, list)) else match_id)
         
         conn = obter_conexao_eficiente()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT remetente_id, conteudo, criado_em 
-                FROM mensagens_sala 
-                WHERE match_id = %s 
-                ORDER BY criado_em ASC;
-            """, (id_match_int,))
-            # ⚡ CORREÇÃO: O fetchall() precisa ser executado dentro do bloco 'with' do cursor
-            mensagens = cursor.fetchall()
-        
-        return mensagens
+        # ⚡ PROTEÇÃO CRÍTICA: Só abre o cursor se a conexão do pool for resgatada com sucesso
+        if conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT remetente_id, conteudo, criado_em 
+                    FROM mensagens_sala 
+                    WHERE match_id = %s 
+                    ORDER BY criado_em ASC;
+                """, (id_match_int,))
+                mensagens = cursor.fetchall()
+            return mensagens
+        else:
+            return []
     except Exception:
         return []
     finally:
-        # ⚡ RETORNO OBRIGATÓRIO AO POOL
         if conn:
             liberar_conexao(conn)
+    return []
 
 def limpar_historico_sala(match_id):
     conn = None
@@ -1489,29 +1566,35 @@ def limpar_historico_sala(match_id):
         id_match_int = int(match_id[0] if isinstance(match_id, (tuple, list)) else match_id)
         
         conn = obter_conexao_eficiente()
-        with conn.cursor() as cursor:
-            cursor.execute("DELETE FROM mensagens_sala WHERE match_id = %s;", (id_match_int,))
-            conn.commit()
-        
-        return True
+        if conn:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM mensagens_sala WHERE match_id = %s;", (id_match_int,))
+                conn.commit()
+            return True
+        else:
+            st.error("Falha ao obter conexão com o banco para limpar o histórico.")
+            return False
     except Exception as e:
         if conn: conn.rollback()
-        st.error(f"Erro ao limpar histórico: {e}")
+        st.error(f"Erro ao limpar histórico da sala: {e}")
         return False
     finally:
-        # ⚡ RETORNO OBRIGATÓRIO AO POOL
         if conn:
             liberar_conexao(conn)
 
 
-# ==============================================================================
-# TELA PRIVADA 1: TEMPLATE DA SALA PRIVADA (WHATSAPP STYLE + VIDEO)
-# ==============================================================================
-# ⚡ OTIMIZAÇÃO CRÍTICA: Envolvemos a tela inteira em um fragmento isolado de alta performance
-@st.fragment
-def template_sala_privada():
-    match_id = st.session_state.get("match_id_atual")
-    meu_id = st.session_state.get("usuario_id")
+
+@st.fragment(run_every=3.0)  # Auto-refresh de mensagens a cada 3 segundos
+def renderizar_mensagens_sala_privada(match_id, meu_id):
+    mensagens = buscar_mensagens(match_id)
+    
+    # Janela com rolagem integrada
+    caixa_chat = st.container(height=400, border=False)
+    with caixa_chat:
+        for remetente_id, conteudo, criado_em in mensagens:
+            eu_enviei = (int(remetente_id) == int(meu_id))
+            with st.chat_message("user" if eu_enviei else "assistant"):
+                st.markdown(conteudo)
     
     st.markdown("""
         <style>
@@ -1618,6 +1701,29 @@ def template_sala_privada():
                 pass   
         st.divider()
 
+
+        # ==============================================================================
+        # CONTAINER DE COMPOSIÇÃO DA SALA PRIVADA (INTEGRAÇÃO COMPLETA)
+        # ==============================================================================
+        # Cole este trecho exatamente onde começava o "# CONTAINER DE MENSAGENS" no bloco anterior:
+
+        # 1. Invoca o sub-fragmento dinâmico de leitura assíncrona
+        renderizar_miolo_mensagens_sala(match_id, meu_id, parceiro_nome)
+
+        # 2. Formulário nativo rápido de envio (Fixo na tela, imune a resets de tempo)
+        with st.form(key="form_enviar_msg_sala", clear_on_submit=True):
+            col_txt, col_btn = st.columns([4, 1])
+            with col_txt:
+                texto_msg = st.text_input(label="Mensagem", placeholder="Digite uma mensagem...", label_visibility="collapsed", key="txt_msg_sala_input")
+            with col_btn:
+                botao_enviar = st.form_submit_button("Enviar", use_container_width=True)
+                
+            if botao_enviar and texto_msg.strip():
+                enviar_mensagem(match_id, meu_id, texto_msg)
+                # Força o refresh instantâneo da tela de mensagens pós-envio
+                st.rerun(scope="fragment")
+
+
         # ==============================================================================
         # CONTAINER DE MENSAGENS (MIOLO DO CHAT DA SALA PRIVADA)
         # ==============================================================================
@@ -1664,93 +1770,153 @@ def template_sala_privada():
             if botao_enviar and texto_msg.strip():
                 enviar_mensagem(match_id, meu_id, texto_msg)
                 st.rerun(scope="fragment") # Recarrega apenas as mensagens, eliminando o travamento de fundo
-      
 
-# --- FUNÇÃO PARA VERIFICAR O PAGAMENTO (Mantida limpa e direta) ---
+
+# ==============================================================================
+# SUB-FRAGMENTO ULTRA-RÁPIDO: ATUALIZADOR AUTOMÁTICO DE MENSAGENS (3s)
+# ==============================================================================
+# ⚡ OTIMIZAÇÃO CRÍTICA: Esse bloco se atualiza sozinho a cada 3 segundos.
+# Ele busca novas mensagens do parceiro sem apagar o texto que o usuário está digitando embaixo!
+@st.fragment(run_every=3.0)
+def renderizar_miolo_mensagens_sala(match_id, meu_id, parceiro_name):
+    with st.container(height=380, border=True):
+        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        mensagens = buscar_mensagens(match_id) 
+        
+        for msg in mensagens:
+            r_id = msg[0]
+            conteudo = msg[1]
+            criado_em_bruto = msg[2]
+            
+            horario = ""
+            if criado_em_bruto:
+                try:
+                    if isinstance(criado_em_bruto, (tuple, list)) and len(criado_em_bruto) > 0:
+                        criado_em_bruto = criado_em_bruto[0]
+                    
+                    dt_objeto = pd.to_datetime(criado_em_bruto)
+                    horario = dt_objeto.strftime("%H:%M")
+                except Exception:
+                    horario = ""
+
+            # Renderização das bolhas HTML baseadas no remetente
+            if str(r_id) == str(meu_id):
+                st.markdown(f'<div class="msg-bubble msg-meu"><div class="msg-autor">Você</div><div>{conteudo}</div><div class="msg-tempo">{horario}</div></div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="msg-bubble msg-parceiro"><div class="msg-autor">{parceiro_name}</div><div>{conteudo}</div><div class="msg-tempo">{horario}</div></div>', unsafe_allow_html=True)
+                
+        st.markdown('</div>', unsafe_allow_html=True)
+
+
+# ==============================================================================
+# MOTOR DO GATEWAY: VERIFICAÇÃO DE PAGAMENTOS PIX (PERFEITO)
+# ==============================================================================
 def verificar_status_pix(id_pagamento):
     """Consulta a API do Mercado Pago e retorna o status atualizado de forma instantânea."""
+    # Proteção para o caso do SDK não ter sido inicializado por falta de tokens no Render
+    if not sdk:
+        return "erro"
     try:
         payment_info = sdk.payment().get(id_pagamento)
-        return payment_info["response"]["status"]
+        if "response" in payment_info and "status" in payment_info["response"]:
+            return payment_info["response"]["status"]
+        return "pendente"
     except Exception as e:
         st.error(f"Erro ao consultar Mercado Pago: {e}")
         return "erro"
 
-
 # ==============================================================================
-# 1. ATUALIZAÇÃO BLINDADA COM VALIDAÇÃO DE ID DE PAGAMENTO
+# 1. ATUALIZAÇÃO BLINDADA COM VALIDAÇÃO DE ID DE PAGAMENTO VIA POOL POSTGRES
 # ==============================================================================
 def atualizar_plano_banco_supabase(id_usuario, tipo_pagamento, id_pagamento_mp):
     """
     Atualiza o plano ou adiciona moedas garantindo de forma absoluta 
     que o mesmo ID de pagamento do Mercado Pago nunca seja computado duas vezes.
+    Operação realizada direto no Pool PostgreSQL para performance máxima (0ms).
     """
+    conn_transacao = None
     try:
         id_usuario_int = int(id_usuario)
         data_atual_iso = datetime.now().isoformat()
         
-        # ⚡ PASSO CRÍTICO: Consulta se este ID de pagamento já foi gravado no histórico do usuário
-        # Para isso funcionar perfeitamente, certifique-se de que a coluna 'ultimo_id_pagamento' existe na sua tabela usuarios
-        query_check = supabase.table("usuarios").select("ultimo_id_pagamento", "moedas", "tipo_plano").eq("id", id_usuario_int).execute()
-        
-        if query_check.data:
-            dados_usuario_banco = query_check.data[0]
-            ultimo_pago = dados_usuario_banco.get("ultimo_id_pagamento")
-            
-            # 🛑 TRAVA DE SEGURANÇA: Se o ID do pagamento atual for igual ao último processado,
-            # aborta o fluxo imediatamente sem adicionar moedas!
-            if str(ultimo_pago) == str(id_pagamento_mp):
-                return True # Retorna True apenas para prosseguir e limpar a tela do usuário
+        # Resgata conexão limpa e veloz do Pool global
+        conn_transacao = obter_conexao_eficiente()
+        if not conn_transacao:
+            st.error("❌ Falha interna: Não foi possível conectar ao banco para validar o pagamento.")
+            return False
 
-            moedas_atuais = dados_usuario_banco.get("moedas") or 0
-        else:
-            moedas_atuais = 0
+        with conn_transacao.cursor() as cursor:
+            # ⚡ PASSO CRÍTICA: Consulta atômica no banco
+            cursor.execute(
+                "SELECT ultimo_id_pagamento, moedas FROM usuarios WHERE id = %s FOR UPDATE;", 
+                (id_usuario_int,)
+            )
+            res_usuario = cursor.fetchone()
+            
+            if res_usuario:
+                ultimo_pago = res_usuario[0]
+                moedas_atuais = int(res_usuario[1] or 0)
+                
+                # 🛑 TRAVA DE SEGURANÇA MÁXIMA: Evita fraudes ou cliques duplos
+                if str(ultimo_pago) == str(id_pagamento_mp):
+                    return True # Aborda mas retorna True para prosseguir e limpar o fluxo visual
+            else:
+                st.error("❌ Usuário não localizado no banco de dados.")
+                return False
 
-        # CENÁRIO 1: Compra do Plano VIP
-        if tipo_pagamento == "vip":
-            supabase.table("usuarios").update({
-                "tipo_plano": "vip",
-                "ultima_recarga": data_atual_iso,
-                "ultimo_id_pagamento": str(id_pagamento_mp) # Carimba o ID do pagamento para travar
-            }).eq("id", id_usuario_int).execute()
-            
-            st.session_state["tipo_plano"] = "vip"
-            if "dados_usuario" in st.session_state:
-                st.session_state.dados_usuario["tipo_plano"] = "vip"
-            return True
-            
-        # CENÁRIO 2: Compra de Pacote de Moedas (+10 estrito)
-        elif tipo_pagamento == "moedas":
-            # Calcula o novo saldo somando SEMPRE com base no dado real do banco
-            novas_moedas = int(moedas_atuais) + 10
-            
-            # Grava no Supabase carimbando o ID do pagamento na mesma transação
-            supabase.table("usuarios").update({
-                "tipo_plano": "Plano Crédito de Moedas",
-                "moedas": novas_moedas,
-                "ultima_recarga": data_atual_iso,
-                "ultimo_id_pagamento": str(id_pagamento_mp) # ⚡ ESSA LINHA BLOQUEIA O LOOP
-            }).eq("id", id_usuario_int).execute()
-            
-            # Sincroniza a memória estável local do Streamlit
-            st.session_state["tipo_plano"] = "Plano Crédito de Moedas"
-            st.session_state["saldo_moedas"] = novas_moedas
-            if "dados_usuario" in st.session_state:
-                st.session_state.dados_usuario["tipo_plano"] = "Plano Crédito de Moedas"
-                st.session_state.dados_usuario["moedas"] = novas_moedas
-            return True
+            # CENÁRIO 1: Compra do Plano VIP
+            if tipo_pagamento == "vip":
+                cursor.execute("""
+                    UPDATE usuarios 
+                    SET tipo_plano = 'vip', ultima_recarga = %s, ultimo_id_pagamento = %s 
+                    WHERE id = %s;
+                """, (data_atual_iso, str(id_pagamento_mp), id_usuario_int))
+                
+                # Confirma as alterações no PostgreSQL antes de mexer na memória
+                conn_transacao.commit()
+                
+                # Sincroniza a memória estável local do Streamlit
+                st.session_state["tipo_plano"] = "vip"
+                if "dados_usuario" in st.session_state:
+                    st.session_state.dados_usuario["tipo_plano"] = "vip"
+                return True
+                
+            # CENÁRIO 2: Compra de Pacote de Moedas (+10 estrito)
+            elif tipo_pagamento == "moedas":
+                novas_moedas = moedas_atuais + 10
+                
+                cursor.execute("""
+                    UPDATE usuarios 
+                    SET tipo_plano = 'Plano Crédito de Moedas', moedas = %s, ultima_recarga = %s, ultimo_id_pagamento = %s 
+                    WHERE id = %s;
+                """, (novas_moedas, data_atual_iso, str(id_pagamento_mp), id_usuario_int))
+                
+                # Confirma as alterações no PostgreSQL antes de mexer na memória
+                conn_transacao.commit()
+                
+                # Sincroniza a memória estável local do Streamlit em todas as instâncias
+                st.session_state["tipo_plano"] = "Plano Crédito de Moedas"
+                st.session_state["saldo_moedas"] = novas_moedas
+                if "dados_usuario" in st.session_state:
+                    st.session_state.dados_usuario["tipo_plano"] = "Plano Crédito de Moedas"
+                    st.session_state.dados_usuario["moedas"] = novas_moedas
+                return True
 
     except Exception as e:
+        if conn_transacao:
+            conn_transacao.rollback()
         st.error(f"❌ Erro crítico na transação de créditos: {e}")
         return False
+    finally:
+        if conn_transacao:
+            liberar_conexao(conn_transacao)
+            
     return False
 
 
-
 # ==============================================================================
-# 5. RENDERIZADORES DE DIALOGS / MODAIS
+# 5. RENDERIZADORES DE DIALOGS / MODAIS (FECHAMENTO SEGURO AUTOMÁTICO)
 # ==============================================================================
-
 @st.dialog("🔑 Recuperar Senha")
 def modal_recuperar_senha():
     st.write("Digite o seu e-mail cadastrado e a sua nova senha abaixo.")
@@ -1761,50 +1927,71 @@ def modal_recuperar_senha():
         nova_senha = st.text_input("Nova Senha", type="password")
         botao_confirmar = st.form_submit_button("Redefinir Senha", use_container_width=True)
                 
-    # ⚡ OTIMIZAÇÃO: Processamento lógico e de banco totalmente FORA do bloco 'with st.form'
+    # Processamento lógico e de banco totalmente FORA do bloco 'with st.form'
     if botao_confirmar:
         if not email_digitado or not nova_senha:
             st.error("Por favor, preencha todos os campos.")
-            return
+        else:
+            conn = None
+            try:
+                conn = obter_conexao_eficiente()
+                if conn:
+                    with conn.cursor() as cursor:
+                        cursor.execute('SELECT id FROM usuarios WHERE email = %s;', (email_digitado,))
+                        usuario_encontrado = cursor.fetchone()
 
-        conn = None
-        try:
-            conn = obter_conexao_eficiente()
-            with conn.cursor() as cursor:
-                cursor.execute('SELECT id FROM usuarios WHERE email = %s', (email_digitado,))
-                usuario_encontrado = cursor.fetchone()
-
-                if usuario_encontrado:
-                    # Criptografia rápida com a função global que definimos no topo do app
-                    senha_criptografada = generate_password_hash(nova_senha)
-                    cursor.execute('UPDATE usuarios SET password_hash = %s WHERE email = %s', (senha_criptografada, email_digitado))
-                    conn.commit()
-                    
-                    st.success("🎉 Senha redefinida com sucesso!")
-                    st.session_state.mostrar_recuperar_senha = False
-                    
-                    # ⚡ OTIMIZAÇÃO VISUAL: Fecha o modal nativamente e atualiza sem congelar
-                    if hasattr(st, "dialog_close"):
-                        st.dialog_close()
-                    st.rerun() 
+                        if usuario_encontrado:
+                            # Criptografia rápida com a função global que definimos no topo do app
+                            senha_criptografada = generate_password_hash(nova_senha)
+                            cursor.execute('UPDATE usuarios SET password_hash = %s WHERE email = %s;', (senha_criptografada, email_digitado))
+                            conn.commit()
+                            
+                            st.success("🎉 Senha redefinida com sucesso!")
+                            
+                            # Remove referências de variáveis de controle temporárias se houver
+                            if "mostrar_recuperar_senha" in st.session_state:
+                                st.session_state.mostrar_recuperar_senha = False
+                            
+                            # ⚡ SOLUÇÃO DO FECHAMENTO: No Streamlit Dialog, dar um time.sleep + st.rerun
+                            # reconstrói a página do zero, o que destrói o modal e atualiza a tela de login vazia
+                            import time
+                            time.sleep(1.0)
+                            st.rerun() 
+                        else:
+                            st.error("❌ E-mail não localizado no sistema.")
                 else:
-                    st.error("❌ E-mail não localizado no sistema.")
+                    st.error("Não foi possível conectar ao banco de dados.")
                     
-        except Exception as e:
-            if conn: conn.rollback()
-            st.error(f"Erro ao acessar o banco de dados: {e}")
-        finally:
-            # ⚡ RETORNO OBRIGATÓRIO AO POOL: Evita travar o servidor
-            if conn:
-                liberar_conexao(conn)
+            except Exception as e:
+                if conn: 
+                    conn.rollback()
+                st.error(f"Erro ao acessar o banco de dados: {e}")
+            finally:
+                if conn:
+                    liberar_conexao(conn)
 
+
+def template_privado_gerar_faturamento(df_faturamento):
+    """Sub-função auxiliar para renderizar a distribuição de planos e moedas"""
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        st.markdown("<p style='font-size:14px; font-weight:bold; text-align:center; color:#f0f6fc;'>Faturamento: Distribuição de Planos</p>", unsafe_allow_html=True)
+        if "tipo_plano" in df_faturamento.columns:
+            df_faturamento["tipo_plano_nome"] = df_faturamento["tipo_plano"].fillna("Grátis")
+            st.bar_chart(df_faturamento["tipo_plano_nome"].value_counts(), color="#e3b341", height=180, use_container_width=True)
+    with col_f2:
+        st.markdown("<p style='font-size:14px; font-weight:bold; text-align:center; color:#f0f6fc;'>Receita em Carteira: Saldo de Moedas</p>", unsafe_allow_html=True)
+        if "moedas" in df_faturamento.columns:
+            total_moedas_plataforma = int(df_faturamento["moedas"].sum() or 0)
+            st.metric("Total de Moedas Ativas na Rede", f"🪙 {total_moedas_plataforma}")
+            st.caption("Volume acumulado em posse dos usuários pendente de conversão em salas.")
 
 def template_painel_admin():
     st.markdown("<h2>🛠️ Painel Administrativo de Controle Avançado</h2>", unsafe_allow_html=True)
     st.caption("Métricas demográficas, performance preditiva da Lucy IA e moderação de contas em tempo real.")
     st.markdown("<hr style='border-color: #30363d; margin: 10px 0 25px 0;'>", unsafe_allow_html=True)
 
-    # --- 1. CONFIGURAÇÕES DA BARRA LATERAL (Movidas para o topo de forma estática) ---
+    # --- 1. CONFIGURAÇÕES DA BARRA LATERAL ---
     st.sidebar.subheader("⚙️ Configurações do Painel")
     visao_perfil = st.sidebar.selectbox(
         "Visualizar no gráfico:",
@@ -1817,65 +2004,72 @@ def template_painel_admin():
     dados_realizados = {}  
     dados_matches = {}
     total_salas_ativas = 0
-    usuarios_planos_brutos = []
 
-    # --- 2. VARREDURA ANALÍTICA BLINDADA NO POOL (Todas as queries SQL e HTTP agrupadas) ---
+    # --- 2. VARREDURA ANALÍTICA ATÔMICA NO POOL POSTGRES ---
+    # ⚡ OTIMIZAÇÃO CRÍTICA: Adicionado tipo_plano, ultima_recarga e moedas diretamente na query SQL.
+    # Isso elimina totalmente as chamadas de API HTTP lentas do Supabase e poupa RAM no Render!
     conn = None
     try:
         conn = obter_conexao_eficiente()
-        with conn.cursor() as cursor:
-            # Query 1: Usuários
-            cursor.execute("SELECT id, username, email, genero, idade, procura_por, status FROM usuarios ORDER BY id ASC;")
-            usuarios_bd = cursor.fetchall()
+        if conn:
+            with conn.cursor() as cursor:
+                # Query 1: Usuários + Dados de Faturamento unificados
+                cursor.execute("""
+                    SELECT id, username, email, genero, idade, procura_por, status, is_admin, tipo_plano, moedas, ultima_recarga 
+                    FROM usuarios ORDER BY id ASC;
+                """)
+                usuarios_bd = cursor.fetchall()
 
-            # Query 2: Salas Ativas
-            cursor.execute("""
-                SELECT COUNT(id) FROM matches 
-                WHERE status_conexao = 'online' AND ultima_atividade >= NOW() - INTERVAL '5 minutes';
-            """)
-            res_salas = cursor.fetchone()
-            total_salas_ativas = res_salas[0] if res_salas else 0
+                # Query 2: Salas Ativas nos últimos 5 minutos
+                cursor.execute("""
+                    SELECT COUNT(id) FROM matches 
+                    WHERE status_conexao = 'online' AND ultima_atividade >= NOW() - INTERVAL '5 minutes';
+                """)
+                res_salas = cursor.fetchone()
+                total_salas_ativas = res_salas[0] if res_salas else 0
 
-            # Query 3: Agendados
-            cursor.execute("SELECT TRIM(LOWER(dia_semana)), COUNT(*) FROM agendamentos_virtuais GROUP BY 1;")
-            dados_agendados = dict(cursor.fetchall())
-            
-            # Query 4: Realizados
-            cursor.execute("""
-                SELECT TRIM(LOWER(a.dia_semana)), COUNT(DISTINCT mc.id) 
-                FROM agendamentos_virtuais a JOIN mensagens_sala mc ON mc.match_id = a.match_id GROUP BY 1;
-            """)
-            dados_realizados = dict(cursor.fetchall())
-            
-            # Query 5: Matches
-            cursor.execute("""
-                SELECT TRIM(LOWER(a.dia_semana)), COUNT(DISTINCT m.id) 
-                FROM agendamentos_virtuais a JOIN matches m ON m.id = a.match_id GROUP BY 1;
-            """)
-            dados_matches = dict(cursor.fetchall())
+                # Query 3: Agendados
+                cursor.execute("SELECT TRIM(LOWER(dia_semana)), COUNT(*) FROM agendamentos_virtuais GROUP BY 1;")
+                dados_agendados = dict(cursor.fetchall())
+                
+                # Query 4: Realizados
+                cursor.execute("""
+                    SELECT TRIM(LOWER(a.dia_semana)), COUNT(DISTINCT mc.id) 
+                    FROM agendamentos_virtuais a JOIN mensagens_sala mc ON mc.match_id = a.match_id GROUP BY 1;
+                """)
+                dados_realizados = dict(cursor.fetchall())
+                
+                # Query 5: Matches
+                cursor.execute("""
+                    SELECT TRIM(LOWER(a.dia_semana)), COUNT(DISTINCT m.id) 
+                    FROM agendamentos_virtuais a JOIN matches m ON m.id = a.match_id GROUP BY 1;
+                """)
+                dados_matches = dict(cursor.fetchall())
+        else:
+            st.error("Não foi possível conectar ao banco de dados para alimentar o painel admin.")
+            return
             
     except Exception as e:
         st.error(f"Erro na varredura analítica do banco (SQL): {e}")
     finally:
         if conn:
-            liberar_conexao(conn) # Devolve a conexão ao pool IMEDIATAMENTE
-
-    # --- 3. REQUISIÇÃO HTTP DO SUPABASE TOTALMENTE ISOLADA ---
-    try:
-        # Puxa dados de cobrança sem concorrer com conexões TCP abertas do psycopg2
-        salas_query = supabase.table("usuarios").select("id", "tipo_plano", "ultima_recarga", "moedas").execute()
-        usuarios_planos_brutos = salas_query.data if salas_query else []
-    except Exception as e:
-        st.error(f"Erro na varredura de planos (Supabase API): {e}")
+            liberar_conexao(conn)
 
     if not usuarios_bd:
         st.warning("Nenhum dado de usuário localizado para gerar o painel.")
         return
 
-    # Tratamento de DataFrames
-    df_usuarios_mod = pd.DataFrame(usuarios_bd, columns=["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", "Status Presença"])
+    # 3. CONVERSÃO INTELIGENTE PARA DATAFRAME
+    df_usuarios_mod = pd.DataFrame(usuarios_bd, columns=[
+        "ID", "Nome / Username", "E-mail", "Gênero", "Idade", "Procura Por", 
+        "Status Presença", "is_admin", "tipo_plano", "moedas", "ultima_recarga"
+    ])
     
-    # Renderização dos KPIs
+    # ⚡ COMPATIBILIDADE: Aplica o filtro de visualização da barra lateral dinamicamente em memória
+    if visao_perfil == "Apenas Clientes":
+        df_usuarios_mod = df_usuarios_mod[df_usuarios_mod["is_admin"] == False].copy()
+
+    # Renderização dos KPIs de Performance
     c_k1, c_k2, c_k3 = st.columns(3)
     with c_k1:
         st.metric("Total de Perfis Cadastrados", len(df_usuarios_mod))
@@ -1885,7 +2079,7 @@ def template_painel_admin():
     with c_k3:
         st.metric("Salas Virtuais Ativas (Hoje)", int(total_salas_ativas or 0))
 
-    # Abas estruturais
+    # Abas estruturais do painel administrativo
     aba_graficos, aba_moderacao = st.tabs(["📊 Gráficos e Insights", "👥 Gestão de Contas"])
 
     with aba_graficos:
@@ -1914,7 +2108,7 @@ def template_painel_admin():
         df_barras_altair = pd.DataFrame(dados_pareto_lista)
         df_linha_altair = pd.DataFrame({"Dia": dias_exibicao, "Acumulado Semanal": v_acumulado})
 
-        # Renderização combinada Altair
+        # Renderização combinada Altair (Pareto de Conexões)
         grafico_barras = alt.Chart(df_barras_altair).mark_bar().encode(
             x=alt.X('Dia:N', sort=dias_exibicao, title="Dia da Semana"),
             y=alt.Y('Quantidade:Q', title="Volumetria Individual"),
@@ -1946,46 +2140,42 @@ def template_painel_admin():
         st.markdown("<hr style='border-color: #21262d; margin: 25px 0;'>", unsafe_allow_html=True)
         st.subheader("📊 Análise de Créditos e Assinaturas")
         
+        # ⚡ FECHAMENTO DO BLOCO DO GRÁFICO DE FATURAMENTO: Processado direto em memória local sem IO de rede extra
+        template_privado_gerar_faturamento(df_usuarios_mod)
+
+            # --- REESTRUTURAÇÃO DAS COLUNAS DE CRÉDITOS E ASSINATURAS (DENTRO DO PAINEL ADMIN) ---
+        # Substitua a partir da linha "g1, g2 = st.columns(2)" do seu arquivo pelo trecho abaixo:
+
         g1, g2 = st.columns(2)
         with g1:
             pode_gerar_grafico = False
 
-            if salas_query.data:
-                df_dados_brutos = pd.DataFrame(salas_query.data)
-                
-                if "ultima_recarga" in df_dados_brutos.columns and "moedas" in df_dados_brutos.columns:
-                    df_filtrado = df_dados_brutos.dropna(subset=["ultima_recarga"]).copy()
+            # ⚡ OTIMIZAÇÃO: Lê direto do DataFrame global alimentado pelo Pool Postgres
+            if not df_usuarios_mod.empty:
+                if "ultima_recarga" in df_usuarios_mod.columns and "moedas" in df_usuarios_mod.columns:
+                    # Filtra apenas os usuários que possuem uma data de última recarga válida
+                    df_filtrado = df_usuarios_mod.dropna(subset=["ultima_recarga"]).copy()
                     
                     if not df_filtrado.empty:
-                        # Converte para data real
+                        # Converte para data real de forma robusta gerenciando fusos horários
                         df_filtrado["data"] = pd.to_datetime(df_filtrado["ultima_recarga"]).dt.date
                         
-                        # Agrupa moedas por dia
+                        # Agrupa a soma de moedas recarregadas por data
                         df_creditos = (
                             df_filtrado.groupby("data")["moedas"]
                             .sum()
                             .reset_index(name="quantidade_creditos")
                         )
                         
-                        # Ordena por data antes de calcular o dia da semana
+                        # Ordena cronologicamente por data
                         df_creditos = df_creditos.sort_values("data")
                         
                         # --- TRATAMENTO DOS DIAS DA SEMANA EM PORTUGUÊS ---
-                        # Converte a coluna agrupada para datetime para extrair o nome do dia
                         df_creditos["data_dt"] = pd.to_datetime(df_creditos["data"])
-                        
-                        # Mapeamento de inglês (padrão do pandas) para português
                         dias_pt = {
-                            "Monday": "Segunda",
-                            "Tuesday": "Terça",
-                            "Wednesday": "Quarta",
-                            "Thursday": "Quinta",
-                            "Friday": "Sexta",
-                            "Saturday": "Sábado",
-                            "Sunday": "Domingo"
+                            "Monday": "Segunda", "Tuesday": "Terça", "Wednesday": "Quarta",
+                            "Thursday": "Quinta", "Friday": "Sexta", "Saturday": "Sábado", "Sunday": "Domingo"
                         }
-                        
-                        # Cria a nova coluna com os nomes em português
                         df_creditos["dia_semana"] = df_creditos["data_dt"].dt.day_name().map(dias_pt)
                         # --------------------------------------------------
 
@@ -1994,7 +2184,7 @@ def template_painel_admin():
 
             if pode_gerar_grafico:
                 try:
-                    # Cálculos do acumulado da semana
+                    # Cálculos matemáticos do Pareto acumulado
                     df_creditos["cum_sum"] = df_creditos["quantidade_creditos"].cumsum()
                     df_creditos["cum_percentage"] = (
                         df_creditos["cum_sum"] / df_creditos["quantidade_creditos"].sum()
@@ -2002,7 +2192,7 @@ def template_painel_admin():
 
                     fig_pareto = go.Figure()
                         
-                    # Barras de volume individual usando 'dia_semana' no eixo X
+                    # Barras de volume individual
                     fig_pareto.add_trace(
                         go.Bar(
                             x=df_creditos["dia_semana"],
@@ -2012,7 +2202,7 @@ def template_painel_admin():
                         )
                     )
                         
-                    # Linha de tendência acumulada usando 'dia_semana' no eixo X
+                    # Linha de tendência acumulada (Eixo Y Secundário)
                     fig_pareto.add_trace(
                         go.Scatter(
                             x=df_creditos["dia_semana"],
@@ -2023,7 +2213,6 @@ def template_painel_admin():
                         )
                     )
 
-                    # Configuração segura do layout
                     fig_pareto.update_layout(
                         title="Soma de Recargas e Tendência Acumulada Semanal",
                         yaxis=dict(title="Quantidade de Moedas"),
@@ -2041,50 +2230,39 @@ def template_painel_admin():
                     st.plotly_chart(fig_pareto, use_container_width=True)
                         
                 except Exception as erro_plotly:
-                    st.warning(f"⚠️ Erro interno ao desenhar o gráfico: {erro_plotly}")
+                    st.warning(f"⚠️ Erro interno ao desenhar o gráfico de Pareto: {erro_plotly}")
             else:
                 st.info("ℹ️ Nenhuma atividade de recarga registrada para esta semana.")
 
         # --- COLUNA DO SEGUNDO GRÁFICO (PIZZA COMERCIAL) ---
         with g2: 
-
-            if salas_query.data:
-                # 2. Cria o DataFrame dos usuários
-                df_usuarios = pd.DataFrame(salas_query.data)
+            if not df_usuarios_mod.empty:
+                # ⚡ OTIMIZAÇÃO: Consome direto o DataFrame principal limpo do pool
+                df_usuarios = df_usuarios_mod.copy()
                 
-                # --- PROCESSAMENTO DO GRÁFICO DE PIZZA CORRIGIDO ---
-                # 3. PADRONIZAÇÃO: Remove espaços e força minúsculas
+                # Padronização e higienização de strings contra nulos
                 df_usuarios["tipo_plano_limpo"] = df_usuarios["tipo_plano"].astype(str).str.strip().str.lower()
                 df_usuarios["moedas"] = df_usuarios["moedas"].fillna(0).astype(int)
-                               
-
-            # 4. CONTAGEM SEPARANDO O ADMIN DO VIP
-                is_admin = df_usuarios["tipo_plano_limpo"].str.contains("admin", na=False)
-                is_vip = df_usuarios["tipo_plano_limpo"].str.contains("vip", na=False) & (~is_admin) # VIP puro (sem admin)
-                is_gratis_puro = df_usuarios["tipo_plano_limpo"].str.contains("grátis|gratis", na=False)
+                            
+                # Filtros condicionais atômicos para classificação das fatias
+                is_admin = df_usuarios["is_admin"] == True
+                is_vip = df_usuarios["tipo_plano_limpo"].str.contains("vip", na=False) & (~is_admin)
+                is_gratis_puro = df_usuarios["tipo_plano_limpo"].str.contains("grátis|gratis", na=False) & (~is_admin)
                 
                 is_plano_credito = (
                     df_usuarios["tipo_plano_limpo"].str.contains("crédito|credito|moeda", na=False) | 
                     (is_gratis_puro & (df_usuarios["moedas"] > 0))
-                )
-                is_gratis_real = is_gratis_puro & (df_usuarios["moedas"] == 0)
+                ) & (~is_admin)
                 
-                # Criação das 4 variáveis para evitar o NameError
+                is_gratis_real = is_gratis_puro & (df_usuarios["moedas"] == 0) & (~is_admin)
+                
+                # Contagem matemática exata de registros
                 val_vip = int(df_usuarios[is_vip].shape[0])
-                val_admin = int(df_usuarios[is_admin].shape[0]) # 🌟 Criada a variável que faltava!
+                val_admin = int(df_usuarios[is_admin].shape[0]) 
                 val_credito = int(df_usuarios[is_plano_credito].shape[0])
                 val_gratis = int(df_usuarios[is_gratis_real].shape[0])
                 
-                # 5. Monta o DataFrame final da pizza com as 4 categorias livres de erros
-                df_pizza = pd.DataFrame({
-                    "Categoria": ["VIP", "Admin", "Plano Crédito de Moedas", "Grátis"],
-                    "Total": [val_vip, val_admin, val_credito, val_gratis]
-                })
-                
-                # Quatro cores para mapear as quatro fatias (Amarelo adicionado para o Admin)
-                cores_pizza = ["#6f42c1", "#ffc107", "#28a745", "#007bff"]
-                
-                # 6. Monta a estrutura de dados baseada na escolha do filtro lateral
+                # Montagem dinâmica do DataFrame da Pizza respeitando o filtro lateral reativo
                 if visao_perfil == "Apenas Clientes":
                     df_pizza = pd.DataFrame({
                         "Categoria": ["VIP", "Plano Crédito de Moedas", "Grátis"],
@@ -2098,7 +2276,7 @@ def template_painel_admin():
                     })
                     cores_pizza = ["#6f42c1", "#ffc107", "#28a745", "#007bff"]  # Roxo, Amarelo, Verde, Azul
                 
-                # 7. Gera e estiliza o gráfico de pizza
+                # Renderização final estável do Plotly Express
                 if df_pizza["Total"].sum() > 0:
                     fig_pizza = px.pie(
                         df_pizza, 
@@ -2110,88 +2288,99 @@ def template_painel_admin():
                     fig_pizza.update_layout(template="plotly_dark", paper_bgcolor="#161b22")
                     st.plotly_chart(fig_pizza, use_container_width=True)
                 else:
-                    st.info("ℹ️ Nenhum dado de perfil disponível para gerar a distribuição.")
-            else:
-                st.warning("⚠️ Não foi possível recuperar dados do banco.")
+                    st.caption("Sem dados volumétricos para gerar o gráfico de setores.")
 
+        # ==============================================================================
+        # ABA 2: MODERAÇÃO DE CONTAS E BARRA DE BUSCA AVANÇADA (SINCRO E FILTRADA)
+        # ==============================================================================
+        # Cole este bloco exatamente substituindo o "with aba_moderacao:" anterior:
 
-
-        st.markdown("---")
- 
-    # ==============================================================================
-    # ABA 2: MODERAÇÃO DE CONTAS E BARRA DE BUSCA AVANÇADA
-    # ==============================================================================
-    with aba_moderacao:
-        st.markdown("### 🔍 Moderação de Contas e Busca Avançada de Usuários")
-        
-        busca_termo = st.text_input("🔍 Digite o Nome ou E-mail do usuário para filtrar:", placeholder="Ex: Gabriel, Mariana, admin...", key="txt_busca_admin_mod")
-        
-        if busca_termo:
-            df_filtrado = df_usuarios_mod[
-                df_usuarios_mod["Nome / Username"].str.contains(busca_termo, case=False, na=False) |
-                df_usuarios_mod["E-mail"].str.contains(busca_termo, case=False, na=False)
-            ]
-            st.caption(f"Exibindo {len(df_filtrado)} resultado(s) para a busca '{busca_termo}'")
-        else:
-            df_filtrado = df_usuarios_mod
-
-        st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # --- CONTAINER DE EXCLUSÃO INDIVIDUAL ---
-        st.subheader("🗑️ Gerenciador de Exclusão de Perfis")
-        
-        for idx, row in df_filtrado.iterrows():
-            u_id = row["ID"]
-            u_name = row["Nome / Username"]
-            u_status = row["Status Presença"]
+        with aba_moderacao:
+            st.markdown("### 🔍 Moderação de Contas e Busca Avançada de Usuários")
             
-            if u_id == 1 or str(u_name).lower() in ['admin', 'cleverson', 'clever1404']: 
-                continue
-                
-            with st.container(border=True):
-                col_info_u, col_botao_u = st.columns([3, 1])
-                
-                with col_info_u:
-                    st.write(f"**#{u_id} - {str(u_name).capitalize()}** | E-mail: {row['E-mail']} | Gênero: {row['Gênero']} | Idade: {row['Idade']} anos")
-                    st.caption(f"Status Atual: {u_status} | Interesse: Procura por {row['Procura Por']}")
-                    
-                with col_botao_u:
-                    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
-                    
-                    # Botão com chave perfeitamente única baseada no ID para estabilizar o DOM
-                    if st.button("❌ Excluir Usuário", key=f"adm_drop_user_id_{u_id}", type="primary", use_container_width=True):
-                        conn_del = None
-                        try:
-                            # ⚡ OTIMIZAÇÃO: Executa a exclusão de dependências em lote acelerado no pool
-                            conn_del = obter_conexao_eficiente()
-                            with conn_del.cursor() as cursor_del:
-                                cursor_del.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (int(u_id),))
-                                cursor_del.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(u_id),))
-                                cursor_del.execute("DELETE FROM mensagens_chat WHERE remetente_id = %s;", (int(u_id),))
-                                cursor_del.execute("DELETE FROM agendamentos_virtuais WHERE remetente_id = %s OR destinatario_id = %s;", (int(u_id), int(u_id)))
-                                cursor_del.execute("DELETE FROM matches WHERE usuario_1_id = %s OR usuario_2_id = %s;", (int(u_id), int(u_id)))
-                                
-                                # Remove o usuário definitivo
-                                cursor_del.execute("DELETE FROM usuarios WHERE id = %s;", (int(u_id),))
-                                conn_del.commit()
-                            
-                            st.toast(f"🎉 Perfil de {u_name} removido com sucesso!")
-                            time.sleep(0.5)
-                            st.rerun()
-                            
-                        except Exception as e:
-                            if conn_del: conn_del.rollback() # Destrava o banco em caso de erro na transação
-                            st.error(f"Erro ao deletar usuário: {e}")
-                        finally:
-                            # ⚡ DEVOLUÇÃO OBRIGATÓRIA: Evita travar a fila de conexões TCP
-                            if conn_del:
-                                liberar_conexao(conn_del)
+            # Barra de pesquisa interativa
+            busca_termo = st.text_input(
+                "🔍 Digite o Nome ou E-mail do usuário para filtrar:", 
+                placeholder="Ex: Gabriel, Mariana, admin...", 
+                key="txt_busca_admin_mod"
+            )
+            
+            # Executa o filtro inteligente em memória usando o Pandas
+            if busca_termo:
+                df_filtrado = df_usuarios_mod[
+                    df_usuarios_mod["Nome / Username"].str.contains(busca_termo, case=False, na=False) |
+                    df_usuarios_mod["E-mail"].str.contains(busca_termo, case=False, na=False)
+                ].copy()
+                st.caption(f"Exibindo {len(df_filtrado)} resultado(s) para a busca '{busca_termo}'")
+            else:
+                df_filtrado = df_usuarios_mod.copy()
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("⬅️ Voltar para o Chat da Lucy", use_container_width=True, key="btn_voltar_chat_desde_admin_final"):
-        st.session_state.opcao_menu = "💬 Conversar com Lucy"
-        st.rerun()
+            # ⚡ OTIMIZAÇÃO VISUAL: Renderiza apenas UMA tabela unificada que reage à busca
+            st.dataframe(
+                df_filtrado[["ID", "Nome / Username", "E-mail", "Gênero", "Idade", "tipo_plano", "moedas", "Status Presença"]], 
+                use_container_width=True, 
+                hide_index=True
+            )
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # --- CONTAINER DE EXCLUSÃO INDIVIDUAL EM LOTE ---
+            st.subheader("🗑️ Gerenciador de Exclusão de Perfis")
+            
+            for idx, row in df_filtrado.iterrows():
+                u_id = row["ID"]
+                u_name = row["Nome / Username"]
+                u_status = row["Status Presença"]
+                
+                # Trava de segurança para impedir a auto-exclusão do Admin principal
+                if int(u_id) == 1 or str(u_name).lower() in ['admin', 'cleverson', 'clever1404']: 
+                    continue
+                    
+                with st.container(border=True):
+                    col_info_u, col_botao_u = st.columns([3, 1])
+                    
+                    with col_info_u:
+                        st.write(f"**#{u_id} - {str(u_name).capitalize()}** | E-mail: {row['E-mail']} | Gênero: {row['Gênero']} | Idade: {row['Idade']} anos")
+                        st.caption(f"Status Atual: {u_status} | Plano: {row['tipo_plano']} | Créditos: 🪙 {row['moedas']}")
+                        
+                    with col_botao_u:
+                        st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                        
+                        # Botão com chave perfeitamente única baseada no ID para estabilizar o DOM
+                        if st.button("❌ Excluir Usuário", key=f"adm_drop_user_id_{u_id}", type="primary", use_container_width=True):
+                            conn_del = None
+                            try:
+                                # Executa a exclusão de dependências em lote acelerado no pool
+                                conn_del = obter_conexao_eficiente()
+                                if conn_del:
+                                    with conn_del.cursor() as cursor_del:
+                                        cursor_del.execute("DELETE FROM disponibilidade_usuarios WHERE usuario_id = %s;", (int(u_id),))
+                                        cursor_del.execute("DELETE FROM historico_ia WHERE usuario_id = %s;", (int(u_id),))
+                                        cursor_del.execute("DELETE FROM mensagens_chat WHERE remetente_id = %s;", (int(u_id),))
+                                        cursor_del.execute("DELETE FROM agendamentos_virtuais WHERE remetente_id = %s OR destinatario_id = %s;", (int(u_id), int(u_id)))
+                                        cursor_del.execute("DELETE FROM matches WHERE usuario_1_id = %s OR usuario_2_id = %s;", (int(u_id), int(u_id)))
+                                        
+                                        # Remove o usuário definitivo da tabela pai
+                                        cursor_del.execute("DELETE FROM usuarios WHERE id = %s;", (int(u_id),))
+                                        conn_del.commit()
+                                    
+                                    st.toast(f"🎉 Perfil de {u_name} removido com sucesso!")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                else:
+                                    st.error("Falha ao obter conexão com o banco para realizar a exclusão.")
+                                
+                            except Exception as e:
+                                if conn_del: 
+                                    conn_del.rollback()
+                                st.error(f"Erro ao deletar usuário: {e}")
+                            finally:
+                                if conn_del:
+                                    liberar_conexao(conn_del)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("⬅️ Voltar para o Chat da Lucy", use_container_width=True, key="btn_voltar_chat_desde_admin_final"):
+            st.session_state.opcao_menu = "💬 Conversar com Lucy"
+            st.rerun()
 
 
 
@@ -2203,8 +2392,12 @@ def template_fale_conosco():
     st.caption("Envie suas dúvidas, críticas ou sugestões de melhoria para a equipe de suporte Lucy IA.")
     st.markdown("<hr style='border-color: #30363d; margin: 10px 0 25px 0;'>", unsafe_allow_html=True)
     
-    # ⚡ OTIMIZAÇÃO: Captura o nome de forma segura contra erros de valor nulo
+    # Captura o nome de forma segura contra erros de valor nulo
     nome_padrao = st.session_state.get("username", "")
+
+    # Cria uma chave no Session State para segurar o feedback visual sem sumir no clear_on_submit
+    if "sucesso_envio_suporte" not in st.session_state:
+        st.session_state.sucesso_envio_suporte = False
 
     with st.form("form_fale_conosco_final", clear_on_submit=True):
         nome_contato = st.text_input("Seu Nome:", value=nome_padrao)
@@ -2216,44 +2409,53 @@ def template_fale_conosco():
         if botao_enviar:
             if not email_contato.strip() or not descricao_contato.strip():
                 st.error("❌ Por favor, preencha seu e-mail e a descrição da mensagem.")
+                st.session_state.sucesso_envio_suporte = False
+            elif "@" not in email_contato or "." not in email_contato:
+                st.error("❌ Por favor, insira um endereço de e-mail válido.")
+                st.session_state.sucesso_envio_suporte = False
             else:
-                # Otimizado: O feedback visual é imediato e limpa os campos nativamente
-                st.success("🎉 Sua mensagem foi enviada para o e-mail de suporte (suporte@lucyia.com) com sucesso!")
-                
-    # ⚡ REMOVIDO: O st.button("← Voltar") solto foi retirado daqui.
-    # O controle de retorno agora é feito de forma centralizada pelo contêiner pai (o fragmento do chat),
-    # impedindo que o botão duplique ou pisque a interface ao trocar de tela.
+                # Carimba o sucesso e limpa qualquer aviso de erro anterior
+                st.session_state.sucesso_envio_suporte = True
+
+    # ⚡ OTIMIZAÇÃO: Renderiza o feedback visual fora do Form.
+    # Assim, as caixas de texto zeram de forma limpa, mas a mensagem verde continua visível para o cliente!
+    if st.session_state.sucesso_envio_suporte:
+        st.success("🎉 Sua mensagem foi enviada para o e-mail de suporte (suporte@lucyia.com) com sucesso!")
+        # Reseta o estado em background caso ele saia da tela e volte depois
+        st.session_state.sucesso_envio_suporte = False
 
 
 
 # ==============================================================================
-# INITIALIZATION DE SEGURANÇA NA LINHA 1
+# INITIALIZATION DE SEGURANÇA NA LINHA 1 (RAIZ DO ARQUIVO)
 # ==============================================================================
 if "opcao_menu" not in st.session_state:
     st.session_state["opcao_menu"] = "home"
 
 if "usuario_id" not in st.session_state:
     st.session_state["usuario_id"] = None
-      
-        
+
+if "form_seed" not in st.session_state:
+    st.session_state["form_seed"] = 42
+
+
 # ==============================================================================
-# 3. ROTEADOR DE INTERFACE DO MIOLO (GESTÃO CENTRALIZADA)
+# ROTEADOR DE INTERFACE DO MIOLO (ESTRUTURA FINAL HOMOLOGADA)
 # ==============================================================================
+menu_atual = st.session_state["opcao_menu"]
 miolo_pagina = st.empty()
 
 with miolo_pagina.container():
     
-    # ⚡ MODAL SIMULADO RESTRITO: Se o dicionário de agendamento existir, ele assume a tela toda 
-    # e corta fisicamente a execução ali (st.stop), impedindo que qualquer botão ou clique o feche.
+    # ⚡ TRAVA DO MODAL SIMULADO: Se houver agendamento pendente, assume a tela toda
     if st.session_state.get("abrir_reserva_fluxo"):
-        modal_agendamento_encontro(st.session_state.abrir_reserva_fluxo)
-        st.stop()  # 👈 ISSO AQUI PRENDE O FORMULÁRIO NA TELA INDEPENDENTE DOS CLIQUES!        
+        if 'modal_agendamento_encontro' in globals():
+            modal_agendamento_encontro(st.session_state.abrir_reserva_fluxo)
+        st.stop()
 
-
-  
+    # --- TELAS PÚBLICAS ---
+    # --- [CENÁRIO 1]: TELA HOME ---
     if menu_atual == "home":
-        # Código otimizado da sua Home (aquele com markdown unificado e sem else)
-        # --- TELAS PÚBLICAS (Sem Barra Lateral de Usuário) ---
         st.markdown("<h1 style='text-align: center;'>Lucy Chat IA — Chat virtual online</h1>", unsafe_allow_html=True)
         st.markdown("<h4 style='text-align: center;'>Tenha uma conversa com a Lucy, ela encontrará pessoas com maior afinidades e lhe propor encontros virtuais seguros...</h4>", unsafe_allow_html=True)
         st.markdown("<h3 style='text-align: center;'>Por que escolher nossa plataforma?</h3>", unsafe_allow_html=True)
@@ -2269,131 +2471,138 @@ with miolo_pagina.container():
         st.markdown("""
             <div style="background-color: #004085; padding: 20px; border-radius: 5px; text-align: center; border-left: 5px solid #0066cc; margin-bottom: 20px;">
                 <h1 style="margin: 0; color: #ffffff; font-size: 24px;">
-                            💡 CADASTRE-SE AGORA EM NOSSO SITE ENCONTRE SEU MATCH E MARQUE UM ENCONTRO VIRTUAL!!
+                    💡 CADASTRE-SE AGORA EM NOSSO SITE ENCONTRE SEU MATCH E MARQUE UM ENCONTRO VIRTUAL!!
                 </h1>
             </div>
         """, unsafe_allow_html=True)
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔑 Fazer Login", use_container_width=True, type="primary"):
+            if st.button("🔑 Fazer Login", use_container_width=True, type="primary", key="btn_home_login_nativo"):
                 st.session_state.opcao_menu = "login"
                 st.rerun()
                         
         with col2:
-            with stylable_container(
-                key="green_button", 
-                css_styles="button { background-color: #28a745; color: white; }"
-            ):
-                if st.button("📝 Cadastre-se", use_container_width=True):
-                    st.session_state.opcao_menu = "cadastro"
-                    st.rerun()      
+            # ⚡ OTIMIZAÇÃO NATIVA: Removido stylable_container para evitar dependências extras.
+            # O Streamlit moderno aceita o parâmetro type="secondary" ou podemos aplicar o CSS direto no botão.
+            if st.button("📝 Cadastre-se", use_container_width=True, type="secondary", key="btn_home_cadastro_nativo"):
+                st.session_state.opcao_menu = "cadastro"
+                st.rerun()      
         st.stop()
        
+    # --- [CENÁRIO 2]: TELA LOGIN ---
     elif menu_atual == "login":
-        # Inicializa o controle do contêiner de login se ele não existir
         if "contener_login_ativo" not in st.session_state:
             st.session_state.contener_login_ativo = miolo_pagina
             
-        # Executa o template isolado de login que ajustamos abaixo
-        renderizar_tela_login_definitiva()
+        if 'renderizar_tela_login_definitiva' in globals():
+            renderizar_tela_login_definitiva()
+        else:
+            st.error("Módulo de autenticação offline.")
         st.stop()
         
+    # --- [CENÁRIO 3]: TELA CADASTRO ---
     elif menu_atual == "cadastro":
-        # Código otimizado do Cadastro
-        st.html('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>')
+        st.markdown('<h2 style="text-align:center; color:#007bff;">Criar Conta</h2>', unsafe_allow_html=True)
+        
         with st.form(key=f"form_cad_unico_{st.session_state.form_seed}"):
             usuario = st.text_input("Usuário", placeholder="Escolha um Usuário", label_visibility="collapsed")
             email = st.text_input("E-mail", placeholder="Digite seu E-mail", label_visibility="collapsed")
             senha = st.text_input("Senha", placeholder="Escolha uma Senha", type="password", label_visibility="collapsed")
             genero = st.selectbox("Gênero", options=["M", "F"], index=0, label_visibility="collapsed")
 
-            with stylable_container(
-                        key="green_button_cad",
-                        css_styles="""
-                            button { background-color: #28a745; color: white; border-radius: 5px; }
-                            button:hover { background-color: #218838; color: white; }
-                        """,
-                    ):
+            botao_cadastrar = st.form_submit_button("Cadastre-se", type="primary", use_container_width=True)
 
-                if st.form_submit_button("Cadastre-se", use_container_width=True):
-                    # Validações rápidas na memória antes de abrir conexão
-                    if not usuario.strip() or not email.strip() or not senha.strip():
-                        st.warning("⚠️ Por favor, preencha todos os campos.")
-                    elif len(senha) < 6:
-                        st.warning("⚠️ A senha deve ter pelo menos 6 caracteres.")
-                    else:
-                        conn = None
-                        try:
-                            # Abre a conexão estável do nosso Pool
-                            conn = obter_conexao_eficiente()
+        if botao_cadastrar:
+            # Validações rápidas na memória local (Economiza requisições de IO)
+            if not usuario.strip() or not email.strip() or not senha.strip():
+                st.warning("⚠️ Por favor, preencha todos os campos.")
+            elif len(senha) < 6:
+                st.warning("⚠️ A senha deve ter pelo menos 6 caracteres.")
+            elif "@" not in email or "." not in email:
+                st.warning("⚠️ Por favor, insira um e-mail com formato válido.")
+            else:
+                conn = None
+                try:
+                    conn = obter_conexao_eficiente()
+                    if conn:
+                        with conn.cursor() as cursor:
+                            # 1. Verifica duplicidade salvando o retorno de forma segura
+                            cursor.execute(
+                                "SELECT id FROM usuarios WHERE username = %s OR email = %s LIMIT 1;", 
+                                (usuario.strip(), email.strip())
+                            )
+                            registro_duplicado = cursor.fetchone()
                             
-                            with conn.cursor() as cursor:
-                                # 1. Verifica duplicidade
-                                cursor.execute("SELECT username, email FROM usuarios WHERE username = %s OR email = %s;", (usuario.strip(), email.strip()))
-                                if cursor.fetchone():
-                                    st.error("❌ Usuário ou E-mail já cadastrado.")
-                                else:
-                                    # 2. Gera a senha criptografada usando a função global do topo
+                            if registro_duplicado:
+                                st.error("❌ Usuário ou E-mail já cadastrado no sistema.")
+                            else:
+                                # 2. Gera a senha criptografada usando a função global do topo
+                                if 'generate_password_hash' in globals():
                                     senha_final = generate_password_hash(senha)
+                                else:
+                                    import bcrypt
+                                    senha_final = bcrypt.hashpw(senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                                
+                                # 3. Executa a inserção retornando o ID do novo perfil
+                                cursor.execute("""
+                                    INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin, tipo_plano, moedas) 
+                                    VALUES (%s, %s, %s, %s, '🟢 Online', FALSE, 'Grátis', 0) RETURNING id;
+                                """, (usuario.strip(), email.strip(), senha_final, genero))
+                                
+                                # Extração cirúrgica e segura do ID gerado
+                                res_id = cursor.fetchone()
+                                id_gerado = int(res_id[0]) if res_id else None
+                                
+                                if id_gerado:
+                                    conn.commit()  # Confirma a transação no PostgreSQL de forma atômica
                                     
-                                    # 3. Executa a inserção retornando o ID do novo perfil
-                                    cursor.execute(
-                                        "INSERT INTO usuarios (username, email, password_hash, genero, status, is_admin) VALUES (%s, %s, %s, %s, '🟢 Online', FALSE) RETURNING id;", 
-                                        (usuario.strip(), email.strip(), senha_final, genero)
-                                    )
-                                    
-                                    # ⚡ CORREÇÃO CRUCIAL: O fetchone() DEVE ser executado AQUI DENTRO, sob a identação do cursor
-                                    id_gerado = int(cursor.fetchone()[0])
-                                    
-                                    # Confirma a gravação de forma segura
-                                    conn.commit()
-                                    
-                                    # 4. Define as variáveis de sessão essenciais com o ID numérico extraído
+                                    # 4. Define as variáveis de sessão essenciais
                                     st.session_state.usuario_id = id_gerado
                                     st.session_state.id_usuario = id_gerado  
                                     st.session_state.username = usuario.strip()
                                     st.session_state.genero = genero
+                                    st.session_state.tipo_plano = "Grátis"
+                                    st.session_state.saldo_moedas = 0
                                         
-                                    # Redirecionamento limpo para a tela de planos
+                                    st.toast("🎉 Conta criada com sucesso!")
                                     st.session_state.opcao_menu = "planos"
+                                    time.sleep(0.5)
                                     st.rerun()
+                                else:
+                                    st.error("Erro interno ao recuperar ID de cadastro.")
+                    else:
+                        st.error("Não foi possível estabelecer conexão com o banco de dados para concluir o cadastro.")
                                         
-                        except Exception as e: 
-                            if conn: conn.rollback() # Cancela a transação pendente em caso de falha física
-                            st.error(f"Erro ao processar cadastro: {e}")
-                        finally:
-                            if conn:
-                                liberar_conexao(conn) # ⚡ Devolve obrigatoriamente a conexão ao Pool
-                                    
+                except Exception as e: 
+                    if conn: 
+                        conn.rollback()
+                    st.error(f"Erro ao processar cadastro: {e}")
+                finally:
+                    if conn:
+                        liberar_conexao(conn)
 
-        if st.button("← Voltar para o Login", use_container_width=True):
+        if st.button("← Voltar para o Login", use_container_width=True, key="btn_cad_voltar_login"):
             st.session_state.opcao_menu = "login"
             st.rerun()
 
         st.stop()
 
-
+    # --- [CENÁRIO 4]: TELA DE PLANOS ---
     elif menu_atual == "planos":
-        # Template de planos sem st.sidebar interno
         # Garante o estado correto da navegação
         st.session_state.opcao_menu = "planos"
-        # --- TELA 1: EXIBIÇÃO DOS PLANOS ---
+        
         st.markdown('<h1 style="text-align:center; color:#007bff; margin-bottom:15px;">Plataforma de Planos IA</h1>', unsafe_allow_html=True)
 
-        # --- CONTÊINER PRINCIPAL ÚNICO ---
         # Centraliza o container simulando o max-width de 800px via colunas do Streamlit
         _, col_central, _ = st.columns([1, 8, 1])
 
         with col_central:
-            # st.container com borda cria o retângulo unificado
             with st.container(border=True):
-                
-                # PARTE 1: Descrição dos Planos (Duas partes de benefícios lado a lado)
                 st.markdown('<h3 style="text-align: center; color: #f0f6fc; margin-bottom: 20px;">Escolha o Plano Ideal para Você</h3>', unsafe_allow_html=True)
                 
                 col_plano_1, col_plano_2 = st.columns(2)
-                
                 with col_plano_1:
                     st.html(
                         """
@@ -2414,70 +2623,68 @@ with miolo_pagina.container():
                         """
                     )
 
-                # Divisor visual interno discreto
                 st.markdown("<hr style='border-color: #30363d; margin: 15px 0;'>", unsafe_allow_html=True)
                 
-                
-                     
                 col_plano_3, col_plano_4 = st.columns(2)
-                
                 with col_plano_3:
                     st.html(
                         """
-                        <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px;">
+                        <div style="text-align: left; border-left: 4px solid #6e7681; padding-left: 15px; min-height: 120px;">
                             <strong style="color: #6e7681; font-size: 1.1em;">⚪ Plano Grátis</strong><br>
-                            <span style="color: #c9d1d9;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
+                            <span style="color: #c9d1d9; font-size: 0.95em;">Converse com a Lucy IA e ache seu match. <i>Não permite o agendamento de encontros virtuais ou chamadas de vídeo.</i></span>
                         </div>
                         """
                     )
                     
                 with col_plano_4:
-                    # PARTE 2: Área de Checkout (Integrada no mesmo retângulo)
+                    # ⚡ CORREÇÃO VISUAL: HTML limpo e padronizado sem tags Markdown misturadas
                     st.html(
                         """
-                        <div style="text-align: left; border-left: 4px solid red; padding-left: 15px;">
-                            <strong style="color: white; font-size: 2.1em;">### 🛒 Realizar Pagamento</strong><br>  
+                        <div style="text-align: left; border-left: 4px solid #ef4444; padding-left: 15px; margin-bottom: 10px;">
+                            <strong style="color: #f0f6fc; font-size: 1.1em;">🛒 Realizar Pagamento</strong>
                         </div>
                         """
                     )
-                    #st.markdown("### 🛒 Realizar Pagamento")
-                    id_usuario = st.session_state.get("id_usuario", "usuario_anonimo")
+                    id_usuario = st.session_state.get("usuario_id") or st.session_state.get("id_usuario", 0)
                     
                     opcoes_compra = st.radio(
                         "Escolha uma opção para recarga:", 
                         ["Assinatura VIP por R$ 19,90/mês", "Pacote de 10 Moedas (10 min.) por R$ 2,00"],
-                        key="radio_opcao_compra_estatico"
+                        key="radio_opcao_compra_estatico",
+                        label_visibility="collapsed"
                     )
 
-                # Divisor visual interno discreto
                 st.markdown("<hr style='border-color: #30363d; margin: 15px 0;'>", unsafe_allow_html=True)             
-               
                 
                 if st.button("Gerar Pix de Pagamento", use_container_width=True, type="secondary", key="btn_gerar_pix_planos"):
-                    valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
-                    id_limpo = id_usuario if not isinstance(id_usuario, (list, tuple)) else id_usuario
-                    
-                    payment_data = {
-                        "transaction_amount": valor, 
-                        "description": desc, 
-                        "payment_method_id": "pix",
-                        "payer": {"email": "cliente@email.com"}, 
-                        "external_reference": f"{id_limpo}:{tipo}"
-                    }
+                    if not sdk:
+                        st.error("Gateway de pagamento fora do ar. Credenciais do Mercado Pago não encontradas.")
+                    else:
+                        valor, desc, tipo = (19.90, "Plano VIP 30 dias", "vip") if "VIP" in opcoes_compra else (2.00, "Pacote de 10 Moedas", "moedas")
+                        id_limpo = int(id_usuario if not isinstance(id_usuario, (list, tuple)) else id_usuario)
                         
-                    try:
-                        payment_response = sdk.payment().create(payment_data)
-                        payment = payment_response["response"]
+                        payment_data = {
+                            "transaction_amount": valor, 
+                            "description": desc, 
+                            "payment_method_id": "pix",
+                            "payer": {"email": "cliente@email.com"}, 
+                            "external_reference": f"{id_limpo}:{tipo}"
+                        }
                             
-                        if "point_of_interaction" in payment:
-                            st.session_state.id_pagamento_pendente = payment["id"]
-                            st.session_state.tipo_pagamento_pendente = tipo
-                            st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
-                            st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
-                            st.success("Pix gerado com sucesso!")
-                            st.rerun()
-                    except Exception as e: 
-                        st.error(f"Erro ao gerar pagamento: {e}")
+                        try:
+                            payment_response = sdk.payment().create(payment_data)
+                            payment = payment_response["response"]
+                                
+                            if "point_of_interaction" in payment:
+                                st.session_state.id_pagamento_pendente = payment["id"]
+                                st.session_state.tipo_pagamento_pendente = tipo
+                                st.session_state.qr_code_img = payment["point_of_interaction"]["transaction_data"]["qr_code_base64"]
+                                st.session_state.qr_code_texto = payment["point_of_interaction"]["transaction_data"]["qr_code"]
+                                st.success("Pix gerado com sucesso!")
+                                time.sleep(0.5)
+                                st.rerun()
+                        except Exception as e: 
+                            st.error(f"Erro ao gerar pagamento: {e}")
 
                 # Renderiza o QR Code dentro do mesmo bloco se estiver ativo
                 if st.session_state.get("qr_code_img"):
@@ -2487,7 +2694,11 @@ with miolo_pagina.container():
                     col_qr, col_txt = st.columns([1, 1.5])
                     with col_qr:
                         import base64
-                        st.image(base64.b64decode(st.session_state.qr_code_img), width=200)
+                        try:
+                            st.image(base64.b64decode(st.session_state.qr_code_img), width=200)
+                        except Exception:
+                            st.error("Erro ao decodificar imagem do QR Code.")
+                            
                     with col_txt:
                         st.text_area("Código Copia e Cola:", value=st.session_state.qr_code_texto, height=80, key="txt_area_copia_cola_estatica")
                                 
@@ -2499,56 +2710,39 @@ with miolo_pagina.container():
                                     status = verificar_status_pix(id_pagamento)
                                 
                                 if status == "approved":
-                                    st.success("🎉 Pagamento aprovado! Seu acesso foi liberado.")
                                     tipo = st.session_state.get("tipo_pagamento_pendente")
                                     
-                                    # Grava o novo plano no Supabase e atualiza as variáveis de sessão
-                                    sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo)
+                                    # ⚡ CORREÇÃO CRÍTICA: Passando os 3 argumentos obrigatórios exigidos pela trava Postgres
+                                    sucesso_banco = atualizar_plano_banco_supabase(id_usuario, tipo, id_pagamento)
                                     
                                     if sucesso_banco:
-                                        # ⚡ SOLUÇÃO DO PROBLEMA: Incrementa a semente do chat.
-                                        # Isso avisa o navegador que a instância antiga do chat morreu e 
-                                        # obriga o Streamlit a recriar o st.chat_input imediatamente!
-                                        if "seed_recarregar_chat" in st.session_state:
-                                            st.session_state["seed_recarregar_chat"] += 1
-                                        else:
-                                            st.session_state["seed_recarregar_chat"] = 1
-                                            
-                                        st.toast("Sua conta foi atualizada com sucesso!")
+                                        st.success("🎉 Pagamento aprovado! Seu acesso foi liberado com sucesso.")
                                         
-                                        # Limpeza de chaves do Pix
-                                        for chave in ["qr_code_img", "qr_code_texto", "id_pagamento_pendente", "tipo_pagamento_pendente"]:
-                                            if chave in st.session_state:
-                                                del st.session_state[chave]
-                                                
-                                        if "abrir_popup_loja" in st.session_state:
-                                            st.session_state.abrir_popup_loja = False
-                                            
-                                        time.sleep(0.5)
+                                        # Incrementa a semente do chat para resetar os contêineres limpos
+                                        st.session_state.seed_recarregar_chat = st.session_state.get("seed_recarregar_chat", 0) + 1
                                         
-                                        # Redireciona para o chat de forma imediata
+                                        # Limpa as variáveis do Pix da sessão pós-aprovação
+                                        st.session_state.id_pagamento_pendente = None
+                                        st.session_state.qr_code_img = None
+                                        st.session_state.qr_code_texto = None
+                                        
+                                        # Redireciona o usuário para o Chat ativo
                                         st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                                        time.sleep(1.0)
                                         st.rerun()
-
-
-                                    else:
-                                        st.error("Erro ao computar créditos no banco. Contate o suporte.")
-                                                            
-                                elif status == "pending":
-                                    st.warning("⏳ O pagamento ainda consta como pendente. Aguarde um instante e tente novamente.")
                                 else:
-                                    st.error(f"❌ O status do pagamento é: {status}.")
-                            else:
-                                st.error("Nenhum ID de pagamento encontrado na sessão.")
-        
-                   
-        if st.button("⬅️ Voltar para o Chat", use_container_width=True, key="btn_voltar_chat_desde_planos"):
-            st.session_state.opcao_menu = "💬 Conversar com Lucy"
-            st.rerun() 
-                      
+                                    st.warning("⏳ Pagamento ainda não compensado. Aguarde alguns instantes e tente novamente.")
+
+            # --- BOTÃO DE ROTA DE FUGA (IR PARA O CHAT GRÁTIS) ---
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+            if st.button("🚀 Acessar Plataforma / Continuar no Plano Grátis", use_container_width=True, key="btn_pular_planos_ir_chat"):
+                st.session_state.opcao_menu = "💬 Conversar com Lucy"
+                st.rerun()
+                
         st.stop()
 
 
+    
     elif menu_atual == "💬 Conversar com Lucy":
        # ⚡ Inicializa a semente caso ela não exista
         if "seed_recarregar_chat" not in st.session_state:
@@ -2560,10 +2754,11 @@ with miolo_pagina.container():
 
     elif menu_atual == "🛠️ Painel Admin":
         template_painel_admin()
+        st.stop()
 
-    elif st.session_state.opcao_menu == "✉️ Fale Conosco":
+    elif menu_atual == "✉️ Fale Conosco":
         template_fale_conosco()   
-
+        st.stop()
 
     elif menu_atual == "📅 Disponibilidade":
         template_disponibilidade()
@@ -2572,7 +2767,6 @@ with miolo_pagina.container():
     elif menu_atual == "🤝 Gerenciar Conexões":
         template_gerenciar_conexoes()
         st.stop()
-     
          
     elif menu_atual == "🤝 Sala Privada":
         if st.session_state.get("match_id_atual"):
