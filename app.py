@@ -1426,13 +1426,14 @@ def template_gerenciar_conexoes():
                             else: 
                                 st.info("📆 Convite Aceito") 
 
-        # Histórico de encontros passados 
-        st.markdown("### 🕒 Histórico de Convites Recusados ou Passados", unsafe_allow_html=True) 
-        if not encontros_passados: 
-            st.caption("Nenhum histórico disponível.") 
-        else: 
-            for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados: 
-                parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize() 
+        # Histórico de encontros passados
+        st.markdown("### 🕒 Histórico de Convites Recusados ou Passados", unsafe_allow_html=True)
+
+        if not encontros_passados:
+            st.caption("Nenhum histórico disponível.")
+        else:
+            for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados:
+                parceiro_limpo = str(parceiro_nome).split("@")[0].capitalize()
                 st.text(f"⚪ Encontro com {parceiro_limpo} ({dia} às {str(hora)[:5]}) - Status: {status.upper()}") 
 
 
