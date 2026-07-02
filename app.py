@@ -523,11 +523,22 @@ def renderizar_tela_login_definitiva():
                         )
                         res = cursor.fetchone()
                                       
-                        # --- AGORA FORA DO WITH (As variáveis locais estão seguras na memória) ---
                         if res:
-                            # Validação usando a função de Hash global
-                            if not check_password_hash(banco_password_hash, str(pass_in)):
-                                st.error("Senha incorreta. Tente novamente.")
+                        # Guardamos tudo em variáveis locais seguras antes que o cursor feche no final do 'with'
+                        banco_id = res[0]
+                        banco_username = res[1]
+                        banco_foto = res[2]
+                        banco_admin = res[3]
+                        banco_genero = res[4]
+                        banco_plano = res[5]
+                        banco_moedas = res[6]
+                        banco_password_hash = res[7]
+                
+                    # --- AGORA FORA DO WITH (O cursor fechou, mas as variáveis locais estão seguras na memória) ---
+                    if res:
+                        # Validação usando a função de Hash global
+                        if not check_password_hash(banco_password_hash, str(pass_in)):
+                            st.error("Senha incorreta. Tente novamente.")
                             else:
                                 # CONFIGURAÇÃO DE SESSÃO UNIFICADA
                                 id_numerico = int(banco_id)
