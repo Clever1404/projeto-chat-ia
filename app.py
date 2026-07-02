@@ -1404,8 +1404,8 @@ def template_gerenciar_conexoes():
                                 st.error(f"Erro ao cancelar: {e_up}") 
                             finally: 
                                 if conn_up: liberar_conexao(conn_up) 
-                            else: 
-                                st.info("📆 Convite Aceito") 
+                                else: 
+                                    st.info("📆 Convite Aceito") 
 
         # Histórico de encontros passados
         st.markdown("### 🕒 Histórico de Convites Recusados ou Passados", unsafe_allow_html=True)
