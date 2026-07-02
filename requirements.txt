@@ -13,3 +13,4 @@ supabase
 mercadopago
 supabase>=2.0.0
 bcrypt
+plotly
