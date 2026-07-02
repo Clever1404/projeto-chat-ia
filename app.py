@@ -1401,7 +1401,7 @@ def template_gerenciar_conexoes():
                                         st.rerun() 
                             except Exception as e_up: 
                                 if conn_up: conn_up.rollback() 
-                                    st.error(f"Erro ao cancelar: {e_up}") 
+                                st.error(f"Erro ao cancelar: {e_up}") 
                             finally: 
                                 if conn_up: liberar_conexao(conn_up) 
                             else: 
