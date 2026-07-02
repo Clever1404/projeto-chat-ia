@@ -1406,36 +1406,34 @@ def template_gerenciar_conexoes():
                                 finally:
                                     if conn_up: liberar_conexao(conn_up)
 
-elif status == 'pendente' and eu_enviei: 
-if st.button("🚫 Cancelar", key=f"btn_canc_{ag_id}", type="secondary", use_container_width=True): 
-conn_up = None 
-try: 
-conn_up = obter_conexao_eficiente() 
-if conn_up: 
-with conn_up.cursor() as cursor_up: 
-cursor_up.execute("UPDATE agendamentos_virtuais SET status_convite = 'cancelado' WHERE id = %s;", (int(ag_id),)) 
-conn_up.commit() 
-st.toast("Convite cancelado.") 
-time.sleep(0.5) 
-st.rerun() 
-except Exception as e_up: 
-if conn_up: conn_up.rollback() 
-st.error(f"Erro ao cancelar: {e_up}") 
-finally: 
-if conn_up: liberar_conexao(conn_up) 
-else: 
-st.info("📆 Convite Aceito") 
+                            elif status == 'pendente' and eu_enviei: 
+                                if st.button("🚫 Cancelar", key=f"btn_canc_{ag_id}", type="secondary", use_container_width=True): 
+                                    conn_up = None 
+                            try: 
+                                conn_up = obter_conexao_eficiente() 
+                                if conn_up: 
+                                    with conn_up.cursor() as cursor_up: 
+                                        cursor_up.execute("UPDATE agendamentos_virtuais SET status_convite = 'cancelado' WHERE id = %s;", (int(ag_id),)) 
+                                        conn_up.commit() 
+                                        st.toast("Convite cancelado.") 
+                                        time.sleep(0.5) 
+                                        st.rerun() 
+                            except Exception as e_up: 
+                                if conn_up: conn_up.rollback() 
+                                    st.error(f"Erro ao cancelar: {e_up}") 
+                            finally: 
+                                if conn_up: liberar_conexao(conn_up) 
+                            else: 
+                                st.info("📆 Convite Aceito") 
 
-# Histórico de encontros passados 
-st.markdown(" 
-### 🕒 Histórico de Convites Recusados ou Passados", unsafe_allow_html=True) 
-if not encontros_passados: 
-st.caption("Nenhum histórico disponível.") 
-else: 
-for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados: 
-parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize() 
-st.text(f"⚪ Encontro com {parceiro_limpo} ({dia} às {str(hora)[:5]}) - Status: {status.upper()}") 
-
+        # Histórico de encontros passados 
+        st.markdown("### 🕒 Histórico de Convites Recusados ou Passados", unsafe_allow_html=True) 
+        if not encontros_passados: 
+            st.caption("Nenhum histórico disponível.") 
+        else: 
+            for ag_id, dia, per, hora, status, rem_id, parceiro_nome, m_id in encontros_passados: 
+                parceiro_limpo = str(parceiro_nome).split('@')[0].capitalize() 
+                st.text(f"⚪ Encontro com {parceiro_limpo} ({dia} às {str(hora)[:5]}) - Status: {status.upper()}") 
 
 
 
