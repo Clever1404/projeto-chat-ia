@@ -1575,17 +1575,26 @@ def limpar_historico_sala(match_id):
 
 
 
-@st.fragment(run_every=3.0)  # Auto-refresh de mensagens a cada 3 segundos
-def renderizar_mensagens_sala_privada(match_id, meu_id):
+@st.fragment(run_every=3.0)  # Auto-refresh de mensagens a cada 3 segundos funciona perfeitamente agora
+def renderizar_mensagens_sala_privada(): # 💡 REMOVIDOS OS ARGUMENTOS DAQUI
+    # 💡 Buscamos direto do estado da sessão de forma limpa e segura
+    match_id = st.session_state.get("match_id_atual")
+    meu_id = st.session_state.get("usuario_id")
+    
+    # Validação de segurança caso o usuário não esteja devidamente logado ou na sala
+    if not match_id or not meu_id:
+        st.warning("Seção expirada ou sala não encontrada.")
+        return
+
     mensagens = buscar_mensagens(match_id)
     
-    # Janela com rolagem integrada
-    caixa_chat = st.container(height=400, border=False)
-    with caixa_chat:
-        for remetente_id, conteudo, criado_em in mensagens:
-            eu_enviei = (int(remetente_id) == int(meu_id))
-            with st.chat_message("user" if eu_enviei else "assistant"):
-                st.markdown(conteudo)
+    # # Janela com rolagem integrada
+    # caixa_chat = st.container(height=400, border=False)
+    # with caixa_chat:
+    #     for remetente_id, conteudo, criado_em in mensagens:
+    #         eu_enviei = (int(remetente_id) == int(meu_id))
+    #         with st.chat_message("user" if eu_enviei else "assistant"):
+    #             st.markdown(conteudo)
     
     st.markdown("""
         <style>
@@ -1692,29 +1701,6 @@ def renderizar_mensagens_sala_privada(match_id, meu_id):
                 pass   
         st.divider()
 
-
-        # ==============================================================================
-        # CONTAINER DE COMPOSIÇÃO DA SALA PRIVADA (INTEGRAÇÃO COMPLETA)
-        # ==============================================================================
-        # Cole este trecho exatamente onde começava o "# CONTAINER DE MENSAGENS" no bloco anterior:
-
-        # 1. Invoca o sub-fragmento dinâmico de leitura assíncrona
-        renderizar_miolo_mensagens_sala(match_id, meu_id, parceiro_nome)
-
-        # 2. Formulário nativo rápido de envio (Fixo na tela, imune a resets de tempo)
-        with st.form(key="form_enviar_msg_sala", clear_on_submit=True):
-            col_txt, col_btn = st.columns([4, 1])
-            with col_txt:
-                texto_msg = st.text_input(label="Mensagem", placeholder="Digite uma mensagem...", label_visibility="collapsed", key="txt_msg_sala_input")
-            with col_btn:
-                botao_enviar = st.form_submit_button("Enviar", use_container_width=True)
-                
-            if botao_enviar and texto_msg.strip():
-                enviar_mensagem(match_id, meu_id, texto_msg)
-                # Força o refresh instantâneo da tela de mensagens pós-envio
-                st.rerun(scope="fragment")
-
-
         # ==============================================================================
         # CONTAINER DE MENSAGENS (MIOLO DO CHAT DA SALA PRIVADA)
         # ==============================================================================
@@ -1762,41 +1748,6 @@ def renderizar_mensagens_sala_privada(match_id, meu_id):
                 enviar_mensagem(match_id, meu_id, texto_msg)
                 st.rerun(scope="fragment") # Recarrega apenas as mensagens, eliminando o travamento de fundo
 
-
-# ==============================================================================
-# SUB-FRAGMENTO ULTRA-RÁPIDO: ATUALIZADOR AUTOMÁTICO DE MENSAGENS (3s)
-# ==============================================================================
-# ⚡ OTIMIZAÇÃO CRÍTICA: Esse bloco se atualiza sozinho a cada 3 segundos.
-# Ele busca novas mensagens do parceiro sem apagar o texto que o usuário está digitando embaixo!
-@st.fragment(run_every=3.0)
-def renderizar_miolo_mensagens_sala(match_id, meu_id, parceiro_name):
-    with st.container(height=380, border=True):
-        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-        mensagens = buscar_mensagens(match_id) 
-        
-        for msg in mensagens:
-            r_id = msg[0]
-            conteudo = msg[1]
-            criado_em_bruto = msg[2]
-            
-            horario = ""
-            if criado_em_bruto:
-                try:
-                    if isinstance(criado_em_bruto, (tuple, list)) and len(criado_em_bruto) > 0:
-                        criado_em_bruto = criado_em_bruto[0]
-                    
-                    dt_objeto = pd.to_datetime(criado_em_bruto)
-                    horario = dt_objeto.strftime("%H:%M")
-                except Exception:
-                    horario = ""
-
-            # Renderização das bolhas HTML baseadas no remetente
-            if str(r_id) == str(meu_id):
-                st.markdown(f'<div class="msg-bubble msg-meu"><div class="msg-autor">Você</div><div>{conteudo}</div><div class="msg-tempo">{horario}</div></div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="msg-bubble msg-parceiro"><div class="msg-autor">{parceiro_name}</div><div>{conteudo}</div><div class="msg-tempo">{horario}</div></div>', unsafe_allow_html=True)
-                
-        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ==============================================================================
@@ -2761,7 +2712,7 @@ with miolo_pagina.container():
          
     elif menu_atual == "🤝 Sala Privada":
         if st.session_state.get("match_id_atual"):
-            template_sala_privada()
+            renderizar_mensagens_sala_privada()
         else:
             st.warning("Nenhuma sala ativa.")
             st.session_state.opcao_menu = "💬 Conversar com Lucy"
